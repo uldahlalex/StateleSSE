@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@plugin "daisyui";
+@plugin "daisyui" {
+    themes: all;
+}
+
+.btn-game {
+  @apply btn btn-lg font-bold text-white transition-transform hover:scale-105;
+}
+
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-xl hover:-translate-y-1;
+}
+
+.quiz-option {
+  @apply btn btn-lg btn-outline w-full justify-start text-left h-auto min-h-[4rem] whitespace-normal;
+}
+
+.quiz-option.selected {
+  @apply btn-primary;
+}
+
+.quiz-option.correct {
+  @apply btn-success;
+}
+
+.quiz-option.incorrect {
+  @apply btn-error;
+}

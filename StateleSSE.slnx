@@ -1,0 +1,11 @@
+<Solution>
+    <Project Path="StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" Type="Classic C#" />
+    <Project Path="StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" Type="Classic C#" />
+    <Folder Name="/StateleSSE.ExampleApp/" >
+        <Project Path="StateleSSE.ExampleApp/server/api/api.csproj" Type="Classic C#" />
+        <Project Path="StateleSSE.ExampleApp/server/dataaccess/dataaccess.csproj" Type="Classic C#" />
+        <Project Path="StateleSSE.ExampleApp/server/mqtt/mqtt.csproj" Type="Classic C#" />
+        <Project Path="StateleSSE.ExampleApp/server/tests/tests.csproj" Type="Classic C#" />
+    </Folder>
+
+</Solution>

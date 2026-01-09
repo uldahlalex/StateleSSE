@@ -1,0 +1,31 @@
+Aktuelt:
+- tests
+- fungerer hangfire fint med det nye layout og forstår jeg det fuldt?
+    - er der en dev / prod forskel?
+- 
+
+
+- hvordan kan man få et nogenlunde test miljø for cosumer appen som også tester broadcasts?
+    - kan måske nøjes med at teste interceptoren således jeg kan lave en service insert og interceptoren laver resten
+        - vil consumer applikationer så rent faktisk kunne skrive testen?
+
+- Queryable extensions til nuget?
+- code first
+- ms identity + builtin token validation
+- ny readme til 2-nuget modellen
+
+__________
+
+Til undervisningsforberedelse:
+
+
+- Lave et heat pump system?
+    - 
+
+- Lav projekt 1: Kahoot clone (week 8)
+- Exam project: The imaginary IoT project (skal påbegyndes meget tidligt)
+    - the digital weather station
+    - the home heating system
+        - X termostater(data observeres i app?) og en varmepumpe (styres via en app) 
+
+https://docs.google.com/spreadsheets/d/1rbADoBdBfhDFX5m0Qzr-3gojBILjmoehnPAQorXnk9w/edit?gid=0#gid=0

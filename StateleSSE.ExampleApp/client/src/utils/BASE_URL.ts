@@ -1,0 +1,1 @@
+export const BASE_URL = import.meta.env.PROD ? "https://kahoot.fly.dev" : "http://localhost:5000";

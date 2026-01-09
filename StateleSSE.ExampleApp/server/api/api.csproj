@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup Condition="Exists('../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
+        <ProjectReference Include="../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
+    </ItemGroup>
+    <ItemGroup Condition="!Exists('../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
+        <PackageReference Include="StateleSSE.AspNetCore" Version="*" />
+    </ItemGroup>
+    <ItemGroup Condition="Exists('../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
+        <ProjectReference Include="../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="!Exists('../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
+        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />
+    </ItemGroup>
+    
+    
+    <ItemGroup>
+        <ProjectReference Include="..\dataaccess\dataaccess.csproj" />
+        <ProjectReference Include="..\mqtt\mqtt.csproj" />
+        <ProjectReference Include="..\..\..\..\EF.Utilities\EF.Utilities.csproj" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <PackageReference Include="Hangfire.AspNetCore" Version="1.8.22" />
+        <PackageReference Include="Hangfire.PostgreSql" Version="1.20.13" />
+        <PackageReference Include="JWT" Version="11.0.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+        <PackageReference Include="NSwag.AspNetCore" Version="14.6.3" />
+        <PackageReference Include="NSwag.CodeGeneration.TypeScript" Version="14.6.3" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.3.1" />
+    </ItemGroup>
+
+</Project>

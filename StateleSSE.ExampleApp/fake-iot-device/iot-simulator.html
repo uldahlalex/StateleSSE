@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Station IoT Simulator</title>
+    <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .connection-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .connection-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-connect {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-connect:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-connect:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-disconnect {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-disconnect:hover {
+            background: #da190b;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #4CAF50;
+        }
+
+        .status.disconnected {
+            background: #f44336;
+        }
+
+        .stations-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .station {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .station-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .station-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .station-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-toggle {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+
+        .station.active .btn-toggle {
+            background: #f44336;
+        }
+
+        .station.inactive .btn-toggle {
+            background: #4CAF50;
+        }
+
+        .visualization {
+            height: 200px;
+            position: relative;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .device {
+            position: absolute;
+            bottom: 20px;
+            left: 50px;
+            font-size: 3rem;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+        }
+
+        .satellite {
+            position: absolute;
+            top: 20px;
+            right: 50px;
+            font-size: 2rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .beam {
+            position: absolute;
+            width: 4px;
+            height: 0;
+            background: linear-gradient(to top, transparent, #00ff00);
+            animation: beam-shoot 2s ease-out infinite;
+            opacity: 0;
+        }
+
+        @keyframes beam-shoot {
+            0% {
+                bottom: 70px;
+                left: 80px;
+                height: 0;
+                opacity: 1;
+            }
+            50% {
+                height: 120px;
+                opacity: 0.8;
+            }
+            100% {
+                height: 140px;
+                opacity: 0;
+            }
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .metric {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .config {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .config-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.9rem;
+        }
+
+        .logs {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-time {
+            color: #4CAF50;
+            margin-right: 10px;
+        }
+
+        .log-station {
+            color: #2196F3;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .station-1 { border-left: 4px solid #FF6B6B; }
+        .station-1 .metric { border-left-color: #FF6B6B; }
+        .station-1 .beam { background: linear-gradient(to top, transparent, #FF6B6B); }
+
+        .station-2 { border-left: 4px solid #4ECDC4; }
+        .station-2 .metric { border-left-color: #4ECDC4; }
+        .station-2 .beam { background: linear-gradient(to top, transparent, #4ECDC4); }
+
+        .station.inactive {
+            opacity: 0.5;
+        }
+
+        .station.inactive .beam {
+            animation: none;
+        }
+
+        .btn-send {
+            background: #2196F3;
+            color: white;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-send:hover {
+            background: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌤️ Weather Station IoT Simulator</h1>
+
+        <div class="connection-panel">
+            <div class="connection-form">
+                <div class="form-group">
+                    <label>MQTT Broker (WebSocket)</label>
+                    <input type="text" id="brokerUrl" placeholder="wss://eb98bdd7215141a7a9ae47cf1b77e5ee.s2.eu.hivemq.cloud:8884/mqtt" value="wss://eb98bdd7215141a7a9ae47cf1b77e5ee.s2.eu.hivemq.cloud:8884/mqtt">
+                </div>
+                <div class="form-group">
+                    <label>Username (optional)</label>
+                    <input type="text" id="username" placeholder="username">
+                </div>
+                <div class="form-group">
+                    <label>Password (optional)</label>
+                    <input type="password" id="password" placeholder="password">
+                </div>
+                <div class="form-group">
+                    <button id="connectBtn" class="btn-connect">Connect</button>
+                </div>
+                <div class="form-group">
+                    <span class="status disconnected" id="status">Disconnected</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stations-container">
+            <!-- Station 1 -->
+            <div class="station station-1 inactive" data-station="1">
+                <div class="station-header">
+                    <div class="station-title">🏔️ Alpine Station North</div>
+                    <div class="station-controls">
+                        <button class="btn-toggle" onclick="toggleStation(1)">Start</button>
+                    </div>
+                </div>
+
+                <div class="visualization">
+                    <div class="device">📡</div>
+                    <div class="satellite">🛰️</div>
+                    <div class="beam"></div>
+                    <div class="beam" style="animation-delay: 0.5s;"></div>
+                    <div class="beam" style="animation-delay: 1s;"></div>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-label">🌡️ Temperature</div>
+                        <div class="metric-value" id="temp-1">--°C</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">💧 Humidity</div>
+                        <div class="metric-value" id="humidity-1">--%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">🎈 Pressure</div>
+                        <div class="metric-value" id="pressure-1">-- hPa</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">📊 Messages Sent</div>
+                        <div class="metric-value" id="count-1">0</div>
+                    </div>
+                </div>
+
+                <div class="config">
+                    <div class="config-title">⚙️ Configuration</div>
+                    <div class="config-item">
+                        <span>Station ID:</span>
+                        <span>alpine-north-001</span>
+                    </div>
+                    <div class="config-item">
+                        <span>Interval:</span>
+                        <span id="interval-1">5s</span>
+                    </div>
+                    <div class="config-item">
+                        <span>Status:</span>
+                        <span id="status-1">Inactive</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Station 2 -->
+            <div class="station station-2 inactive" data-station="2">
+                <div class="station-header">
+                    <div class="station-title">🏖️ Coastal Station South</div>
+                    <div class="station-controls">
+                        <button class="btn-toggle" onclick="toggleStation(2)">Start</button>
+                    </div>
+                </div>
+
+                <div class="visualization">
+                    <div class="device">📡</div>
+                    <div class="satellite">🛰️</div>
+                    <div class="beam"></div>
+                    <div class="beam" style="animation-delay: 0.5s;"></div>
+                    <div class="beam" style="animation-delay: 1s;"></div>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-label">🌡️ Temperature</div>
+                        <div class="metric-value" id="temp-2">--°C</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">💧 Humidity</div>
+                        <div class="metric-value" id="humidity-2">--%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">🎈 Pressure</div>
+                        <div class="metric-value" id="pressure-2">-- hPa</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">📊 Messages Sent</div>
+                        <div class="metric-value" id="count-2">0</div>
+                    </div>
+                </div>
+
+                <div class="config">
+                    <div class="config-title">⚙️ Configuration</div>
+                    <div class="config-item">
+                        <span>Station ID:</span>
+                        <span>coastal-south-002</span>
+                    </div>
+                    <div class="config-item">
+                        <span>Interval:</span>
+                        <span id="interval-2">5s</span>
+                    </div>
+                    <div class="config-item">
+                        <span>Status:</span>
+                        <span id="status-2">Inactive</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="logs">
+            <h3 style="margin-bottom: 15px;">📋 Activity Logs</h3>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        let client = null;
+        let stations = {
+            1: {
+                id: 'alpine-north-001',
+                active: false,
+                interval: 5000,
+                timer: null,
+                count: 0,
+                baseTemp: -5,
+                baseHumidity: 75,
+                basePressure: 950
+            },
+            2: {
+                id: 'coastal-south-002',
+                active: false,
+                interval: 5000,
+                timer: null,
+                count: 0,
+                baseTemp: 22,
+                baseHumidity: 65,
+                basePressure: 1013
+            }
+        };
+
+        const TOPIC_DATA = 'weather/data';
+        const TOPIC_PREFERENCES = 'weather/preferences';
+
+        // Connect to MQTT broker
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            const brokerUrl = document.getElementById('brokerUrl').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!brokerUrl) {
+                alert('Please enter a broker URL');
+                return;
+            }
+
+            const options = {
+                clean: true,
+                connectTimeout: 4000,
+            };
+
+            if (username) options.username = username;
+            if (password) options.password = password;
+
+            addLog('SYSTEM', 'Connecting to ' + brokerUrl);
+
+            try {
+                client = mqtt.connect(brokerUrl, options);
+
+                client.on('connect', () => {
+                    addLog('SYSTEM', 'Connected to MQTT broker ✓');
+                    document.getElementById('status').textContent = 'Connected';
+                    document.getElementById('status').className = 'status connected';
+                    document.getElementById('connectBtn').disabled = true;
+
+                    // Subscribe to preferences topic
+                    client.subscribe(TOPIC_PREFERENCES, (err) => {
+                        if (!err) {
+                            addLog('SYSTEM', 'Subscribed to ' + TOPIC_PREFERENCES);
+                        }
+                    });
+                });
+
+                client.on('error', (err) => {
+                    addLog('ERROR', 'Connection error: ' + err.message);
+                });
+
+                client.on('message', (topic, message) => {
+                    if (topic === TOPIC_PREFERENCES) {
+                        handlePreferencesUpdate(message.toString());
+                    }
+                });
+
+                client.on('close', () => {
+                    addLog('SYSTEM', 'Disconnected from broker');
+                    document.getElementById('status').textContent = 'Disconnected';
+                    document.getElementById('status').className = 'status disconnected';
+                    document.getElementById('connectBtn').disabled = false;
+                });
+            } catch (err) {
+                addLog('ERROR', 'Failed to connect: ' + err.message);
+            }
+        });
+
+        function toggleStation(stationNum) {
+            const station = stations[stationNum];
+            station.active = !station.active;
+
+            const stationEl = document.querySelector(`.station[data-station="${stationNum}"]`);
+            const btn = stationEl.querySelector('.btn-toggle');
+            const statusEl = document.getElementById(`status-${stationNum}`);
+
+            if (station.active) {
+                stationEl.classList.remove('inactive');
+                stationEl.classList.add('active');
+                btn.textContent = 'Stop';
+                statusEl.textContent = 'Active';
+                addLog(station.id, 'Started sending data');
+                sendWeatherData(stationNum);
+                station.timer = setInterval(() => sendWeatherData(stationNum), station.interval);
+            } else {
+                stationEl.classList.remove('active');
+                stationEl.classList.add('inactive');
+                btn.textContent = 'Start';
+                statusEl.textContent = 'Inactive';
+                addLog(station.id, 'Stopped');
+                clearInterval(station.timer);
+            }
+        }
+
+        function sendWeatherData(stationNum) {
+            if (!client || !client.connected) {
+                addLog('ERROR', 'Not connected to broker');
+                return;
+            }
+
+            const station = stations[stationNum];
+
+            // Simulate realistic weather fluctuations
+            const temperature = station.baseTemp + (Math.random() - 0.5) * 4;
+            const humidity = station.baseHumidity + (Math.random() - 0.5) * 10;
+            const pressure = station.basePressure + (Math.random() - 0.5) * 20;
+
+            const data = {
+                StationId: station.id,
+                Temperature: parseFloat(temperature.toFixed(1)),
+                Humidity: parseFloat(humidity.toFixed(1)),
+                Pressure: parseFloat(pressure.toFixed(1)),
+                Timestamp: new Date().toISOString()
+            };
+
+            client.publish(TOPIC_DATA, JSON.stringify(data), { qos: 1 }, (err) => {
+                if (!err) {
+                    station.count++;
+                    updateStationUI(stationNum, data);
+                    addLog(station.id, `Sent: ${temperature.toFixed(1)}°C, ${humidity.toFixed(1)}%, ${pressure.toFixed(1)} hPa`);
+                } else {
+                    addLog('ERROR', 'Failed to publish: ' + err.message);
+                }
+            });
+        }
+
+        function updateStationUI(stationNum, data) {
+            document.getElementById(`temp-${stationNum}`).textContent = data.Temperature + '°C';
+            document.getElementById(`humidity-${stationNum}`).textContent = data.Humidity + '%';
+            document.getElementById(`pressure-${stationNum}`).textContent = data.Pressure + ' hPa';
+            document.getElementById(`count-${stationNum}`).textContent = stations[stationNum].count;
+        }
+
+        function handlePreferencesUpdate(message) {
+            try {
+                const prefs = JSON.parse(message);
+                addLog('PREFERENCES', `Received update for ${prefs.StationId}: ${prefs.IntervalSeconds}s`);
+
+                // Find which station this applies to
+                for (let num in stations) {
+                    if (stations[num].id === prefs.StationId) {
+                        const oldInterval = stations[num].interval;
+                        stations[num].interval = prefs.IntervalSeconds * 1000;
+                        document.getElementById(`interval-${num}`).textContent = prefs.IntervalSeconds + 's';
+
+                        // If active, restart with new interval
+                        if (stations[num].active) {
+                            clearInterval(stations[num].timer);
+                            stations[num].timer = setInterval(() => sendWeatherData(num), stations[num].interval);
+                        }
+
+                        addLog(stations[num].id, `Interval updated: ${oldInterval/1000}s → ${prefs.IntervalSeconds}s`);
+                    }
+                }
+            } catch (err) {
+                addLog('ERROR', 'Failed to parse preferences: ' + err.message);
+            }
+        }
+
+        function addLog(source, message) {
+            const logsDiv = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-station">${source}</span>${message}`;
+            logsDiv.insertBefore(entry, logsDiv.firstChild);
+
+            // Keep only last 50 logs
+            while (logsDiv.children.length > 50) {
+                logsDiv.removeChild(logsDiv.lastChild);
+            }
+        }
+
+        // Auto-scroll logs
+        const logsDiv = document.getElementById('logs');
+        const observer = new MutationObserver(() => {
+            logsDiv.scrollTop = 0;
+        });
+        observer.observe(logsDiv, { childList: true });
+    </script>
+</body>
+</html>
