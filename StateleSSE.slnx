@@ -1,11 +1,14 @@
 <Solution>
     <Project Path="StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" Type="Classic C#" />
     <Project Path="StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" Type="Classic C#" />
-    <Folder Name="/StateleSSE.ExampleApp/" >
-        <Project Path="StateleSSE.ExampleApp/server/api/api.csproj" Type="Classic C#" />
-        <Project Path="StateleSSE.ExampleApp/server/dataaccess/dataaccess.csproj" Type="Classic C#" />
-        <Project Path="StateleSSE.ExampleApp/server/mqtt/mqtt.csproj" Type="Classic C#" />
-        <Project Path="StateleSSE.ExampleApp/server/tests/tests.csproj" Type="Classic C#" />
+    <Folder Name="/ExampleApp.Kahoot/" >
+        <Project Path="ExampleApp.Kahoot/server/api/api.csproj" Type="Classic C#" />
+        <Project Path="ExampleApp.Kahoot/server/dataaccess/dataaccess.csproj" Type="Classic C#" />
+        <Project Path="ExampleApp.Kahoot/server/mqtt/mqtt.csproj" Type="Classic C#" />
+        <Project Path="ExampleApp.Kahoot/server/tests/tests.csproj" Type="Classic C#" />
+    </Folder>
+    <Folder Name="/ExampleApp.Chat/" >
+        <Project Path="ExampleApp.Chat/server/server.csproj" Type="Classic C#" />
     </Folder>
 
 </Solution>

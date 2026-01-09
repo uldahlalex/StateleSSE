@@ -6,20 +6,20 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-    <ItemGroup Condition="Exists('../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
-        <ProjectReference Include="../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
+    <ItemGroup Condition="Exists('../../../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
+        <ProjectReference Include="../../../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
     </ItemGroup>
-    <ItemGroup Condition="!Exists('../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
-        <PackageReference Include="StateleSSE.AspNetCore" Version="*" />
-    </ItemGroup>
-    <ItemGroup Condition="Exists('../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <ProjectReference Include="../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
+<!--    <ItemGroup Condition="!Exists('../../../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">-->
+<!--        <PackageReference Include="StateleSSE.AspNetCore" Version="*" />-->
+<!--    </ItemGroup>-->
+    <ItemGroup Condition="Exists('../../../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
+        <ProjectReference Include="../../../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
     </ItemGroup>
 
-    <ItemGroup Condition="!Exists('../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />
-    </ItemGroup>
-    
+<!--    <ItemGroup Condition="!Exists('../../../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">-->
+<!--        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />-->
+<!--    </ItemGroup>-->
+<!--    -->
     
     <ItemGroup>
         <ProjectReference Include="..\dataaccess\dataaccess.csproj" />
