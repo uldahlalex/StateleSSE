@@ -18,6 +18,7 @@
     <RootNamespace>StateleSSE.AspNetCore</RootNamespace>
   </PropertyGroup>
 
+  <!-- Always include CodeGen types for all OpenAPI libraries -->
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);NSWAG;SWASHBUCKLE</DefineConstants>
   </PropertyGroup>
@@ -29,6 +30,14 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+
+  <!--
+    Reference OpenAPI packages for compilation only (PrivateAssets=all means they won't flow to consumers).
+    Consumers must add their own OpenAPI library:
+    - NSwag.AspNetCore (or NSwag.Generation)
+    - Swashbuckle.AspNetCore
+    - Microsoft.AspNetCore.OpenApi (.NET 9+)
+  -->
 
   <ItemGroup>
     <PackageReference Include="NSwag.Generation" Version="14.0.0" PrivateAssets="all" />
@@ -48,6 +57,7 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="build\StateleSSE.AspNetCore.props" Pack="true" PackagePath="build\" />
   </ItemGroup>
 
 </Project>

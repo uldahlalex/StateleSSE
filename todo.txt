@@ -1,4 +1,9 @@
 Aktuelt:
+- codegen test i nyt setup
+- readme update
+- swashbuckle / default openapi / etc
+
+
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?
     - er der en dev / prod forskel?
@@ -12,7 +17,7 @@ Aktuelt:
 - Queryable extensions til nuget?
 - code first
 - ms identity + builtin token validation
-- ny readme til 2-nuget modellen
+
 
 __________
 

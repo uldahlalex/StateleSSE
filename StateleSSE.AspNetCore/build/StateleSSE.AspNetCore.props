@@ -1,0 +1,32 @@
+<Project>
+  <!--
+    Auto-detect OpenAPI packages and enable corresponding StateleSSE CodeGen types.
+    This allows StateleSSE to be completely agnostic while supporting all OpenAPI libraries.
+  -->
+
+  <Target Name="DetectOpenApiPackages" BeforeTargets="BeforeBuild;BeforeCompile">
+    <ItemGroup>
+      <!-- Check if NSwag is referenced -->
+      <_NSwagPackages Include="@(PackageReference)" Condition="'%(Identity)' == 'NSwag.Generation' OR '%(Identity)' == 'NSwag.AspNetCore'" />
+
+      <!-- Check if Swashbuckle is referenced -->
+      <_SwashbucklePackages Include="@(PackageReference)" Condition="'%(Identity)' == 'Swashbuckle.AspNetCore' OR '%(Identity)' == 'Swashbuckle.AspNetCore.SwaggerGen'" />
+
+      <!-- Check if Microsoft.AspNetCore.OpenApi is referenced -->
+      <_MicrosoftOpenApiPackages Include="@(PackageReference)" Condition="'%(Identity)' == 'Microsoft.AspNetCore.OpenApi'" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <!-- Set flags based on detected packages -->
+      <_HasNSwag Condition="'@(_NSwagPackages)' != ''">true</_HasNSwag>
+      <_HasSwashbuckle Condition="'@(_SwashbucklePackages)' != ''">true</_HasSwashbuckle>
+      <_HasMicrosoftOpenApi Condition="'@(_MicrosoftOpenApiPackages)' != ''">true</_HasMicrosoftOpenApi>
+
+      <!-- Define constants for StateleSSE compilation -->
+      <DefineConstants Condition="'$(_HasNSwag)' == 'true'">$(DefineConstants);NSWAG</DefineConstants>
+      <DefineConstants Condition="'$(_HasSwashbuckle)' == 'true'">$(DefineConstants);SWASHBUCKLE</DefineConstants>
+      <DefineConstants Condition="'$(_HasMicrosoftOpenApi)' == 'true'">$(DefineConstants);MICROSOFT_OPENAPI</DefineConstants>
+    </PropertyGroup>
+  </Target>
+
+</Project>
