@@ -31,7 +31,8 @@ public static class TypeScriptEventSourceGenerator
         if (endpoints.Count == 0)
         {
             Console.WriteLine("⚠️  No EventSource endpoints found in OpenAPI spec");
-            Console.WriteLine("   (Looking for endpoints with x-event-source: true extension)");
+            Console.WriteLine("   (Looking for GET endpoints with text/event-stream content type)");
+            Console.WriteLine("   Add [Produces(\"text/event-stream\")] and [ProducesResponseType(typeof(YourEvent), 200)] to your SSE endpoints");
             return;
         }
 
@@ -66,15 +67,38 @@ public static class TypeScriptEventSourceGenerator
             if (!pathProp.Value.TryGetProperty("get", out var operation))
                 continue;
 
-            // Check for x-event-source: true extension
-            if (!operation.TryGetProperty("x-event-source", out var isEventSource) ||
-                !isEventSource.GetBoolean())
+            // Check for text/event-stream content type in responses
+            if (!operation.TryGetProperty("responses", out var responses))
                 continue;
 
-            // Extract event type from x-event-type or default to path
-            var eventType = operation.TryGetProperty("x-event-type", out var evtType)
-                ? evtType.GetString()
-                : path.TrimStart('/').Replace("/", "");
+            string? eventType = null;
+
+            // Look for text/event-stream in any response (typically 200)
+            foreach (var responseProp in responses.EnumerateObject())
+            {
+                if (!responseProp.Value.TryGetProperty("content", out var content))
+                    continue;
+
+                if (!content.TryGetProperty("text/event-stream", out var eventStreamContent))
+                    continue;
+
+                // Extract event type from schema reference
+                if (eventStreamContent.TryGetProperty("schema", out var schema))
+                {
+                    if (schema.TryGetProperty("$ref", out var schemaRef))
+                    {
+                        // Extract type name from $ref like "#/components/schemas/Message"
+                        var refPath = schemaRef.GetString();
+                        eventType = refPath?.Split('/').LastOrDefault();
+                    }
+                }
+
+                break; // Found text/event-stream, no need to check other responses
+            }
+
+            // Skip if not an EventSource endpoint
+            if (eventType == null)
+                continue;
 
             // Extract operation ID for function naming
             var operationId = operation.TryGetProperty("operationId", out var opId)

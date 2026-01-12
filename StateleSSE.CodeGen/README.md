@@ -6,9 +6,10 @@
 
 - ✅ **Zero dependencies** - only uses built-in `System.Text.Json`
 - ✅ **Framework-agnostic** - works with any OpenAPI spec (Swashbuckle, NSwag, Microsoft.AspNetCore.OpenApi, or even non-.NET sources)
-- ✅ **Simple** - reads `openapi.json`, finds `x-event-source: true` endpoints, generates TypeScript
+- ✅ **Simple** - reads `openapi.json`, finds `text/event-stream` endpoints, generates TypeScript
 - ✅ **Type-safe** - generates typed query parameters from OpenAPI schema
 - ✅ **Multi-target** - supports .NET 6, 8, 9, and 10
+- ✅ **Zero configuration** - uses standard HTTP content-type detection
 
 ## Usage
 
@@ -34,8 +35,15 @@ Given an OpenAPI spec with:
       "get": {
         "operationId": "Messages_StreamMessages",
         "summary": "Stream chat messages",
-        "x-event-source": true,
-        "x-event-type": "Message",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": { "$ref": "#/components/schemas/Message" }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "name": "groupid",
@@ -101,23 +109,30 @@ export function createTypedEventStream<T>(
 ## How It Works
 
 1. Reads your OpenAPI JSON spec
-2. Finds GET endpoints with `x-event-source: true` extension
+2. Finds GET endpoints that return `text/event-stream` content type
 3. Extracts:
    - Path
-   - Event type from `x-event-type`
+   - Event type from schema `$ref` (e.g., `#/components/schemas/Message`)
    - Operation ID for function naming
    - Query parameters with types
 4. Generates TypeScript functions with type-safe parameters
 
 ## Requirements
 
-The generator looks for these OpenAPI extensions:
-- `x-event-source: true` - marks endpoint as SSE
-- `x-event-type: "EventTypeName"` - event type name (optional, defaults to path)
+The generator looks for endpoints with `text/event-stream` content type in responses.
 
-These are added automatically by:
-- `StateleSSE.AspNetCore` runtime filters (Swashbuckle, NSwag, Microsoft.AspNetCore.OpenApi)
-- Or you can add them manually to your OpenAPI spec
+Mark your ASP.NET Core controllers with standard attributes:
+```csharp
+[HttpGet("StreamMessages")]
+[Produces("text/event-stream")]
+[ProducesResponseType(typeof(Message), 200)]
+public async Task StreamMessages(string groupId)
+{
+    await StreamEventType<Message>($"chat:{groupId}:Message");
+}
+```
+
+**Works automatically** with all OpenAPI frameworks (Swashbuckle, NSwag, Microsoft.AspNetCore.OpenApi) - no custom configuration needed.
 
 ## Dependencies
 

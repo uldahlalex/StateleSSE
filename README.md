@@ -81,7 +81,8 @@ using StateleSSE.AspNetCore;
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     [HttpGet("subscribe/{roomId}")]
-    [EventSourceEndpoint(typeof(MessageReceivedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(MessageReceivedEvent), 200)]
     public Task SubscribeToRoom(string roomId)
     {
         var channel = $"chat:{roomId}";
@@ -100,7 +101,8 @@ using StateleSSE.Backplane.Redis;
 public class ChatController(ISseBackplane backplane) : SseControllerBase(backplane)
 {
     [HttpGet("subscribe/{roomId}")]
-    [EventSourceEndpoint(typeof(MessageReceivedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(MessageReceivedEvent), 200)]
     public async Task SubscribeToRoom(string roomId)
     {
         var channel = $"chat:{roomId}:MessageReceivedEvent";
@@ -238,18 +240,15 @@ This allows you to scale to multiple servers while maintaining real-time event d
 
 ## TypeScript Code Generation
 
-StateleSSE can automatically generate type-safe TypeScript EventSource clients from your SSE endpoints.
+StateleSSE can automatically generate type-safe TypeScript EventSource clients from your SSE endpoints using standard OpenAPI content-types.
 
-**StateleSSE is completely OpenAPI-agnostic**. It supports all three major OpenAPI libraries without requiring any of them:
-- NSwag
-- Swashbuckle
-- Microsoft.AspNetCore.OpenApi (.NET 9+)
+**Zero configuration required** - works with all OpenAPI frameworks (NSwag, Swashbuckle, Microsoft.AspNetCore.OpenApi) out of the box!
 
 ### Setup
 
 **Step 1: Add your preferred OpenAPI library**
 
-Choose one (or none if you don't need TypeScript codegen):
+Choose one:
 
 ```bash
 # NSwag
@@ -262,45 +261,12 @@ dotnet add package Swashbuckle.AspNetCore
 dotnet add package Microsoft.AspNetCore.OpenApi
 ```
 
-**Step 2: Configure OpenAPI and add the StateleSSE processor/filter**
-
-StateleSSE automatically detects which OpenAPI library you're using and provides the appropriate integration:
-
-**NSwag:**
-```csharp
-using StateleSSE.AspNetCore.CodeGen;
-
-services.AddOpenApiDocument(conf =>
-{
-    conf.OperationProcessors.Add(new NSwagEventSourceProcessor());
-});
-```
-
-**Swashbuckle:**
-```csharp
-using StateleSSE.AspNetCore.CodeGen;
-
-services.AddSwaggerGen(c =>
-{
-    c.OperationFilter<SwashbuckleEventSourceFilter>();
-});
-```
-
-**Microsoft.AspNetCore.OpenApi (.NET 9+):**
-```csharp
-using StateleSSE.AspNetCore.CodeGen;
-
-builder.Services.AddOpenApi(options =>
-{
-    options.AddOperationTransformer<MicrosoftOpenApiEventSourceTransformer>();
-});
-```
-
-**Step 3: Mark your SSE endpoints**
+**Step 2: Mark your SSE endpoints with standard attributes**
 
 ```csharp
 [HttpGet(nameof(StreamMessages))]
-[EventSourceEndpoint(typeof(MessageReceivedEvent))]
+[Produces("text/event-stream")]
+[ProducesResponseType(typeof(MessageReceivedEvent), 200)]
 public async Task StreamMessages(string roomId)
 {
     var channel = $"chat:{roomId}:MessageReceivedEvent";
@@ -308,16 +274,20 @@ public async Task StreamMessages(string roomId)
 }
 ```
 
-**Step 4: Generate TypeScript client at startup**
+That's it! The `text/event-stream` content-type is automatically detected by all OpenAPI frameworks.
+
+**Step 3: Generate TypeScript client at startup**
 
 ```csharp
+using StateleSSE.CodeGen;
+
 var app = builder.Build();
 
-app.UseOpenApi(); // or app.UseSwagger() for Swashbuckle
+app.MapOpenApi(); // or app.UseSwagger() for Swashbuckle
 
 // Generate TypeScript EventSource client
-TypeScriptSseGenerator.Generate(
-    openApiSpecPath: "openapi-with-docs.json",
+TypeScriptEventSourceGenerator.Generate(
+    openApiSpecPath: "openapi.json",
     outputPath: "../client/src/generated-sse-client.ts"
 );
 

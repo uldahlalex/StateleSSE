@@ -93,8 +93,9 @@ public class Program
         services.AddControllers();
 
         // Use built-in .NET 10 OpenAPI support
-        services.AddOpenApi();
-        services.AddSingleton<MicrosoftOpenApiEventSourceTransformer>();
+        services.AddOpenApi(options =>
+        {
+        });
         // Hangfire for distributed background jobs
         // services.AddHangfire(config => config
         //     .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(appOptions.Db)));

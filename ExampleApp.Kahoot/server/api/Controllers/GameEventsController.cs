@@ -24,7 +24,8 @@ public class GameEventsController(ISseBackplane backplane)
     /// Use: When round begins, clients need question details
     /// </summary>
     [HttpGet(nameof(RoundStartedEvent))]
-    [EventSourceEndpoint(typeof(RoundStartedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(RoundStartedEvent), 200)]
     public async Task StreamRoundStarted([FromQuery] RoundStartedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:RoundStartedEvent";
@@ -36,7 +37,8 @@ public class GameEventsController(ISseBackplane backplane)
     /// Use: Track player joins in lobby
     /// </summary>
     [HttpGet(nameof(PlayerJoinedEvent))]
-    [EventSourceEndpoint(typeof(PlayerJoinedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(PlayerJoinedEvent), 200)]
     public async Task StreamPlayerJoined([FromQuery] PlayerJoinedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:PlayerJoinedEvent";
@@ -48,7 +50,8 @@ public class GameEventsController(ISseBackplane backplane)
     /// Use: Host dashboard showing answer progress
     /// </summary>
     [HttpGet(nameof(AnswerSubmittedEvent))]
-    [EventSourceEndpoint(typeof(AnswerSubmittedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(AnswerSubmittedEvent), 200)]
     public async Task StreamAnswerSubmitted([FromQuery] AnswerSubmittedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:AnswerSubmittedEvent";
@@ -60,7 +63,8 @@ public class GameEventsController(ISseBackplane backplane)
     /// Use: Display results and leaderboard after round
     /// </summary>
     [HttpGet(nameof(RoundEndedEvent))]
-    [EventSourceEndpoint(typeof(RoundEndedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(RoundEndedEvent), 200)]
     public async Task StreamRoundEnded([FromQuery] RoundEndedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:RoundEndedEvent";
@@ -72,7 +76,8 @@ public class GameEventsController(ISseBackplane backplane)
     /// Use: Initial game setup notifications
     /// </summary>
     [HttpGet(nameof(GameCreatedEvent))]
-    [EventSourceEndpoint(typeof(GameCreatedEvent))]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(GameCreatedEvent), 200)]
     public async Task StreamGameCreated([FromQuery] GameCreatedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:GameCreatedEvent";

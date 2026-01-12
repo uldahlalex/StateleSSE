@@ -6,9 +6,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
 
-    <!-- NuGet Package Metadata -->
     <PackageId>StateleSSE.AspNetCore</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.2.0</Version>
     <Authors>Alex</Authors>
     <Description>Complete StateleSSE framework for ASP.NET Core: type-safe Server-Sent Events with horizontal scaling support. Includes in-memory and Redis backplanes for production scaling. Install StateleSSE.CodeGen for TypeScript client generation.</Description>
     <PackageTags>sse;server-sent-events;aspnetcore;extensions;stateless;real-time;redis;backplane;horizontal-scaling</PackageTags>
@@ -32,7 +31,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
-
+    
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

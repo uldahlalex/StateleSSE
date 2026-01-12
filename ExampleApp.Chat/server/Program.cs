@@ -1,15 +1,13 @@
-using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
 using StateleSSE.CodeGen;
+using StateleSSE.AspNetCore;
+using System.Text.Json.Nodes;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInMemorySseBackplane();
 
-builder.Services.AddOpenApi(conf =>
-{
-    conf.AddOperationTransformer<MicrosoftOpenApiEventSourceTransformer>();
-});
+builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 
 var app = builder.Build();
