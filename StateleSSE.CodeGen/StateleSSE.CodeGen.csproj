@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
 
-    <!-- NuGet Package Metadata -->
     <PackageId>StateleSSE.CodeGen</PackageId>
     <Version>1.0.0</Version>
     <Authors>Alex</Authors>
@@ -17,7 +16,5 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>StateleSSE.CodeGen</RootNamespace>
   </PropertyGroup>
-
-  <!-- Zero dependencies - only uses System.Text.Json which is built-in -->
 
 </Project>
