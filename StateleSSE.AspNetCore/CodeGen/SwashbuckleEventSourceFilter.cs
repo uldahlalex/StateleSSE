@@ -1,3 +1,4 @@
+#if !NET10_0_OR_GREATER
 using System.Reflection;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
@@ -22,3 +23,4 @@ public sealed class SwashbuckleEventSourceFilter : IOperationFilter
         operation.Extensions["x-event-type"] = new OpenApiString(attribute.EventType.Name);
     }
 }
+#endif

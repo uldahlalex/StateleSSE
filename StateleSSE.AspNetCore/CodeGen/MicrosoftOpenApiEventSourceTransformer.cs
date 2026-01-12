@@ -1,9 +1,14 @@
 #if NET9_0_OR_GREATER
 using System.Reflection;
 using Microsoft.AspNetCore.OpenApi;
+using StateleSSE.AspNetCore;
+#if NET10_0_OR_GREATER
+using Microsoft.OpenApi;
+using System.Text.Json.Nodes;
+#else
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
-using StateleSSE.AspNetCore;
+#endif
 
 namespace StateleSSE.AspNetCore.CodeGen;
 
@@ -32,8 +37,14 @@ public sealed class MicrosoftOpenApiEventSourceTransformer : IOpenApiOperationTr
 
         if (attribute == null) return Task.CompletedTask;
 
+#if NET10_0_OR_GREATER
+        operation.Extensions ??= new Dictionary<string, IOpenApiExtension>();
+        operation.Extensions["x-event-source"] = new JsonNodeExtension(JsonValue.Create(true)!);
+        operation.Extensions["x-event-type"] = new JsonNodeExtension(JsonValue.Create(attribute.EventType.Name)!);
+#else
         operation.Extensions["x-event-source"] = new OpenApiBoolean(true);
         operation.Extensions["x-event-type"] = new OpenApiString(attribute.EventType.Name);
+#endif
 
         return Task.CompletedTask;
     }

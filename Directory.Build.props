@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Define the repository/solution root directory -->
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+  </PropertyGroup>
+</Project>

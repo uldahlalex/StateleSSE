@@ -1,0 +1,7 @@
+#redis container
+services:
+  redis:
+    image: "redis:alpine"
+    container_name: "redis_chat_app"
+    ports:
+      - "6379:6379"

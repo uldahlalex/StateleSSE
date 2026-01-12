@@ -5,26 +5,30 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.OpenApi.Generated</InterceptorsNamespaces>
     </PropertyGroup>
-    <ItemGroup Condition="Exists('../../../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
-        <ProjectReference Include="../../../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
+    <ItemGroup Condition="Exists('$(RepoRoot)StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
+        <ProjectReference Include="$(RepoRoot)StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
     </ItemGroup>
-<!--    <ItemGroup Condition="!Exists('../../../StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">-->
-<!--        <PackageReference Include="StateleSSE.AspNetCore" Version="*" />-->
-<!--    </ItemGroup>-->
-    <ItemGroup Condition="Exists('../../../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <ProjectReference Include="../../../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
+    <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
+        <PackageReference Include="StateleSSE.AspNetCore" Version="*" />
     </ItemGroup>
 
-<!--    <ItemGroup Condition="!Exists('../../../StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">-->
-<!--        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />-->
-<!--    </ItemGroup>-->
-<!--    -->
+    <ItemGroup Condition="Exists('$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
+        <ProjectReference Include="$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
+    </ItemGroup>
+    <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
+        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />
+    </ItemGroup>
     
     <ItemGroup>
         <ProjectReference Include="..\dataaccess\dataaccess.csproj" />
         <ProjectReference Include="..\mqtt\mqtt.csproj" />
-        <ProjectReference Include="..\..\..\..\EF.Utilities\EF.Utilities.csproj" />
+    </ItemGroup>
+
+    <!-- External project outside this repo -->
+    <ItemGroup Condition="Exists('$(RepoRoot)../EF.Utilities/EF.Utilities.csproj')">
+        <ProjectReference Include="$(RepoRoot)../EF.Utilities/EF.Utilities.csproj" />
     </ItemGroup>
 
 
@@ -33,7 +37,8 @@
         <PackageReference Include="Hangfire.PostgreSql" Version="1.20.13" />
         <PackageReference Include="JWT" Version="11.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
-        <PackageReference Include="NSwag.AspNetCore" Version="14.6.3" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+        <PackageReference Include="NSwag.Generation" Version="14.6.3" />
         <PackageReference Include="NSwag.CodeGeneration.TypeScript" Version="14.6.3" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.3.1" />
     </ItemGroup>

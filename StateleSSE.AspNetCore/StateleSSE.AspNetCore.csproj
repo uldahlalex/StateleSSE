@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net8.0;net9.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net8.0;net9.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -23,23 +23,45 @@
   </ItemGroup>
 
   <!--
-    Include all OpenAPI libraries as dependencies.
-    These are compile-time dependencies but will flow to consumers.
-    Consumers only need to use the processor/filter for their chosen library.
+    OpenAPI framework packages are compile-time only dependencies.
+    Consumers explicitly add their chosen OpenAPI framework (Swashbuckle, NSwag, or Microsoft.AspNetCore.OpenApi).
+    These are only needed to compile the filter/processor classes.
   -->
 
-  <ItemGroup>
-    <PackageReference Include="NSwag.Generation" Version="14.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0" />
+  <!-- Swashbuckle and NSwag - compile-time only, not compatible with net10 -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+    <PackageReference Include="NSwag.Generation" Version="14.0.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
+  <!-- Microsoft.OpenApi - compile-time only, consumers get it from their chosen framework -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.OpenApi" Version="1.6.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="1.6.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
+  <!-- Microsoft.AspNetCore.OpenApi - compile-time only for net9/10 -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
-    <PackageReference Include="Microsoft.OpenApi" Version="1.6.17" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.OpenApi" Version="1.6.17">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.OpenApi" Version="2.0.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">

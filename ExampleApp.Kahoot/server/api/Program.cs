@@ -16,9 +16,8 @@ using Microsoft.IdentityModel.Tokens;
 using mqtt;
 using StackExchange.Redis;
 using StateleSSE.AspNetCore;
-using StateleSSE.Backplane.Redis.Extensions;
-using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.CodeGen;
+using StateleSSE.Backplane.Redis.Extensions;
 
 namespace api;
 
@@ -93,11 +92,9 @@ public class Program
         }, ServiceLifetime.Transient);
         services.AddControllers();
 
-        services.AddOpenApiDocument(conf =>
-        {
-            conf.OperationProcessors.Add(new NSwagEventSourceProcessor());
-
-        });
+        // Use built-in .NET 10 OpenAPI support
+        services.AddOpenApi();
+        services.AddSingleton<MicrosoftOpenApiEventSourceTransformer>();
         // Hangfire for distributed background jobs
         // services.AddHangfire(config => config
         //     .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(appOptions.Db)));
@@ -242,9 +239,7 @@ public class Program
             }
         });
 
-        app.UseOpenApi();
-
-        app.UseSwaggerUi();
+        app.MapOpenApi();
 
         // Generate NSwag TypeScript client
         app.GenerateApiClientsFromOpenApi("/../../client/src/generated-client.ts").GetAwaiter().GetResult();

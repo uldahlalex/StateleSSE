@@ -1,3 +1,4 @@
+#if !NET10_0_OR_GREATER
 using System.Reflection;
 using NSwag.Generation.Processors;
 using NSwag.Generation.Processors.Contexts;
@@ -24,3 +25,4 @@ public sealed class NSwagEventSourceProcessor : IOperationProcessor
         return true;
     }
 }
+#endif
