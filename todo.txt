@@ -1,4 +1,5 @@
 Aktuelt:
+- stackxchange backplane redis i aspnetcore pckagen
 - readme update
 - access api spec when file isnt downloaded
     - lige nu bruger jeg bare et timeout
@@ -8,6 +9,9 @@ Aktuelt:
 
 - openapi problematikken:
     - kan jeg lave event source gen der kun kender til pathen og ikke dto?
+        - fix: zero dependency packagen
+            - aktuelt: Denne kan jeg blot bundle sammen med den nuværende
+
 
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?
