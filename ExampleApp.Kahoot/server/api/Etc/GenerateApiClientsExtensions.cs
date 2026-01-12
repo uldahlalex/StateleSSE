@@ -1,7 +1,6 @@
 using NJsonSchema.CodeGeneration.TypeScript;
 using NSwag;
 using NSwag.CodeGeneration.TypeScript;
-using NSwag.Generation;
 
 namespace api.Etc;
 
@@ -9,18 +8,28 @@ public static class GenerateApiClientsExtensions
 {
     public static async Task GenerateApiClientsFromOpenApi(this WebApplication app, string path)
     {
-        // Step 1: Generate OpenAPI document with full documentation
-        var document = await app.Services.GetRequiredService<IOpenApiDocumentGenerator>()
-            .GenerateAsync("v1");
+        // Step 1: Fetch OpenAPI JSON from the endpoint (Microsoft.AspNetCore.OpenApi)
+        using var client = new HttpClient();
+        var addresses = app.Urls.FirstOrDefault() ?? "http://localhost:5000";
+        var openApiUrl = $"{addresses}/openapi/v1.json";
 
-        // Step 2: Serialize the document to JSON to verify it contains documentation
-        var openApiJson = document.ToJson();
-        
-        // Optional: Save the OpenAPI JSON to verify it has documentation
+        string openApiJson;
+        try
+        {
+            openApiJson = await client.GetStringAsync(openApiUrl);
+        }
+        catch (HttpRequestException ex)
+        {
+            var log = app.Services.GetRequiredService<ILogger<Program>>();
+            log.LogError(ex, "Failed to fetch OpenAPI spec from {Url}", openApiUrl);
+            throw;
+        }
+
+        // Step 2: Save the OpenAPI JSON with documentation
         var openApiPath = Path.Combine(Directory.GetCurrentDirectory(), "openapi-with-docs.json");
         await File.WriteAllTextAsync(openApiPath, openApiJson);
-        
-        // Step 3: Parse the document back from JSON to ensure we're only using what's in the OpenAPI spec
+
+        // Step 3: Parse the document with NSwag for TypeScript generation
         var documentFromJson = await OpenApiDocument.FromJsonAsync(openApiJson);
 
         // Step 4: Generate TypeScript client from the parsed OpenAPI document

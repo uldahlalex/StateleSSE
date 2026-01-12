@@ -44,10 +44,5 @@
     </ItemGroup>
 
 
-    <ItemGroup>
-      <Reference Include="NSwag.Generation">
-        <HintPath>..\..\..\..\..\.nuget\packages\nswag.generation\14.0.0\lib\netstandard2.0\NSwag.Generation.dll</HintPath>
-      </Reference>
-    </ItemGroup>
 
 </Project>

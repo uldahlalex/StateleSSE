@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>StateleSSE.CodeGen</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Alex</Authors>
+    <Description>Zero-dependency TypeScript EventSource client generator from OpenAPI specs. Reads openapi.json and generates type-safe SSE client code for endpoints marked with x-event-source extension.</Description>
+    <PackageTags>sse;server-sent-events;typescript;codegen;openapi;eventsource;zero-dependency</PackageTags>
+    <RepositoryUrl>https://github.com/StateleSSE/StateleSSE.AspNetCore</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>StateleSSE.CodeGen</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Zero dependencies - only uses System.Text.Json which is built-in -->
+
+</Project>

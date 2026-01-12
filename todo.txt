@@ -6,6 +6,9 @@ Aktuelt:
 - er private assets virkelig det bedste versus transitive?
     - tests til at consumer app'en kan codegen med alle de specifikke versioner
 
+- openapi problematikken:
+    - kan jeg lave event source gen der kun kender til pathen og ikke dto?
+
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?
     - er der en dev / prod forskel?

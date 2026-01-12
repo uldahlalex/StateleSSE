@@ -1,6 +1,7 @@
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.CodeGen;
 using StateleSSE.Backplane.Redis.Extensions;
+using StateleSSE.CodeGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
