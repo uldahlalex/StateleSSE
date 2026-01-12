@@ -1,8 +1,6 @@
 using api.Models.SseEventDtos;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
-using StateleSSE.Backplane.Redis;
-using StateleSSE.Backplane.Redis.Infrastructure;
 
 namespace api.Controllers;
 
@@ -18,7 +16,7 @@ public record GameCreatedSubscribeRequestDto(string GameId);
 /// Clients subscribe to specific event types they need, composing their own event streams
 /// </summary>
 [ApiController]
-public class GameEventsController(RedisBackplane backplane)
+public class GameEventsController(ISseBackplane backplane)
     : SseControllerBase(backplane)
 {
     /// <summary>

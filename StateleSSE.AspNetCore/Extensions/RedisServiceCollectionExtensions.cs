@@ -1,14 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
-using StateleSSE.AspNetCore;
-using StateleSSE.Backplane.Redis.Infrastructure;
+using StateleSSE.AspNetCore.Infrastructure;
 
-namespace StateleSSE.Backplane.Redis.Extensions;
+namespace StateleSSE.AspNetCore.Extensions;
 
 /// <summary>
-/// Extension methods for configuring RedisBackplane.SSE services
+/// Extension methods for configuring Redis SSE backplane services
 /// </summary>
-public static class ServiceCollectionExtensions
+public static class RedisServiceCollectionExtensions
 {
     /// <summary>
     /// Adds Redis-based SSE backplane to the service collection.
@@ -35,7 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
-            return new Infrastructure.RedisBackplane(redis, options.ChannelPrefix);
+            return new RedisBackplane(redis, options.ChannelPrefix);
         });
 
         // Register ISseBackplane interface
@@ -58,7 +57,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
-            return new Infrastructure.RedisBackplane(redis, channelPrefix);
+            return new RedisBackplane(redis, channelPrefix);
         });
 
         // Register ISseBackplane interface

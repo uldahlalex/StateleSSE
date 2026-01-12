@@ -13,14 +13,13 @@
     <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
         <PackageReference Include="StateleSSE.AspNetCore" Version="*" />
     </ItemGroup>
+    <ItemGroup Condition="Exists('$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj')">
+        <ProjectReference Include="$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj" />
+    </ItemGroup>
+    <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj')">
+        <PackageReference Include="StateleSSE.CodeGen" Version="*" />
+    </ItemGroup>
 
-    <ItemGroup Condition="Exists('$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <ProjectReference Include="$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
-    </ItemGroup>
-    <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />
-    </ItemGroup>
-    
     <ItemGroup>
         <ProjectReference Include="..\dataaccess\dataaccess.csproj" />
         <ProjectReference Include="..\mqtt\mqtt.csproj" />

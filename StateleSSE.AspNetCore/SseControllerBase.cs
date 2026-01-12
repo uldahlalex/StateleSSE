@@ -2,9 +2,8 @@ using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using StateleSSE.AspNetCore;
 
-namespace StateleSSE.Backplane.Redis;
+namespace StateleSSE.AspNetCore;
 
 /// <summary>
 /// Base controller for Server-Sent Events (SSE) with production-ready features:

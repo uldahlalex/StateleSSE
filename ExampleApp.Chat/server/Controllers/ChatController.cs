@@ -1,12 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
-using StateleSSE.Backplane.Redis;
-using StateleSSE.Backplane.Redis.Infrastructure;
 
 namespace server.Controllers;
 
 [ApiController]
-public class ChatController(RedisBackplane backplane) : SseControllerBase(backplane)
+public class ChatController(ISseBackplane backplane) : SseControllerBase(backplane)
 {
     [HttpGet(nameof(StreamMessages))]
     [EventSourceEndpoint(typeof(Message))]

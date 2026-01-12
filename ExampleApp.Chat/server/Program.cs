@@ -1,6 +1,5 @@
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.CodeGen;
-using StateleSSE.Backplane.Redis.Extensions;
+using StateleSSE.AspNetCore.Extensions;
 using StateleSSE.CodeGen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,7 +31,7 @@ _ = Task.Run(async () =>
         await File.WriteAllTextAsync(openApiPath, spec);
 
         // Generate TypeScript EventSource client
-        TypeScriptSseGenerator.Generate(
+        TypeScriptEventSourceGenerator.Generate(
             openApiSpecPath: openApiPath,
             outputPath: Path.Combine(Directory.GetCurrentDirectory(), "../client/src/generated-sse-client.ts")
         );

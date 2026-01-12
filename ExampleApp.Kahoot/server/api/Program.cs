@@ -16,8 +16,8 @@ using Microsoft.IdentityModel.Tokens;
 using mqtt;
 using StackExchange.Redis;
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.CodeGen;
-using StateleSSE.Backplane.Redis.Extensions;
+using StateleSSE.AspNetCore.Extensions;
+using StateleSSE.CodeGen;
 
 namespace api;
 
@@ -245,7 +245,7 @@ public class Program
         app.GenerateApiClientsFromOpenApi("/../../client/src/generated-client.ts").GetAwaiter().GetResult();
 
         // Generate EventSource TypeScript client
-        StateleSSE.AspNetCore.CodeGen.TypeScriptSseGenerator.Generate(
+        TypeScriptEventSourceGenerator.Generate(
             openApiSpecPath: Path.Combine(Directory.GetCurrentDirectory(), "openapi-with-docs.json"),
             outputPath: Path.Combine(Directory.GetCurrentDirectory(), "../../client/src/generated-sse-client.ts")
         );

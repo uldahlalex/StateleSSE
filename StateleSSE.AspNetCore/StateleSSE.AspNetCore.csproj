@@ -10,8 +10,8 @@
     <PackageId>StateleSSE.AspNetCore</PackageId>
     <Version>2.0.0</Version>
     <Authors>Alex</Authors>
-    <Description>Complete StateleSSE framework for ASP.NET Core: type-safe Server-Sent Events with horizontal scaling support. Includes in-memory backplane and fluent streaming APIs. Install StateleSSE.Backplane.Redis for production scaling, or StateleSSE.CodeGen for TypeScript client generation.</Description>
-    <PackageTags>sse;server-sent-events;aspnetcore;extensions;stateless;real-time</PackageTags>
+    <Description>Complete StateleSSE framework for ASP.NET Core: type-safe Server-Sent Events with horizontal scaling support. Includes in-memory and Redis backplanes for production scaling. Install StateleSSE.CodeGen for TypeScript client generation.</Description>
+    <PackageTags>sse;server-sent-events;aspnetcore;extensions;stateless;real-time;redis;backplane;horizontal-scaling</PackageTags>
     <RepositoryUrl>https://github.com/StateleSSE/StateleSSE.AspNetCore</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -20,6 +20,10 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" Version="[2.6.0, 3.0.0)" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">

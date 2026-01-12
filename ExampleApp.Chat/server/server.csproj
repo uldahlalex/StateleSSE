@@ -18,12 +18,6 @@
     <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj')">
         <PackageReference Include="StateleSSE.CodeGen" Version="*" />
     </ItemGroup>
-    <ItemGroup Condition="Exists('$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <ProjectReference Include="$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" />
-    </ItemGroup>
-    <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj')">
-        <PackageReference Include="StateleSSE.Backplane.Redis" Version="*" />
-    </ItemGroup>
 
     <!-- External project outside this repo -->
     <ItemGroup Condition="Exists('$(RepoRoot)../EF.Utilities/EF.Utilities.csproj')">
