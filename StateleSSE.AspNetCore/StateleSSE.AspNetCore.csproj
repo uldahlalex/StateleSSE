@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net8.0;net9.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -18,34 +18,28 @@
     <RootNamespace>StateleSSE.AspNetCore</RootNamespace>
   </PropertyGroup>
 
-  <!-- Always include CodeGen types for all OpenAPI libraries -->
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);NSWAG;SWASHBUCKLE</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0' OR '$(TargetFramework)' == 'net10.0'">
-    <DefineConstants>$(DefineConstants);MICROSOFT_OPENAPI</DefineConstants>
-  </PropertyGroup>
-
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <!--
-    Reference OpenAPI packages for compilation only (PrivateAssets=all means they won't flow to consumers).
-    Consumers must add their own OpenAPI library:
-    - NSwag.AspNetCore (or NSwag.Generation)
-    - Swashbuckle.AspNetCore
-    - Microsoft.AspNetCore.OpenApi (.NET 9+)
+    Include all OpenAPI libraries as dependencies.
+    These are compile-time dependencies but will flow to consumers.
+    Consumers only need to use the processor/filter for their chosen library.
   -->
 
   <ItemGroup>
-    <PackageReference Include="NSwag.Generation" Version="14.0.0" PrivateAssets="all" />
-    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0" PrivateAssets="all" />
+    <PackageReference Include="NSwag.Generation" Version="14.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0' OR '$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" PrivateAssets="all" />
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.OpenApi" Version="1.6.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="1.6.17" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">

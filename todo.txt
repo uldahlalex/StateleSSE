@@ -1,8 +1,10 @@
 Aktuelt:
-- codegen test i nyt setup
 - readme update
-- swashbuckle / default openapi / etc
-
+- access api spec when file isnt downloaded
+    - lige nu bruger jeg bare et timeout
+- library bug causing dotnet run to fail in chat app
+- er private assets virkelig det bedste versus transitive?
+    - tests til at consumer app'en kan codegen med alle de specifikke versioner
 
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?

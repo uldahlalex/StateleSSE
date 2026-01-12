@@ -15,11 +15,33 @@ builder.Services.AddControllers();
 var app = builder.Build();
 
 app.MapControllers();
-app.MapOpenApi(); 
-// Generate TypeScript EventSource client
-TypeScriptSseGenerator.Generate(
-    openApiSpecPath: "openapi-with-docs.json",
-    outputPath: "../client/src/generated-sse-client.ts"
-);
+app.MapOpenApi();
+
+// Start the app in the background to generate OpenAPI spec
+_ = Task.Run(async () =>
+{
+    await Task.Delay(2000); // Wait for app to start
+
+    try
+    {
+        using var client = new HttpClient();
+        var spec = await client.GetStringAsync("http://localhost:5000/openapi/v1.json");
+
+        var openApiPath = Path.Combine(Directory.GetCurrentDirectory(), "openapi-spec.json");
+        await File.WriteAllTextAsync(openApiPath, spec);
+
+        // Generate TypeScript EventSource client
+        TypeScriptSseGenerator.Generate(
+            openApiSpecPath: openApiPath,
+            outputPath: Path.Combine(Directory.GetCurrentDirectory(), "../client/src/generated-sse-client.ts")
+        );
+
+        Console.WriteLine("✅ Generated TypeScript SSE client");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️  Failed to generate TypeScript client: {ex.Message}");
+    }
+});
 
 app.Run();

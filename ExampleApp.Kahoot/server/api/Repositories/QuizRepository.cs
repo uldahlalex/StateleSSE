@@ -9,42 +9,42 @@ public class QuizRepository(MyDbContext context) : IQuizRepository
 {
     public IQueryable<Quiz> QuizQuery()
     {
-        return context.Quizzes.IncludeAll();
+        return context.Quizzes; //.IncludeAll();
     }
 
     public IQueryable<Gameround> GameroundQuery()
     {
-        return context.Gamerounds.IncludeAll();
+        return context.Gamerounds; //.IncludeAll();
     }
 
     public IQueryable<Game> GameQuery()
     {
-        return context.Games.IncludeAll();
+        return context.Games; //.IncludeAll();
     }
 
     public IQueryable<User> UserQuery()
     {
-        return context.Users.AsNoTracking().IncludeAll();
+        return context.Users.AsNoTracking(); //.IncludeAll();
     }
 
     public IQueryable<Question> QuestionQuery()
     {
-        return context.Questions.IncludeAll();
+        return context.Questions; //.IncludeAll();
     }
 
     public IQueryable<Option> OptionQuery()
     {
-        return context.Options.IncludeAll();
+        return context.Options; //.IncludeAll();
     }
 
     public IQueryable<Answer> AnswerQuery()
     {
-        return context.Answers.IncludeAll();
+        return context.Answers; //.IncludeAll();
     }
 
     public IQueryable<Gamemember> GamememberQuery()
     {
-        return context.Gamemembers.IncludeAll();
+        return context.Gamemembers; //.IncludeAll();
     }
 
 

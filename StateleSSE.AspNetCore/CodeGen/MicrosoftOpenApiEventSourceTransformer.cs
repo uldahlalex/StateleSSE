@@ -1,6 +1,5 @@
+#if NET9_0_OR_GREATER
 using System.Reflection;
-
-#if MICROSOFT_OPENAPI
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
@@ -14,6 +13,7 @@ namespace StateleSSE.AspNetCore.CodeGen;
 /// </summary>
 public sealed class MicrosoftOpenApiEventSourceTransformer : IOpenApiOperationTransformer
 {
+    /// <inheritdoc />
     public Task TransformAsync(
         OpenApiOperation operation,
         OpenApiOperationTransformerContext context,

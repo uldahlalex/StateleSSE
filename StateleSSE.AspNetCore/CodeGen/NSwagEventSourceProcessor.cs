@@ -1,9 +1,7 @@
 using System.Reflection;
-using StateleSSE.AspNetCore;
-
-#if NSWAG
 using NSwag.Generation.Processors;
 using NSwag.Generation.Processors.Contexts;
+using StateleSSE.AspNetCore;
 
 namespace StateleSSE.AspNetCore.CodeGen;
 
@@ -13,6 +11,7 @@ namespace StateleSSE.AspNetCore.CodeGen;
 /// </summary>
 public sealed class NSwagEventSourceProcessor : IOperationProcessor
 {
+    /// <inheritdoc />
     public bool Process(OperationProcessorContext context)
     {
         var attribute = context.MethodInfo.GetCustomAttribute<EventSourceEndpointAttribute>();
@@ -25,4 +24,3 @@ public sealed class NSwagEventSourceProcessor : IOperationProcessor
         return true;
     }
 }
-#endif

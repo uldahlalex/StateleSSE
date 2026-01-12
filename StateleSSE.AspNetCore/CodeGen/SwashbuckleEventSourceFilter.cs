@@ -1,10 +1,8 @@
 using System.Reflection;
-using StateleSSE.AspNetCore;
-
-#if SWASHBUCKLE
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using StateleSSE.AspNetCore;
 
 namespace StateleSSE.AspNetCore.CodeGen;
 
@@ -14,6 +12,7 @@ namespace StateleSSE.AspNetCore.CodeGen;
 /// </summary>
 public sealed class SwashbuckleEventSourceFilter : IOperationFilter
 {
+    /// <inheritdoc />
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
         var attribute = context.MethodInfo.GetCustomAttribute<EventSourceEndpointAttribute>();
@@ -23,4 +22,3 @@ public sealed class SwashbuckleEventSourceFilter : IOperationFilter
         operation.Extensions["x-event-type"] = new OpenApiString(attribute.EventType.Name);
     }
 }
-#endif
