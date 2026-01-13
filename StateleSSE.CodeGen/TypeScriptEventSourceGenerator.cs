@@ -31,8 +31,9 @@ public static class TypeScriptEventSourceGenerator
         if (endpoints.Count == 0)
         {
             Console.WriteLine("⚠️  No EventSource endpoints found in OpenAPI spec");
-            Console.WriteLine("   (Looking for GET endpoints with text/event-stream content type)");
-            Console.WriteLine("   Add [Produces(\"text/event-stream\")] and [ProducesResponseType(typeof(YourEvent), 200)] to your SSE endpoints");
+            Console.WriteLine("   (Looking for GET endpoints with 'Stream' in the path name)");
+            Console.WriteLine("   Name your SSE endpoints with 'Stream' in the path (e.g., /StreamMessages)");
+            Console.WriteLine("   Or add [EventSourceEndpoint(typeof(YourEvent))] attribute for explicit marking");
             return;
         }
 
@@ -67,36 +68,41 @@ public static class TypeScriptEventSourceGenerator
             if (!pathProp.Value.TryGetProperty("get", out var operation))
                 continue;
 
-            // Check for text/event-stream content type in responses
+            // Convention-based detection: endpoint name must contain "Stream"
+            if (!path.Contains("Stream", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             if (!operation.TryGetProperty("responses", out var responses))
                 continue;
 
             string? eventType = null;
 
-            // Look for text/event-stream in any response (typically 200)
+            // Extract event type from any response schema (framework-agnostic)
             foreach (var responseProp in responses.EnumerateObject())
             {
                 if (!responseProp.Value.TryGetProperty("content", out var content))
                     continue;
 
-                if (!content.TryGetProperty("text/event-stream", out var eventStreamContent))
-                    continue;
-
-                // Extract event type from schema reference
-                if (eventStreamContent.TryGetProperty("schema", out var schema))
+                // Look for schema in any content type (text/event-stream, application/json, etc.)
+                foreach (var contentTypeProp in content.EnumerateObject())
                 {
-                    if (schema.TryGetProperty("$ref", out var schemaRef))
+                    if (contentTypeProp.Value.TryGetProperty("schema", out var schema))
                     {
-                        // Extract type name from $ref like "#/components/schemas/Message"
-                        var refPath = schemaRef.GetString();
-                        eventType = refPath?.Split('/').LastOrDefault();
+                        if (schema.TryGetProperty("$ref", out var schemaRef))
+                        {
+                            // Extract type name from $ref like "#/components/schemas/Message"
+                            var refPath = schemaRef.GetString();
+                            eventType = refPath?.Split('/').LastOrDefault();
+                            break;
+                        }
                     }
                 }
 
-                break; // Found text/event-stream, no need to check other responses
+                if (eventType != null)
+                    break;
             }
 
-            // Skip if not an EventSource endpoint
+            // Skip if no event type found
             if (eventType == null)
                 continue;
 
@@ -182,42 +188,31 @@ public static class TypeScriptEventSourceGenerator
     {
         var functionName = GenerateFunctionName(endpoint);
 
-        // Build options type with query parameters
+        // Build parameter list: required params first, then optional params
         var hasParameters = endpoint.Parameters.Any();
-        string paramList;
+        var requiredParams = endpoint.Parameters.Where(p => p.IsRequired)
+            .Select(p => $"{p.Name.ToLowerInvariant()}: {p.Type}").ToList();
+        var optionalParams = endpoint.Parameters.Where(p => !p.IsRequired)
+            .Select(p => $"{p.Name.ToLowerInvariant()}?: {p.Type}").ToList();
 
-        if (hasParameters)
-        {
-            var optionsProps = string.Join("; ", endpoint.Parameters.Select(p =>
-            {
-                var optional = p.IsRequired ? "" : "?";
-                return $"{p.Name.ToLowerInvariant()}{optional}: {p.Type}";
-            }));
-            paramList = $"onMessage: (event: T) => void, options?: {{ {optionsProps}; onError?: (error: Event) => void }}";
-        }
-        else
-        {
-            paramList = "onMessage: (event: T) => void, options?: { onError?: (error: Event) => void }";
-        }
+        var allParams = new List<string>();
+        allParams.AddRange(requiredParams);
+        allParams.Add("onMessage: (event: T) => void");
+        allParams.AddRange(optionalParams);
+        allParams.Add("onError?: (error: Event) => void");
+
+        var paramList = string.Join(", ", allParams);
 
         // JSDoc comment
         sb.AppendLine("/**");
         sb.AppendLine($" * {endpoint.Summary ?? $"Subscribe to {endpoint.EventType} events"}");
+        foreach (var param in endpoint.Parameters)
+        {
+            var optional = param.IsRequired ? "" : " (optional)";
+            sb.AppendLine($" * @param {param.Name.ToLowerInvariant()} - {param.Name}{optional}");
+        }
         sb.AppendLine(" * @param onMessage - Callback for typed message events");
-        if (hasParameters)
-        {
-            sb.AppendLine(" * @param options - Optional configuration object");
-            foreach (var param in endpoint.Parameters)
-            {
-                var optional = param.IsRequired ? "" : " (optional)";
-                sb.AppendLine($" * @param options.{param.Name.ToLowerInvariant()} - {param.Name}{optional}");
-            }
-            sb.AppendLine(" * @param options.onError - Optional error callback");
-        }
-        else
-        {
-            sb.AppendLine(" * @param options - Optional configuration object with onError callback");
-        }
+        sb.AppendLine(" * @param onError - Optional error callback");
         sb.AppendLine($" * @returns EventSource instance for {endpoint.EventType}");
         sb.AppendLine(" */");
 
@@ -231,8 +226,8 @@ public static class TypeScriptEventSourceGenerator
             {
                 var name = p.Name.ToLowerInvariant();
                 return p.IsRequired
-                    ? $"...(options?.{name} !== undefined ? {{ {name}: options.{name} }} : {{}})"
-                    : $"...(options?.{name} !== undefined ? {{ {name}: options.{name} }} : {{}})";
+                    ? $"...({name} !== undefined ? {{ {name} }} : {{}})"
+                    : $"...({name} !== undefined ? {{ {name} }} : {{}})";
             }));
 
             sb.AppendLine($"    const queryParams = new URLSearchParams({{ {paramObj} }});");
@@ -255,8 +250,8 @@ public static class TypeScriptEventSourceGenerator
         sb.AppendLine("        }");
         sb.AppendLine("    };");
         sb.AppendLine("    ");
-        sb.AppendLine("    if (options?.onError) {");
-        sb.AppendLine("        es.onerror = options.onError;");
+        sb.AppendLine("    if (onError) {");
+        sb.AppendLine("        es.onerror = onError;");
         sb.AppendLine("    }");
         sb.AppendLine("    ");
         sb.AppendLine("    return es;");

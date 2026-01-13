@@ -24,7 +24,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
           }
         }
       }
@@ -61,5 +68,17 @@
       }
     }
   },
-  "components": {}
+  "components": {
+    "schemas": {
+      "Message": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
 }

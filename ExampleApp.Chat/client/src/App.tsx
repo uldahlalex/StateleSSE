@@ -8,15 +8,20 @@ function App() {
     const [messages, setMessages] = useState<Message[]>([])
 
     useEffect(() => {
-        const es = subscribeMessage<Message>((dto) => {
-            setMessages(prev => [...prev, dto])
-        }, { groupid: "1" });
+        const es = subscribeMessage<Message>(
+            (dto) => setMessages(prev => [...prev, dto]),
+            "1",
+            (err) => console.error('SSE error:', err)
+        );
 
         return () => es.close();
     }, [])
 
   return (
     <>
+        {
+            JSON.stringify(messages)
+        }
     
     </>
   )
