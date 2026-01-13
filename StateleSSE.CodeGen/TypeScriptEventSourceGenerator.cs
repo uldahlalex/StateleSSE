@@ -175,9 +175,6 @@ public static class TypeScriptEventSourceGenerator
             GenerateSubscriptionFunction(sb, endpoint);
         }
 
-        // Generate generic typed helper
-        GenerateTypedHelper(sb);
-
         return sb.ToString();
     }
 
@@ -185,34 +182,57 @@ public static class TypeScriptEventSourceGenerator
     {
         var functionName = GenerateFunctionName(endpoint);
 
-        // Build parameter list with types
-        var paramList = string.Join(", ", endpoint.Parameters.Select(p =>
+        // Build options type with query parameters
+        var hasParameters = endpoint.Parameters.Any();
+        string paramList;
+
+        if (hasParameters)
         {
-            var optional = p.IsRequired ? "" : "?";
-            return $"{p.Name.ToLowerInvariant()}{optional}: {p.Type}";
-        }));
+            var optionsProps = string.Join("; ", endpoint.Parameters.Select(p =>
+            {
+                var optional = p.IsRequired ? "" : "?";
+                return $"{p.Name.ToLowerInvariant()}{optional}: {p.Type}";
+            }));
+            paramList = $"onMessage: (event: T) => void, options?: {{ {optionsProps}; onError?: (error: Event) => void }}";
+        }
+        else
+        {
+            paramList = "onMessage: (event: T) => void, options?: { onError?: (error: Event) => void }";
+        }
 
         // JSDoc comment
         sb.AppendLine("/**");
         sb.AppendLine($" * {endpoint.Summary ?? $"Subscribe to {endpoint.EventType} events"}");
-        foreach (var param in endpoint.Parameters)
+        sb.AppendLine(" * @param onMessage - Callback for typed message events");
+        if (hasParameters)
         {
-            var optional = param.IsRequired ? "" : " (optional)";
-            sb.AppendLine($" * @param {param.Name.ToLowerInvariant()} - {param.Name}{optional}");
+            sb.AppendLine(" * @param options - Optional configuration object");
+            foreach (var param in endpoint.Parameters)
+            {
+                var optional = param.IsRequired ? "" : " (optional)";
+                sb.AppendLine($" * @param options.{param.Name.ToLowerInvariant()} - {param.Name}{optional}");
+            }
+            sb.AppendLine(" * @param options.onError - Optional error callback");
+        }
+        else
+        {
+            sb.AppendLine(" * @param options - Optional configuration object with onError callback");
         }
         sb.AppendLine($" * @returns EventSource instance for {endpoint.EventType}");
         sb.AppendLine(" */");
 
-        // Function declaration
-        sb.AppendLine($"export function {functionName}({paramList}): EventSource {{");
+        // Function declaration with generic type
+        sb.AppendLine($"export function {functionName}<T = any>({paramList}): EventSource {{");
 
         // Build query string from parameters
-        if (endpoint.Parameters.Any())
+        if (hasParameters)
         {
             var paramObj = string.Join(", ", endpoint.Parameters.Select(p =>
             {
                 var name = p.Name.ToLowerInvariant();
-                return p.IsRequired ? name : $"...({name} !== undefined ? {{ {name} }} : {{}})";
+                return p.IsRequired
+                    ? $"...(options?.{name} !== undefined ? {{ {name}: options.{name} }} : {{}})"
+                    : $"...(options?.{name} !== undefined ? {{ {name}: options.{name} }} : {{}})";
             }));
 
             sb.AppendLine($"    const queryParams = new URLSearchParams({{ {paramObj} }});");
@@ -223,23 +243,9 @@ public static class TypeScriptEventSourceGenerator
             sb.AppendLine($"    const url = `${{BASE_URL}}{endpoint.Path}`;");
         }
 
-        sb.AppendLine("    return new EventSource(url);");
-        sb.AppendLine("}");
-        sb.AppendLine();
-    }
-
-    private static void GenerateTypedHelper(StringBuilder sb)
-    {
-        sb.AppendLine("/**");
-        sb.AppendLine(" * Generic EventSource helper with typed callbacks");
-        sb.AppendLine(" */");
-        sb.AppendLine("export function createTypedEventStream<T>(");
-        sb.AppendLine("    url: string,");
-        sb.AppendLine("    onMessage: (event: T) => void,");
-        sb.AppendLine("    onError?: (error: Event) => void");
-        sb.AppendLine("): EventSource {");
+        // Create EventSource with handlers
+        sb.AppendLine("    ");
         sb.AppendLine("    const es = new EventSource(url);");
-        sb.AppendLine();
         sb.AppendLine("    es.onmessage = (e) => {");
         sb.AppendLine("        try {");
         sb.AppendLine("            const data: T = JSON.parse(e.data);");
@@ -248,13 +254,14 @@ public static class TypeScriptEventSourceGenerator
         sb.AppendLine("            console.error('Failed to parse SSE event:', error);");
         sb.AppendLine("        }");
         sb.AppendLine("    };");
-        sb.AppendLine();
-        sb.AppendLine("    if (onError) {");
-        sb.AppendLine("        es.onerror = onError;");
+        sb.AppendLine("    ");
+        sb.AppendLine("    if (options?.onError) {");
+        sb.AppendLine("        es.onerror = options.onError;");
         sb.AppendLine("    }");
-        sb.AppendLine();
+        sb.AppendLine("    ");
         sb.AppendLine("    return es;");
         sb.AppendLine("}");
+        sb.AppendLine();
     }
 
     private static string GenerateFunctionName(EventSourceEndpoint endpoint)

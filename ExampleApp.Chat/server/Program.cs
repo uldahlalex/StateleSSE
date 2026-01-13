@@ -1,45 +1,52 @@
-using StateleSSE.AspNetCore.Extensions;
-using StateleSSE.CodeGen;
+using api.Etc;
+using Microsoft.AspNetCore.TestHost;
 using StateleSSE.AspNetCore;
-using System.Text.Json.Nodes;
+using StateleSSE.CodeGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInMemorySseBackplane();
-
+builder.Services.AddOpenApiDocument();
 builder.Services.AddOpenApi();
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Conventions.Add(new server.SseEndpointConvention());
+});
 
 var app = builder.Build();
 
+app.UseOpenApi();
+app.UseSwaggerUi();
 app.MapControllers();
 app.MapOpenApi();
 
-// Start the app in the background to generate OpenAPI spec
-_ = Task.Run(async () =>
-{
-    await Task.Delay(2000); // Wait for app to start
+var currentDir = Directory.GetCurrentDirectory();
+var nswagSpecPath = Path.Combine(currentDir, "openapi-with-docs.json");
+var aspNetCoreSpecPath = Path.Combine(currentDir, "openapi-spec.json");
+var clientPath = Path.Combine(currentDir, "../client/src/generated-client.ts");
+var sseClientPath = Path.Combine(currentDir, "../client/src/generated-sse-client.ts");
 
-    try
-    {
-        using var client = new HttpClient();
-        var spec = await client.GetStringAsync("http://localhost:5000/openapi/v1.json");
+await app.GenerateApiClientsFromOpenApi(clientPath, nswagSpecPath);
 
-        var openApiPath = Path.Combine(Directory.GetCurrentDirectory(), "openapi-spec.json");
-        await File.WriteAllTextAsync(openApiPath, spec);
+var testBuilder = WebApplication.CreateBuilder(args);
+testBuilder.WebHost.UseTestServer();
+testBuilder.Services.AddInMemorySseBackplane();
+testBuilder.Services.AddOpenApi();
+testBuilder.Services.AddControllers();
 
-        // Generate TypeScript EventSource client
-        TypeScriptEventSourceGenerator.Generate(
-            openApiSpecPath: openApiPath,
-            outputPath: Path.Combine(Directory.GetCurrentDirectory(), "../client/src/generated-sse-client.ts")
-        );
+using var testApp = testBuilder.Build();
+testApp.MapControllers();
+testApp.MapOpenApi();
+await testApp.StartAsync();
 
-        Console.WriteLine("✅ Generated TypeScript SSE client");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️  Failed to generate TypeScript client: {ex.Message}");
-    }
-});
+using var client = testApp.GetTestClient();
+var aspNetCoreSpec = await client.GetStringAsync("/openapi/v1.json");
+await File.WriteAllTextAsync(aspNetCoreSpecPath, aspNetCoreSpec);
+
+TypeScriptEventSourceGenerator.Generate(
+    openApiSpecPath: aspNetCoreSpecPath,
+    outputPath: sseClientPath,
+    baseUrlImport: "./utils/BASE_URL"
+);
 
 app.Run();

@@ -60,12 +60,12 @@ public class KahootGameController(IQuizRepository repo, IAuthService authService
     [HttpGet(nameof(GameStream))]
     public async Task GameStream([FromQuery] string gameId)
     {
-        var channel = ChannelNamingExtensions.Channel("game", gameId);
-        await HttpContext.StreamSseWithInitialStateAsync(
-            backplane,
-            channel,
-            () => GetGameState(gameId),
-            "game_state");
+        // var channel = ChannelNamingExtensions.Channel("game", gameId);
+        // await HttpContext.StreamSseWithInitialStateAsync(
+        //     backplane,
+        //     // channel,
+        //     () => GetGameState(gameId),
+        //     "game_state");
     }
    
 

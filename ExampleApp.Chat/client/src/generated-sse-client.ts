@@ -8,25 +8,17 @@ import { BASE_URL } from './utils/BASE_URL';
 
 /**
  * Subscribe to Message events
- * @param groupid - groupId (optional)
+ * @param onMessage - Callback for typed message events
+ * @param options - Optional configuration object
+ * @param options.groupid - groupId (optional)
+ * @param options.onError - Optional error callback
  * @returns EventSource instance for Message
  */
-export function subscribeMessage(groupid?: string): EventSource {
-    const queryParams = new URLSearchParams({ ...(groupid !== undefined ? { groupid } : {}) });
+export function subscribeMessage<T = any>(onMessage: (event: T) => void, options?: { groupid?: string; onError?: (error: Event) => void }): EventSource {
+    const queryParams = new URLSearchParams({ ...(options?.groupid !== undefined ? { groupid: options.groupid } : {}) });
     const url = `${BASE_URL}/StreamMessages?${queryParams}`;
-    return new EventSource(url);
-}
-
-/**
- * Generic EventSource helper with typed callbacks
- */
-export function createTypedEventStream<T>(
-    url: string,
-    onMessage: (event: T) => void,
-    onError?: (error: Event) => void
-): EventSource {
+    
     const es = new EventSource(url);
-
     es.onmessage = (e) => {
         try {
             const data: T = JSON.parse(e.data);
@@ -35,10 +27,11 @@ export function createTypedEventStream<T>(
             console.error('Failed to parse SSE event:', error);
         }
     };
-
-    if (onError) {
-        es.onerror = onError;
+    
+    if (options?.onError) {
+        es.onerror = options.onError;
     }
-
+    
     return es;
 }
+
