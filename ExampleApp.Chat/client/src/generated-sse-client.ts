@@ -13,7 +13,11 @@ import { BASE_URL } from './utils/BASE_URL';
  * @param onError - Optional error callback
  * @returns EventSource instance for Message
  */
-export function streamMessages<T = any>(onMessage: (event: T) => void, groupid?: string, onError?: (error: Event) => void): EventSource {
+export function streamMessages<T = any>(
+    onMessage: (event: T) => void, 
+    groupid?: string,
+    onError?: (error: Event) => void
+): EventSource {
     const queryParams = new URLSearchParams({ ...(groupid !== undefined ? { groupid } : {}) });
     const url = `${BASE_URL}/StreamMessages?${queryParams}`;
     

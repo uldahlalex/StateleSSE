@@ -7,12 +7,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddInMemorySseBackplane();
 builder.Services.AddOpenApiDocument();
 builder.Services.AddControllers();
+builder.Services.AddCors();
 
 var app = builder.Build();
 
 app.UseOpenApi();
 app.UseSwaggerUi();
 app.MapControllers();
+app.UseCors(c => c.AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowAnyOrigin()
+    .SetIsOriginAllowed(_ => true));
+
 
 var currentDir = Directory.GetCurrentDirectory();
 var openApiSpecPath = Path.Combine(currentDir, "openapi.json");

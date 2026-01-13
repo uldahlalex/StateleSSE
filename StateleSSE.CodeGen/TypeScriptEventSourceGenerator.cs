@@ -72,8 +72,13 @@ public static class TypeScriptEventSourceGenerator
             if (!path.Contains("Stream", StringComparison.OrdinalIgnoreCase))
                 continue;
 
+            Console.WriteLine($"   Found path with 'Stream': {path}");
+
             if (!operation.TryGetProperty("responses", out var responses))
+            {
+                Console.WriteLine($"   ✗ No responses found for {path}");
                 continue;
+            }
 
             string? eventType = null;
 
@@ -104,7 +109,12 @@ public static class TypeScriptEventSourceGenerator
 
             // Skip if no event type found
             if (eventType == null)
+            {
+                Console.WriteLine($"   ✗ No event type found for {path}");
                 continue;
+            }
+
+            Console.WriteLine($"   ✓ Found endpoint: {path} -> {eventType}");
 
             // Extract operation ID for function naming
             var operationId = operation.TryGetProperty("operationId", out var opId)

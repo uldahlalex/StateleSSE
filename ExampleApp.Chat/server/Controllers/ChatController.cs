@@ -7,8 +7,8 @@ namespace server.Controllers;
 public class ChatController(ISseBackplane backplane) : SseControllerBase(backplane)
 {
     [HttpGet(nameof(StreamMessages))]
+    [Produces<Message>]
     [EventSourceEndpoint(typeof(Message))]
-    [ProducesResponseType(typeof(Message), 200)]
     public async Task StreamMessages(string groupId)
     {
         var channel = $"chat:{groupId}:Message";

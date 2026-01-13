@@ -36,6 +36,9 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\StateleSSE.CodeGen\StateleSSE.CodeGen.csproj" />
+      <ProjectReference Include="..\..\StateleSSE.Analyzers\StateleSSE.Analyzers.csproj"
+                        ReferenceOutputAssembly="false"
+                        OutputItemType="Analyzer" />
     </ItemGroup>
     
 
