@@ -207,8 +207,8 @@ public static class TypeScriptEventSourceGenerator
 
         var allParams = new List<string>();
         allParams.AddRange(requiredParams);
-        allParams.Add("onMessage: (event: T) => void");
         allParams.AddRange(optionalParams);
+        allParams.Add("onMessage?: (event: T) => void");
         allParams.Add("onError?: (error: Event) => void");
 
         var paramList = string.Join(", ", allParams);
@@ -251,14 +251,17 @@ public static class TypeScriptEventSourceGenerator
         // Create EventSource with handlers
         sb.AppendLine("    ");
         sb.AppendLine("    const es = new EventSource(url);");
-        sb.AppendLine("    es.onmessage = (e) => {");
-        sb.AppendLine("        try {");
-        sb.AppendLine("            const data: T = JSON.parse(e.data);");
-        sb.AppendLine("            onMessage(data);");
-        sb.AppendLine("        } catch (error) {");
-        sb.AppendLine("            console.error('Failed to parse SSE event:', error);");
-        sb.AppendLine("        }");
-        sb.AppendLine("    };");
+        sb.AppendLine("    ");
+        sb.AppendLine("    if (onMessage) {");
+        sb.AppendLine("        es.onmessage = (e) => {");
+        sb.AppendLine("            try {");
+        sb.AppendLine("                const data: T = JSON.parse(e.data);");
+        sb.AppendLine("                onMessage(data);");
+        sb.AppendLine("            } catch (error) {");
+        sb.AppendLine("                console.error('Failed to parse SSE event:', error);");
+        sb.AppendLine("            }");
+        sb.AppendLine("        };");
+        sb.AppendLine("    }");
         sb.AppendLine("    ");
         sb.AppendLine("    if (onError) {");
         sb.AppendLine("        es.onerror = onError;");

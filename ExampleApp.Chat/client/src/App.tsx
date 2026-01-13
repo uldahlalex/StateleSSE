@@ -1,6 +1,9 @@
 import {useEffect, useState} from "react";
 import {streamMessages} from "./generated-sse-client.ts";
-import type {Message} from "./generated-client.ts";
+import {ChatClient, type Message} from "./generated-client.ts";
+import {BASE_URL} from "./utils/BASE_URL.ts";
+
+const client = new ChatClient(BASE_URL);
 
 
 function App() {
@@ -9,8 +12,8 @@ function App() {
 
     useEffect(() => {
         const es = streamMessages<Message>(
-            (dto) => setMessages(prev => [...prev, dto]),
-            "1",
+            "2",
+            (dto) => setMessages(prev => [...prev, dto]), 
             (err) => console.error('SSE error:', err)
         );
 
@@ -22,7 +25,9 @@ function App() {
         {
             JSON.stringify(messages)
         }
-    
+    <button onClick={() => {
+        client.createMessage("hi", "2")
+    }}>Add</button>
     </>
   )
 }
