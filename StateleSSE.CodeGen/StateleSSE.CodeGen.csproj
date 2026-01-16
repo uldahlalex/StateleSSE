@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
 
     <PackageId>StateleSSE.CodeGen</PackageId>
-    <Version>2.1.0</Version>
+    <Version>2.1.1</Version>
     <Authors>Alex</Authors>
     <Description>Zero-dependency TypeScript EventSource client generator from OpenAPI specs. Reads openapi.json and generates type-safe SSE client code for endpoints marked with x-event-source extension.</Description>
     <PackageTags>sse;server-sent-events;typescript;codegen;openapi;eventsource;zero-dependency</PackageTags>
