@@ -201,9 +201,9 @@ public static class TypeScriptEventSourceGenerator
         // Build parameter list: required params first, then optional params
         var hasParameters = endpoint.Parameters.Any();
         var requiredParams = endpoint.Parameters.Where(p => p.IsRequired)
-            .Select(p => $"{p.Name.ToLowerInvariant()}: {p.Type}").ToList();
+            .Select(p => $"{ToCamelCase(p.Name)}: {p.Type}").ToList();
         var optionalParams = endpoint.Parameters.Where(p => !p.IsRequired)
-            .Select(p => $"{p.Name.ToLowerInvariant()}?: {p.Type}").ToList();
+            .Select(p => $"{ToCamelCase(p.Name)}?: {p.Type}").ToList();
 
         var allParams = new List<string>();
         allParams.AddRange(requiredParams);
@@ -219,7 +219,7 @@ public static class TypeScriptEventSourceGenerator
         foreach (var param in endpoint.Parameters)
         {
             var optional = param.IsRequired ? "" : " (optional)";
-            sb.AppendLine($" * @param {param.Name.ToLowerInvariant()} - {param.Name}{optional}");
+            sb.AppendLine($" * @param {ToCamelCase(param.Name)} - {param.Name}{optional}");
         }
         sb.AppendLine(" * @param onMessage - Callback for typed message events");
         sb.AppendLine(" * @param onError - Optional error callback");
@@ -234,10 +234,10 @@ public static class TypeScriptEventSourceGenerator
         {
             var paramObj = string.Join(", ", endpoint.Parameters.Select(p =>
             {
-                var name = p.Name.ToLowerInvariant();
+                var paramName = ToCamelCase(p.Name);
                 return p.IsRequired
-                    ? $"...({name} !== undefined ? {{ {name} }} : {{}})"
-                    : $"...({name} !== undefined ? {{ {name} }} : {{}})";
+                    ? $"...({paramName} !== undefined ? {{ '{p.Name}': {paramName} }} : {{}})"
+                    : $"...({paramName} !== undefined ? {{ '{p.Name}': {paramName} }} : {{}})";
             }));
 
             sb.AppendLine($"    const queryParams = new URLSearchParams({{ {paramObj} }});");

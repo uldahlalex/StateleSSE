@@ -29,10 +29,22 @@ public class RedisBackplane : ISseBackplane, IDisposable
         // Subscribe to Redis pub/sub for ALL events on this channel
         _subscriber.Subscribe(
             (RedisChannel)$"{_channelPrefix}:events",
-            async (channel, message) => await OnRedisMessage(message)
+            async (channel, message) =>
+            {
+                try
+                {
+                    await OnRedisMessage(message);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RedisBackplane] ERROR in OnRedisMessage: {ex.Message}");
+                    Console.WriteLine($"[RedisBackplane] Stack trace: {ex.StackTrace}");
+                }
+            }
         );
 
         Console.WriteLine($"[RedisBackplane] Initialized with prefix '{_channelPrefix}'");
+        Console.WriteLine($"[RedisBackplane] Subscribed to channel: {_channelPrefix}:events");
     }
 
     // ============================================

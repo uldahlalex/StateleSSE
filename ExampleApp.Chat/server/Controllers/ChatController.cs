@@ -16,13 +16,22 @@ public class ChatController(ISseBackplane backplane) : SseControllerBase(backpla
     }
 
     [HttpPost(nameof(CreateMessage))]
-    public async Task CreateMessage(string content, string groupId)
+    [ProducesResponseType<Message>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateMessage([FromBody] CreateMessageRequest request)
     {
-        var channel = $"chat:{groupId}:Message";
-        await backplane.PublishToGroup(channel, new Message
-        {
-            Content = content
-        });
+        if (string.IsNullOrWhiteSpace(request.Content))
+            return BadRequest(new ErrorResponse("Content cannot be empty", "EMPTY_CONTENT"));
+
+        if (request.Content.Length > 500)
+            return BadRequest(new ErrorResponse("Content too long", "CONTENT_TOO_LONG"));
+
+        var channel = $"chat:{request.GroupId}:Message";
+        var message = new Message { Content = request.Content };
+
+        await backplane.PublishToGroup(channel, message);
+
+        return Ok(message);
     }
 }
 
@@ -30,3 +39,6 @@ public class Message
 {
     public required string Content { get; set; }
 }
+
+public record CreateMessageRequest(string Content, string GroupId);
+public record ErrorResponse(string Message, string? Code = null);

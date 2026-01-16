@@ -8,13 +8,13 @@ import { BASE_URL } from './utils/BASE_URL';
 
 /**
  * Subscribe to Message events
- * @param groupid - groupId (optional)
+ * @param groupId - groupId (optional)
  * @param onMessage - Callback for typed message events
  * @param onError - Optional error callback
  * @returns EventSource instance for Message
  */
-export function streamMessages<T = any>(groupid?: string, onMessage?: (event: T) => void, onError?: (error: Event) => void): EventSource {
-    const queryParams = new URLSearchParams({ ...(groupid !== undefined ? { groupid } : {}) });
+export function streamMessages<T = any>(groupId?: string, onMessage?: (event: T) => void, onError?: (error: Event) => void): EventSource {
+    const queryParams = new URLSearchParams({ ...(groupId !== undefined ? { 'groupId': groupId } : {}) });
     const url = `${BASE_URL}/StreamMessages?${queryParams}`;
     
     const es = new EventSource(url);

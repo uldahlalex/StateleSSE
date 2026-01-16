@@ -54,21 +54,18 @@ export class ChatClient {
         return Promise.resolve<Message>(null as any);
     }
 
-    createMessage(content: string | undefined, groupId: string | undefined): Promise<void> {
-        let url_ = this.baseUrl + "/CreateMessage?";
-        if (content === null)
-            throw new globalThis.Error("The parameter 'content' cannot be null.");
-        else if (content !== undefined)
-            url_ += "content=" + encodeURIComponent("" + content) + "&";
-        if (groupId === null)
-            throw new globalThis.Error("The parameter 'groupId' cannot be null.");
-        else if (groupId !== undefined)
-            url_ += "groupId=" + encodeURIComponent("" + groupId) + "&";
+    createMessage(request: CreateMessageRequest): Promise<Message> {
+        let url_ = this.baseUrl + "/CreateMessage";
         url_ = url_.replace(/[?&]$/, "");
 
+        const content_ = JSON.stringify(request);
+
         let options_: RequestInit = {
+            body: content_,
             method: "POST",
             headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
             }
         };
 
@@ -77,24 +74,42 @@ export class ChatClient {
         });
     }
 
-    protected processCreateMessage(response: Response): Promise<void> {
+    protected processCreateMessage(response: Response): Promise<Message> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Message;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ErrorResponse;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<Message>(null as any);
     }
 }
 
 export interface Message {
     content?: string;
+}
+
+export interface ErrorResponse {
+    message?: string;
+    code?: string | undefined;
+}
+
+export interface CreateMessageRequest {
+    content?: string;
+    groupId?: string;
 }
 
 export class ApiException extends Error {
