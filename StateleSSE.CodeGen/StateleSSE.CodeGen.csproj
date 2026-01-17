@@ -1,20 +1,53 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net6.0;net8.0;net9.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
 
     <PackageId>StateleSSE.CodeGen</PackageId>
-    <Version>2.1.1</Version>
+    <Version>2.2.0</Version>
     <Authors>Alex</Authors>
-    <Description>Zero-dependency TypeScript EventSource client generator from OpenAPI specs. Reads openapi.json and generates type-safe SSE client code for endpoints marked with x-event-source extension.</Description>
-    <PackageTags>sse;server-sent-events;typescript;codegen;openapi;eventsource;zero-dependency</PackageTags>
+    <Description>TypeScript EventSource client generator and Roslyn analyzer for SSE endpoints. Generates type-safe TS clients from OpenAPI specs and enforces naming conventions at compile time.</Description>
+    <PackageTags>sse;server-sent-events;typescript;codegen;openapi;eventsource;roslyn;analyzer</PackageTags>
     <RepositoryUrl>https://github.com/StateleSSE/StateleSSE.AspNetCore</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>StateleSSE.CodeGen</RootNamespace>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
+
+  <!-- Conditional compilation symbols -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <DefineConstants>$(DefineConstants);ANALYZER_BUILD</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
+    <DefineConstants>$(DefineConstants);CODEGEN_BUILD</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Analyzer dependencies (only for netstandard2.0) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- CodeGen dependencies (not for netstandard2.0) -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
+    <PackageReference Include="System.Text.Json" Version="6.0.0" />
+  </ItemGroup>
+
+  <!-- Conditional compilation of files -->
+  <ItemGroup>
+    <Compile Remove="**\*.cs" />
+    <Compile Include="NamingConventionAnalyzer.cs" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+    <Compile Include="TypeScriptEventSourceGenerator.cs" Condition="'$(TargetFramework)' != 'netstandard2.0'" />
+  </ItemGroup>
+
+  <!-- Package the analyzer DLL -->
+  <ItemGroup>
+    <None Include="$(OutputPath)\netstandard2.0\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
 
 </Project>

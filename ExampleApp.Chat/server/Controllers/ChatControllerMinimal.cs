@@ -4,14 +4,15 @@ using StateleSSE.AspNetCore;
 namespace server.Controllers;
 
 [ApiController]
-public class ChatController(ISseBackplane backplane) : SseControllerBase(backplane)
+public class ChatControllerMinimal(ISseBackplane backplane) : ControllerBase
 {
-    [HttpGet(nameof(StreamMessages)), SseEndpoint]
+    [HttpGet(nameof(StreamMessages))]
     [Produces<Message>]
+    [EventSourceEndpoint(typeof(Message))]
     public async Task StreamMessages(string groupId)
     {
         var channel = $"chat:{groupId}:Message";
-        await StreamEventType<Message>(channel);
+        await HttpContext.StreamSseAsync<Message>(backplane, channel, keepaliveInterval: TimeSpan.FromSeconds(30));
     }
 
     [HttpPost(nameof(CreateMessage))]
@@ -33,11 +34,3 @@ public class ChatController(ISseBackplane backplane) : SseControllerBase(backpla
         return Ok(message);
     }
 }
-
-public class Message
-{
-    public required string Content { get; set; }
-}
-
-public record CreateMessageRequest(string Content, string GroupId);
-public record ErrorResponse(string Message, string? Code = null);

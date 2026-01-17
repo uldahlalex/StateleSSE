@@ -29,16 +29,13 @@
       <PackageReference Include="NSwag.AspNetCore" Version="14.6.3" />
         <PackageReference Include="NSwag.CodeGeneration.TypeScript" Version="14.6.3" />
         <PackageReference Include="NSwag.Generation" Version="14.6.3" />
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.1" />
     </ItemGroup>
 
 
     <ItemGroup>
       <ProjectReference Include="..\..\StateleSSE.CodeGen\StateleSSE.CodeGen.csproj" />
-      <ProjectReference Include="..\..\StateleSSE.Analyzers\StateleSSE.Analyzers.csproj"
-                        ReferenceOutputAssembly="false"
-                        OutputItemType="Analyzer" />
     </ItemGroup>
     
 

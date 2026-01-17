@@ -70,10 +70,17 @@ public static class TypeScriptEventSourceGenerator
             if (!pathProp.Value.TryGetProperty("get", out var operation))
                 continue;
 
-            if (!path.Contains("Stream", StringComparison.OrdinalIgnoreCase))
+            var operationId = operation.TryGetProperty("operationId", out var opId)
+                ? opId.GetString()
+                : null;
+
+            var pathHasStream = path.Contains("Stream", StringComparison.OrdinalIgnoreCase);
+            var operationIdHasStream = operationId?.Contains("Stream", StringComparison.OrdinalIgnoreCase) ?? false;
+
+            if (!pathHasStream && !operationIdHasStream)
                 continue;
 
-            logOutput($"   Found path with 'Stream': {path}");
+            logOutput($"   Found SSE endpoint: {path}" + (operationIdHasStream ? $" (operationId: {operationId})" : ""));
 
             if (!operation.TryGetProperty("responses", out var responses))
             {
@@ -112,10 +119,6 @@ public static class TypeScriptEventSourceGenerator
             }
 
             logOutput($"   Found endpoint: {path} -> {eventType}");
-
-            var operationId = operation.TryGetProperty("operationId", out var opId)
-                ? opId.GetString()
-                : null;
 
             var summary = operation.TryGetProperty("summary", out var sum)
                 ? sum.GetString()
