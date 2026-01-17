@@ -30,11 +30,11 @@ public static class RedisServiceCollectionExtensions
             return ConnectionMultiplexer.Connect(config);
         });
 
-        // Register RedisBackplane as singleton
         services.AddSingleton(sp =>
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
-            return new RedisBackplane(redis, options.ChannelPrefix);
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RedisBackplane>>();
+            return new RedisBackplane(redis, logger, options.ChannelPrefix);
         });
 
         // Register ISseBackplane interface
@@ -57,7 +57,8 @@ public static class RedisServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
-            return new RedisBackplane(redis, channelPrefix);
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RedisBackplane>>();
+            return new RedisBackplane(redis, logger, channelPrefix);
         });
 
         // Register ISseBackplane interface

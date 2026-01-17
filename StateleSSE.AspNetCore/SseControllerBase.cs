@@ -14,6 +14,9 @@ namespace StateleSSE.AspNetCore;
 /// </summary>
 public abstract class SseControllerBase(ISseBackplane backplane) : ControllerBase
 {
+    /// <summary>
+    /// The SSE backplane used for pub/sub messaging.
+    /// </summary>
     protected readonly ISseBackplane Backplane = backplane;
 
     /// <summary>
@@ -30,25 +33,21 @@ public abstract class SseControllerBase(ISseBackplane backplane) : ControllerBas
     {
         var interval = keepaliveInterval ?? TimeSpan.FromSeconds(30);
 
-        // SSE headers
         HttpContext.Response.Headers.Append("Content-Type", "text/event-stream");
         HttpContext.Response.Headers.Append("Cache-Control", "no-cache");
         HttpContext.Response.Headers.Append("Connection", "keep-alive");
-        HttpContext.Response.Headers.Append("X-Accel-Buffering", "no"); // Disable buffering for nginx
+        HttpContext.Response.Headers.Append("X-Accel-Buffering", "no");
 
-        // Tell client to reconnect after 3s on disconnect
         await HttpContext.Response.WriteAsync("retry: 3000\n\n");
         await HttpContext.Response.Body.FlushAsync();
 
         var (reader, subscriberId) = Backplane.Subscribe(channel);
 
-        // Keepalive timer to prevent ANCM timeout (120s)
         using var keepaliveTimer = new PeriodicTimer(interval);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
 
         try
         {
-            // Run keepalives and event streaming concurrently
             var keepaliveTask = SendKeepalives(keepaliveTimer, cts.Token);
             var streamTask = StreamEvents<TEvent>(reader, cts.Token);
 
@@ -77,7 +76,6 @@ public abstract class SseControllerBase(ISseBackplane backplane) : ControllerBas
         }
         catch (OperationCanceledException)
         {
-            // Client disconnected - normal flow
         }
     }
 

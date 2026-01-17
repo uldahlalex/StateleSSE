@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using StateleSSE.AspNetCore;
 
 namespace StateleSSE.AspNetCore.Infrastructure;
@@ -7,22 +8,17 @@ namespace StateleSSE.AspNetCore.Infrastructure;
 /// <summary>
 /// In-memory implementation of ISseBackplane for single-server deployments.
 /// Ideal for development, testing, and applications that don't require horizontal scaling.
-/// All publish operations directly forward to local subscribers without external messaging.
 /// </summary>
-public class InMemoryBackplane : ISseBackplane, IDisposable
+public class InMemoryBackplane(ILogger<InMemoryBackplane> logger) : ISseBackplane, IDisposable
 {
-    // Local SSE connections
-    // groupId -> subscriberId -> channel
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, Channel<object>>> _localSubscribers = new();
 
-    public InMemoryBackplane()
+    /// <summary>
+    /// Creates an InMemoryBackplane instance without logging.
+    /// </summary>
+    public InMemoryBackplane() : this(Microsoft.Extensions.Logging.Abstractions.NullLogger<InMemoryBackplane>.Instance)
     {
-        Console.WriteLine("[InMemoryBackplane] Initialized");
     }
-
-    // ============================================
-    // CLIENT SUBSCRIPTION (LOCAL SSE CONNECTIONS)
-    // ============================================
 
     /// <summary>
     /// Subscribe a local client (SSE connection) to a group.
@@ -36,7 +32,8 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         var channels = _localSubscribers.GetOrAdd(groupId, _ => new ConcurrentDictionary<Guid, Channel<object>>());
         channels.TryAdd(subscriberId, channel);
 
-        Console.WriteLine($"[InMemoryBackplane] New subscriber {subscriberId} for group '{groupId}'. Total local: {channels.Count}");
+        logger.LogDebug("New subscriber {SubscriberId} for group '{GroupId}'. Total local: {Count}",
+            subscriberId, groupId, channels.Count);
 
         return (channel.Reader, subscriberId);
     }
@@ -46,36 +43,32 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
     /// </summary>
     public void Unsubscribe(string groupId, Guid subscriberId)
     {
-        if (_localSubscribers.TryGetValue(groupId, out var channels))
-        {
-            if (channels.TryRemove(subscriberId, out var channel))
-            {
-                channel.Writer.Complete();
-                Console.WriteLine($"[InMemoryBackplane] Unsubscribed {subscriberId} from group '{groupId}'. Remaining local: {channels.Count}");
-            }
+        if (!_localSubscribers.TryGetValue(groupId, out var channels))
+            return;
 
-            // Cleanup: Remove group entry if no subscribers left
-            if (channels.IsEmpty)
-            {
-                _localSubscribers.TryRemove(groupId, out _);
-                Console.WriteLine($"[InMemoryBackplane] No subscribers left for group '{groupId}', cleaning up");
-            }
+        if (channels.TryRemove(subscriberId, out var channel))
+        {
+            channel.Writer.Complete();
+            logger.LogDebug("Unsubscribed {SubscriberId} from group '{GroupId}'. Remaining local: {Count}",
+                subscriberId, groupId, channels.Count);
+        }
+
+        if (channels.IsEmpty)
+        {
+            _localSubscribers.TryRemove(groupId, out _);
+            logger.LogDebug("No subscribers left for group '{GroupId}', cleaning up", groupId);
         }
     }
 
-    // ============================================
-    // BROADCASTING (IN-MEMORY ONLY)
-    // ============================================
-
     /// <summary>
     /// Publish message to all subscribers in a group.
-    /// Since this is in-memory only, directly forwards to local subscribers.
     /// </summary>
     public async Task PublishToGroup(string groupId, object message)
     {
         if (_localSubscribers.TryGetValue(groupId, out var channels))
         {
-            Console.WriteLine($"[InMemoryBackplane] Publishing to {channels.Count} subscribers in group '{groupId}': {message.GetType().Name}");
+            logger.LogDebug("Publishing to {Count} subscribers in group '{GroupId}': {MessageType}",
+                channels.Count, groupId, message.GetType().Name);
 
             var tasks = channels.Values.Select(channel =>
                 channel.Writer.WriteAsync(message).AsTask()
@@ -85,7 +78,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         }
         else
         {
-            Console.WriteLine($"[InMemoryBackplane] Published to group '{groupId}', but no subscribers");
+            logger.LogDebug("Published to group '{GroupId}', but no subscribers", groupId);
         }
     }
 
@@ -100,17 +93,17 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
 
     /// <summary>
     /// Publish message to ALL groups (broadcast to entire system).
-    /// Since this is in-memory, broadcasts to all local subscribers.
     /// </summary>
     public async Task PublishToAll(object message)
     {
-        Console.WriteLine($"[InMemoryBackplane] Broadcasting to ALL groups: {message.GetType().Name}");
+        logger.LogDebug("Broadcasting to ALL groups: {MessageType}", message.GetType().Name);
 
         var allTasks = new List<Task>();
 
         foreach (var (groupId, channels) in _localSubscribers)
         {
-            Console.WriteLine($"[InMemoryBackplane] Broadcasting to {channels.Count} subscribers in group '{groupId}'");
+            logger.LogDebug("Broadcasting to {Count} subscribers in group '{GroupId}'",
+                channels.Count, groupId);
 
             var tasks = channels.Values.Select(channel =>
                 channel.Writer.WriteAsync(message).AsTask()
@@ -121,10 +114,6 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
 
         await Task.WhenAll(allTasks);
     }
-
-    // ============================================
-    // STATS & DIAGNOSTICS
-    // ============================================
 
     /// <summary>
     /// Get count of subscribers for a group.
@@ -159,13 +148,9 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         };
     }
 
-    // ============================================
-    // CLEANUP
-    // ============================================
-
+    /// <inheritdoc/>
     public void Dispose()
     {
-        // Complete all local channels
         foreach (var groupChannels in _localSubscribers.Values)
         {
             foreach (var channel in groupChannels.Values)
@@ -175,6 +160,6 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         }
 
         _localSubscribers.Clear();
-        Console.WriteLine("[InMemoryBackplane] Disposed");
+        logger.LogDebug("Disposed");
     }
 }

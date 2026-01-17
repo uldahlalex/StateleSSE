@@ -1,7 +1,6 @@
 Aktuelt:
 
-- convention based approach med stream hvor attributen lave static checking?
-    - pt kan den gen med korrekt spelling, men kan vi få den til at lave static type checking?
+- What is a good way to conduct testing of the StateleSSE.AspNetCore package? I want to also make integratoin / e2e tests on the basis of the example apps that test the usage of the library, but i also need more "isolative" tests for StateleSSE.AspNetCore in a new xunit StateleSSE.AspNetCore.Testing project
 
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?

@@ -1,6 +1,5 @@
 <Solution>
     <Project Path="StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" Type="Classic C#" />
-    <Project Path="StateleSSE.Backplane.Redis/StateleSSE.Backplane.Redis.csproj" Type="Classic C#" />
     <Project Path="StateleSSE.CodeGen/StateleSSE.CodeGen.csproj" Type="Classic C#" />
     <Folder Name="/ExampleApp.Kahoot/" >
         <Project Path="ExampleApp.Kahoot/server/api/api.csproj" Type="Classic C#" />
