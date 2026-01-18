@@ -1,17 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.Extensions;
 
 namespace server.Controllers;
 
 [ApiController]
-public class ChatController(ISseBackplane backplane) : SseControllerBase(backplane)
+public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     [HttpGet(nameof(StreamMessages)), SseEndpoint]
     [Produces<Message>]
     public async Task StreamMessages(string groupId)
     {
         var channel = $"chat:{groupId}:Message";
-        await StreamEventType<Message>(channel);
+        await HttpContext.StreamSseAsync<Message>(backplane, channel);
     }
 
     [HttpPost(nameof(CreateMessage))]

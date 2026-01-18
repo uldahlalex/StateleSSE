@@ -1,16 +1,12 @@
 namespace StateleSSE.AspNetCore;
 
 /// <summary>
-/// Enforces "Stream" naming convention for SSE endpoints to enable CodeGen discovery.
-///
-/// For Minimal APIs: Apply to the path parameter
-///   app.MapGet([SseEndpoint] "/StreamMessages", ...)
-///
-/// For Controllers: Apply to the HTTP verb attribute
-///   [HttpGet, SseEndpoint]
-///   public async Task StreamMessages() { }
+/// Marks a method as an SSE endpoint for documentation purposes.
+/// Apply to controller methods alongside HTTP verb attributes.
+/// Example: [HttpGet, SseEndpoint] public async Task StreamMessages() { }
+/// Note: TypeScript client generation now works for all GET endpoints automatically.
 /// </summary>
-[AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Method, AllowMultiple = false)]
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public class SseEndpointAttribute : Attribute
 {
 }

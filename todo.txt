@@ -1,6 +1,7 @@
 Aktuelt:
 
-- Are the SSeStreamingExtensions complimantary or opposed to the SseControllerBase methods? If they are opposed to / different way to do this, could you make a new ChatController i my example app using the Extension method setup.
+- remove endpoint filtering
+
 
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?

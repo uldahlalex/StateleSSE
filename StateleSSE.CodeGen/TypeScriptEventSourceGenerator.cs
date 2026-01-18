@@ -33,10 +33,7 @@ public static class TypeScriptEventSourceGenerator
 
         if (endpoints.Count == 0)
         {
-            logOutput("No EventSource endpoints found in OpenAPI spec");
-            logOutput("(Looking for GET endpoints with 'Stream' in the path name)");
-            logOutput("Name your SSE endpoints with 'Stream' in the path (e.g., /StreamMessages)");
-            logOutput("Or add [EventSourceEndpoint(typeof(YourEvent))] attribute for explicit marking");
+            logOutput("No GET endpoints found in OpenAPI spec");
             return;
         }
 
@@ -74,13 +71,7 @@ public static class TypeScriptEventSourceGenerator
                 ? opId.GetString()
                 : null;
 
-            var pathHasStream = path.Contains("Stream", StringComparison.OrdinalIgnoreCase);
-            var operationIdHasStream = operationId?.Contains("Stream", StringComparison.OrdinalIgnoreCase) ?? false;
-
-            if (!pathHasStream && !operationIdHasStream)
-                continue;
-
-            logOutput($"   Found SSE endpoint: {path}" + (operationIdHasStream ? $" (operationId: {operationId})" : ""));
+            logOutput($"   Processing GET endpoint: {path}");
 
             if (!operation.TryGetProperty("responses", out var responses))
             {

@@ -1,6 +1,7 @@
 using api.Models.SseEventDtos;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.Extensions;
 
 namespace api.Controllers;
 
@@ -17,7 +18,7 @@ public record GameCreatedSubscribeRequestDto(string GameId);
 /// </summary>
 [ApiController]
 public class GameEventsController(ISseBackplane backplane)
-    : SseControllerBase(backplane)
+    : ControllerBase
 {
     /// <summary>
     /// Stream RoundStartedEvent only
@@ -29,7 +30,7 @@ public class GameEventsController(ISseBackplane backplane)
     public async Task StreamRoundStarted([FromQuery] RoundStartedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:RoundStartedEvent";
-        await StreamEventType<RoundStartedEvent>(channel);
+        await HttpContext.StreamSseAsync<RoundStartedEvent>(backplane, channel);
     }
 
     /// <summary>
@@ -42,7 +43,7 @@ public class GameEventsController(ISseBackplane backplane)
     public async Task StreamPlayerJoined([FromQuery] PlayerJoinedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:PlayerJoinedEvent";
-        await StreamEventType<PlayerJoinedEvent>(channel);
+        await HttpContext.StreamSseAsync<PlayerJoinedEvent>(backplane, channel);
     }
 
     /// <summary>
@@ -55,7 +56,7 @@ public class GameEventsController(ISseBackplane backplane)
     public async Task StreamAnswerSubmitted([FromQuery] AnswerSubmittedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:AnswerSubmittedEvent";
-        await StreamEventType<AnswerSubmittedEvent>(channel);
+        await HttpContext.StreamSseAsync<AnswerSubmittedEvent>(backplane, channel);
     }
 
     /// <summary>
@@ -68,7 +69,7 @@ public class GameEventsController(ISseBackplane backplane)
     public async Task StreamRoundEnded([FromQuery] RoundEndedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:RoundEndedEvent";
-        await StreamEventType<RoundEndedEvent>(channel);
+        await HttpContext.StreamSseAsync<RoundEndedEvent>(backplane, channel);
     }
 
     /// <summary>
@@ -81,6 +82,6 @@ public class GameEventsController(ISseBackplane backplane)
     public async Task StreamGameCreated([FromQuery] GameCreatedSubscribeRequestDto dto)
     {
         var channel = $"game:{dto.GameId}:GameCreatedEvent";
-        await StreamEventType<GameCreatedEvent>(channel);
+        await HttpContext.StreamSseAsync<GameCreatedEvent>(backplane, channel);
     }
 }

@@ -35,11 +35,12 @@ app.UseCors(c => c.AllowAnyHeader()
     .AllowAnyOrigin()
     .SetIsOriginAllowed(_ => true));
 
-app.MapSseGet<server.Controllers.Message>("/StreamMessagesMinimal", async (HttpContext ctx, ISseBackplane backplane, string groupId) =>
+app.MapGet("/StreamMessagesMinimal", async (HttpContext ctx, ISseBackplane backplane, string groupId) =>
 {
     await ctx.StreamSseAsync<server.Controllers.Message>(backplane, $"chat:{groupId}:Message");
 })
-.WithName("Chat_StreamMessagesMinimal");
+.WithName("Chat_StreamMessagesMinimal")
+.Produces<server.Controllers.Message>(200, "text/event-stream");
 
 
 var currentDir = Directory.GetCurrentDirectory();
