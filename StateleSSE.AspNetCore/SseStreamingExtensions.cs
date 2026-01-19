@@ -137,6 +137,23 @@ public static class SseStreamingExtensions
                 await context.Response.WriteAsync($"data: {json}\n\n", cancellationToken);
                 await context.Response.Body.FlushAsync(cancellationToken);
             }
+            else if (message is JsonElement jsonElement)
+            {
+                try
+                {
+                    var deserializedEvent = jsonElement.Deserialize<TEvent>();
+                    if (deserializedEvent != null)
+                    {
+                        var json = JsonSerializer.Serialize(deserializedEvent);
+                        await context.Response.WriteAsync($"id: {++eventId}\n", cancellationToken);
+                        await context.Response.WriteAsync($"data: {json}\n\n", cancellationToken);
+                        await context.Response.Body.FlushAsync(cancellationToken);
+                    }
+                }
+                catch
+                {
+                }
+            }
         }
     }
 

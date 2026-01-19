@@ -92,10 +92,13 @@ public class RedisBackplane : ISseBackplane, IDisposable
     /// </summary>
     public async Task PublishToGroup(string groupId, object message)
     {
+        var payloadJson = JsonSerializer.Serialize(message);
+        var payloadElement = JsonSerializer.Deserialize<JsonElement>(payloadJson);
+
         var envelope = new BackplaneEnvelope
         {
             GroupId = groupId,
-            Payload = message,
+            Payload = payloadElement,
             PublishedAt = DateTime.UtcNow
         };
 
@@ -124,10 +127,13 @@ public class RedisBackplane : ISseBackplane, IDisposable
     /// </summary>
     public async Task PublishToAll(object message)
     {
+        var payloadJson = JsonSerializer.Serialize(message);
+        var payloadElement = JsonSerializer.Deserialize<JsonElement>(payloadJson);
+
         var envelope = new BackplaneEnvelope
         {
             GroupId = "*",
-            Payload = message,
+            Payload = payloadElement,
             PublishedAt = DateTime.UtcNow
         };
 
@@ -250,6 +256,6 @@ public class RedisBackplane : ISseBackplane, IDisposable
 internal class BackplaneEnvelope
 {
     public required string GroupId { get; init; }
-    public required object Payload { get; init; }
+    public required JsonElement Payload { get; init; }
     public DateTime PublishedAt { get; init; }
 }

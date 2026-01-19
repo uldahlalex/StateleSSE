@@ -5,7 +5,7 @@ using StateleSSE.AspNetCore.Extensions;
 using StateleSSE.CodeGen;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(3));
+builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     {
         var config = ConfigurationOptions.Parse(
