@@ -1,18 +1,8 @@
 # StateleSSE.AspNetCore
 
-Q) What is this?
-A) Making real-time web apps can be challenging. 
+## What is it?
 
-A lot of real-time frameworks have the following characteristics which I dislike:
-- Client-side management of connection (with things like WebSockets which can be open, closed, opening, etc...)
-- Weak and unopinionated "endpoint" / orchestration of communication. (like all network traffic all arriving to a single point in the client app, which now has to mediate traffic)
-- Bad support for web documentation standards / no living docs (no swagger/openapi, lack of source generators based around this standard. AsyncAPI is mostly geared towards "broker" oriented stuff )
-- Horizontal scaling and server side connection / user management can be very difficult (SignalR has a decent "Users/Connections/Groups" abstraction, which I'm inspired by)
-
-Most web devs have existing familiarity with request-response pattern in a simple client-server app with HTTP.
-The concept of this framework is: Custom HTTP endpoints that simply lets clients subscribe to a broadcast / stream and let them know which DTO they will receive upon that event.
-
-
+A type-safe Server-Sent Events (SSE) library for ASP.NET Core with standardized client management & horizontal scaling support via Redis.
 
 ## Installation
 
@@ -22,10 +12,26 @@ dotnet add package StateleSSE.AspNetCore
 
 ## Usage
 
-### Step 1: Configure DI
+### Step 1: Add Backplane
+
+Here demonstrated with a very basic Program.cs startup pipeline:
 
 ```csharp
+//using StackExchange.Redis; remove comment and have the StackExchange.Redis nuget package installed if you want to use redis for backplane instead of inmemory
+using StateleSSE.AspNetCore;
 
+var builder = WebApplication.CreateBuilder(args);
+/* this is required if you want to use redis for backplane - here im simply using a local redis db
+   builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    { var config = ConfigurationOptions.Parse( "localhost:6379" );
+        config.AbortOnConnectFail = false;
+        return ConnectionMultiplexer.Connect(config); });*/
+builder.Services.AddInMemorySseBackplane();
+//builder.Services.AddRedisSseBackplane(); Use this one instead if you want to use redis for backplane - comment out the inmemorybackplane
+builder.Services.AddControllers();
+var app = builder.Build();
+app.MapControllers();
+app.Run();
 ```
 
 ### Step 2: Set up endpoints
@@ -65,6 +71,13 @@ public record CreateMessageRequest(string Content, string GroupId);
 
 ```
 
+### Step 3: Profit:
+
+```
+#Send http request to the API...
+
+```
+
 ## What It Handles
 
 - SSE response headers
@@ -73,6 +86,21 @@ public record CreateMessageRequest(string Content, string GroupId);
 - Cancellation token handling
 - Cleanup in finally blocks
 
+## System vision
+
+A lot of real-time frameworks have the following characteristics which I dislike:
+- Client-side management of connection (with things like WebSockets which can be open, closed, opening, etc...)
+- Weak and unopinionated "endpoint" / orchestration of communication. (like all network traffic all arriving to a single point in the client app, which now has to mediate traffic)
+- Bad support for web documentation standards / no living docs (no swagger/openapi, lack of source generators based around this standard. AsyncAPI is mostly geared towards "broker" oriented stuff )
+- Horizontal scaling and server side connection / user management can be very difficult (SignalR has a decent "Users/Connections/Groups" abstraction, which I'm inspired by)
+
+Most web devs have existing familiarity with request-response pattern in a simple client-server app with HTTP.
+The concept of this framework is: Custom HTTP endpoints that simply lets clients subscribe to a broadcast / stream and let them know which DTO they will receive upon that event.
+
+
+## CodeGen for Typescript & C# Client Code
+
+Can be found in StateleSSE.CodeGen at https://github.com/uldahlalex/StateleSSE.CodeGen 
 
 ## License
 
