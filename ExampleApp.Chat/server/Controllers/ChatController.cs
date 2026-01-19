@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
+[ApiController]
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     [HttpGet(nameof(StreamMessages))]

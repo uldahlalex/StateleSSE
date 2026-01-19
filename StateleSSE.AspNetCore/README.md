@@ -2,7 +2,9 @@
 
 ## What is it?
 
-A type-safe Server-Sent Events (SSE) library for ASP.NET Core with standardized client management & horizontal scaling support via Redis.
+Standardized client/group management for server sent events with horizontal scaling & more.
+
+Built for multi-client realtime web apps that scale (with Server Sent Events (SSE)).
 
 ## Installation
 
@@ -12,7 +14,7 @@ dotnet add package StateleSSE.AspNetCore
 
 ## Usage
 
-### Step 1: Add Backplane
+### Step 1: Add Backplane to DI
 
 Here demonstrated with a very basic Program.cs startup pipeline:
 
@@ -28,7 +30,7 @@ var builder = WebApplication.CreateBuilder(args);
         return ConnectionMultiplexer.Connect(config); });*/
 builder.Services.AddInMemorySseBackplane();
 //builder.Services.AddRedisSseBackplane(); Use this one instead if you want to use redis for backplane - comment out the inmemorybackplane
-builder.Services.AddControllers();
+builder.Services.AddControllers(); //You can also use minimal API or other API type - the library has no MVC dependency
 var app = builder.Build();
 app.MapControllers();
 app.Run();
@@ -36,7 +38,7 @@ app.Run();
 
 ### Step 2: Set up endpoints
 
-*here demo'ed with a controller with a subscribe and one broadcast:*
+*here demo'ed with a controller with a "subscribe/stream" and one broadcast method:*
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
@@ -73,20 +75,20 @@ public record CreateMessageRequest(string Content, string GroupId);
 
 ### Step 3: Profit:
 
+```bash
+#Start the API before running the cURL commands - here I'm just assuming port 5000 is used
+#Terminal 1: Subscribe to the SSE stream
+curl -N http://localhost:5000/StreamMessages?groupId=room1
+
+# Terminal 2: Send a message (will appear in Terminal 1)
+curl -X POST http://localhost:5000/CreateMessage \
+    -H "Content-Type: application/json" \
+    -d '{"Content":"Hello from curl!","GroupId":"room1"}'
 ```
-#Send http request to the API...
-
-```
-
-## What It Handles
-
-- SSE response headers
-- Backplane subscription lifecycle
-- JSON serialization and SSE formatting
-- Cancellation token handling
-- Cleanup in finally blocks
 
 ## System vision
+
+I'd like to share my views on why I have designed the system this way:
 
 A lot of real-time frameworks have the following characteristics which I dislike:
 - Client-side management of connection (with things like WebSockets which can be open, closed, opening, etc...)
@@ -101,6 +103,8 @@ The concept of this framework is: Custom HTTP endpoints that simply lets clients
 ## CodeGen for Typescript & C# Client Code
 
 Can be found in StateleSSE.CodeGen at https://github.com/uldahlalex/StateleSSE.CodeGen 
+
+Explained shortly: Use an OpenAPI generator like NSwag/Swashbuckle/etc to get a JSON spec. Use this JSON file to generate relevant client code for type-safe communication with your realtime API.
 
 ## License
 
