@@ -22,47 +22,47 @@ dotnet add package StateleSSE.AspNetCore
 
 ## Usage
 
-```csharp
-using StateleSSE.AspNetCore;
-using StateleSSE.Abstractions;
+### Step 1: Configure DI
 
-[ApiController]
-public class GameController(ISseBackplane backplane) : ControllerBase
+```csharp
+
+```
+
+### Step 2: Set up endpoints
+
+*here demo'ed with a controller with a subscribe and one broadcast:*
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.Extensions;
+
+public class ChatController(ISseBackplane backplane) : ControllerBase
 {
-    //"Broadcasting" to that topic
-    [HttpGet("events/player-joined")]
-    public async Task StreamPlayerJoined([FromQuery] string gameId)
+    [HttpGet(nameof(StreamMessages))]
+    [Produces<Message>]
+    public async Task StreamMessages(string groupId)
     {
-        var channel = ChannelNamingExtensions.Channel<PlayerJoinedEvent>("game", gameId);
-        await HttpContext.StreamSseAsync<PlayerJoinedEvent>(backplane, channel);
+        var channel = $"chat:{groupId}:Message";
+        await HttpContext.StreamSseAsync<Message>(backplane, channel);
     }
 
-    //"Subscribing" to a "topic"
-    [HttpGet("game/stream")]
-    public async Task GameStream([FromQuery] string gameId)
+    [HttpPost(nameof(CreateMessage))]
+    public async Task CreateMessage([FromBody] CreateMessageRequest request)
     {
-        var channel = 
-            backplane, channel, () => GetGameState(gameId), "game_state");
+        var channel = $"chat:{request.GroupId}:Message";
+        var message = new Message { Content = request.Content };
+        await backplane.PublishToGroup(channel, message);
     }
 }
-```
 
-## Extension Methods
+public class Message
+{
+    public required string Content { get; set; }
+}
 
-**StreamSseAsync&lt;TEvent&gt;** - Stream typed events
-```csharp
-await HttpContext.StreamSseAsync<PlayerJoinedEvent>(backplane, channel);
-```
+public record CreateMessageRequest(string Content, string GroupId);
 
-**StreamSseWithInitialStateAsync&lt;TState&gt;** - Stream with initial state
-```csharp
-await HttpContext.StreamSseWithInitialStateAsync(
-    backplane, channel, getInitialState, eventName);
-```
-
-**StreamSseAsync** - Stream untyped events
-```csharp
-await HttpContext.StreamSseAsync(backplane, channel);
 ```
 
 ## What It Handles
@@ -73,18 +73,6 @@ await HttpContext.StreamSseAsync(backplane, channel);
 - Cancellation token handling
 - Cleanup in finally blocks
 
-## Channel Naming
-
-```csharp
-ChannelNamingExtensions.Channel<PlayerJoinedEvent>("game", "123");
-// "game:123:PlayerJoinedEvent"
-
-ChannelNamingExtensions.Channel("game", "123");
-// "game:123"
-
-ChannelNamingExtensions.BroadcastChannel("game");
-// "game:all"
-```
 
 ## License
 

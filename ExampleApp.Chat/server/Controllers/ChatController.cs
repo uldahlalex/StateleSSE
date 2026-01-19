@@ -1,13 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.Extensions;
 
-namespace server.Controllers;
-
-[ApiController]
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
-    [HttpGet(nameof(StreamMessages)), SseEndpoint]
+    [HttpGet(nameof(StreamMessages))]
     [Produces<Message>]
     public async Task StreamMessages(string groupId)
     {
@@ -16,22 +12,11 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     }
 
     [HttpPost(nameof(CreateMessage))]
-    [ProducesResponseType<Message>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateMessage([FromBody] CreateMessageRequest request)
+    public async Task CreateMessage([FromBody] CreateMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Content))
-            return BadRequest(new ErrorResponse("Content cannot be empty", "EMPTY_CONTENT"));
-
-        if (request.Content.Length > 500)
-            return BadRequest(new ErrorResponse("Content too long", "CONTENT_TOO_LONG"));
-
         var channel = $"chat:{request.GroupId}:Message";
         var message = new Message { Content = request.Content };
-
         await backplane.PublishToGroup(channel, message);
-
-        return Ok(message);
     }
 }
 
@@ -41,4 +26,3 @@ public class Message
 }
 
 public record CreateMessageRequest(string Content, string GroupId);
-public record ErrorResponse(string Message, string? Code = null);

@@ -54,7 +54,7 @@ export class ChatClient {
         return Promise.resolve<Message>(null as any);
     }
 
-    createMessage(request: CreateMessageRequest): Promise<Message> {
+    createMessage(request: CreateMessageRequest): Promise<void> {
         let url_ = this.baseUrl + "/CreateMessage";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -65,7 +65,6 @@ export class ChatClient {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json"
             }
         };
 
@@ -74,37 +73,24 @@ export class ChatClient {
         });
     }
 
-    protected processCreateMessage(response: Response): Promise<Message> {
+    protected processCreateMessage(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Message;
-            return result200;
-            });
-        } else if (status === 400) {
-            return response.text().then((_responseText) => {
-            let result400: any = null;
-            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ErrorResponse;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            return;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Message>(null as any);
+        return Promise.resolve<void>(null as any);
     }
 }
 
 export interface Message {
     content?: string;
-}
-
-export interface ErrorResponse {
-    message?: string;
-    code?: string | undefined;
 }
 
 export interface CreateMessageRequest {

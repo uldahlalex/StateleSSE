@@ -161,10 +161,14 @@ public static class TypeScriptEventSourceGenerator
         string? modelsImport)
     {
         var sb = new StringBuilder();
+        var hasModelsImport = !string.IsNullOrEmpty(modelsImport);
 
+        sb.AppendLine("/* eslint-disable */");
+        sb.AppendLine("// @ts-nocheck");
+        sb.AppendLine();
         sb.AppendLine($"import {{ BASE_URL }} from '{baseUrlImport}';");
 
-        if (!string.IsNullOrEmpty(modelsImport))
+        if (hasModelsImport)
         {
             var eventTypes = endpoints.Select(e => e.EventType).Distinct().OrderBy(t => t);
             var typeImports = string.Join(", ", eventTypes);
@@ -183,6 +187,11 @@ public static class TypeScriptEventSourceGenerator
         foreach (var endpoint in endpoints)
         {
             GenerateSubscriptionFunction(sb, endpoint, modelsImport);
+
+            if (hasModelsImport)
+            {
+                GenerateGenericSubscriptionFunction(sb, endpoint);
+            }
         }
 
         return sb.ToString();
@@ -216,7 +225,7 @@ public static class TypeScriptEventSourceGenerator
             sb.AppendLine($" * @param {ToCamelCase(param.Name)} - {param.Name}{optional}");
         }
         sb.AppendLine(" * @param onMessage - Callback for typed message events");
-        sb.AppendLine(" * @param onError - Optional error callback");
+        sb.AppendLine(" * @param onError - Optional error callback. Triggered on connection errors, network failures, or when server closes the connection");
         sb.AppendLine($" * @returns EventSource instance for {endpoint.EventType}");
         sb.AppendLine(" */");
 
@@ -249,6 +258,54 @@ public static class TypeScriptEventSourceGenerator
         sb.AppendLine("        es.onmessage = (e) => {");
         sb.AppendLine("            try {");
         sb.AppendLine($"                const data: {eventType} = JSON.parse(e.data);");
+        sb.AppendLine("                onMessage(data);");
+        sb.AppendLine("            } catch (error) {");
+        sb.AppendLine("                console.error('Failed to parse SSE event:', error);");
+        sb.AppendLine("            }");
+        sb.AppendLine("        };");
+        sb.AppendLine("    }");
+        sb.AppendLine("    ");
+        sb.AppendLine("    if (onError) {");
+        sb.AppendLine("        es.onerror = onError;");
+        sb.AppendLine("    }");
+        sb.AppendLine("    ");
+        sb.AppendLine("    return es;");
+        sb.AppendLine("}");
+        sb.AppendLine();
+    }
+
+    private static void GenerateGenericSubscriptionFunction(StringBuilder sb, EventSourceEndpoint endpoint)
+    {
+        var functionName = GenerateFunctionName(endpoint);
+        var hasParameters = endpoint.Parameters.Any();
+
+        var allParams = new List<string>();
+        allParams.Add("params?: any");
+        allParams.Add("onMessage?: (event: T) => void");
+        allParams.Add("onError?: (error: Event) => void");
+
+        var paramList = string.Join(", ", allParams);
+
+        sb.AppendLine("/**");
+        sb.AppendLine($" * Generic version of {functionName} that accepts any parameters and returns any type");
+        sb.AppendLine(" * Use this for custom scenarios where you need full control over types");
+        sb.AppendLine(" * @param params - Query parameters as any object");
+        sb.AppendLine(" * @param onMessage - Callback for typed message events");
+        sb.AppendLine(" * @param onError - Optional error callback. Triggered on connection errors, network failures, or when server closes the connection");
+        sb.AppendLine($" * @returns EventSource instance");
+        sb.AppendLine(" */");
+        sb.AppendLine($"export function {functionName}Generic<T = any>({paramList}): EventSource {{");
+
+        sb.AppendLine($"    const queryParams = params ? new URLSearchParams(params) : new URLSearchParams();");
+        sb.AppendLine($"    const url = `${{BASE_URL}}{endpoint.Path}?${{queryParams}}`;");
+
+        sb.AppendLine("    ");
+        sb.AppendLine("    const es = new EventSource(url);");
+        sb.AppendLine("    ");
+        sb.AppendLine("    if (onMessage) {");
+        sb.AppendLine("        es.onmessage = (e) => {");
+        sb.AppendLine("            try {");
+        sb.AppendLine("                const data: T = JSON.parse(e.data);");
         sb.AppendLine("                onMessage(data);");
         sb.AppendLine("            } catch (error) {");
         sb.AppendLine("                console.error('Failed to parse SSE event:', error);");

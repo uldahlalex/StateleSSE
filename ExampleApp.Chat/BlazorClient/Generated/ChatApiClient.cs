@@ -35,11 +35,11 @@ namespace ChatApi.Client
         System.Threading.Tasks.Task<Message> StreamMessagesAsync(string groupId, System.Threading.CancellationToken cancellationToken);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Message> CreateMessageAsync(CreateMessageRequest request);
+        System.Threading.Tasks.Task CreateMessageAsync(CreateMessageRequest request);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Message> CreateMessageAsync(CreateMessageRequest request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task CreateMessageAsync(CreateMessageRequest request, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -174,14 +174,14 @@ namespace ChatApi.Client
         }
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Message> CreateMessageAsync(CreateMessageRequest request)
+        public virtual System.Threading.Tasks.Task CreateMessageAsync(CreateMessageRequest request)
         {
             return CreateMessageAsync(request, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Message> CreateMessageAsync(CreateMessageRequest request, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task CreateMessageAsync(CreateMessageRequest request, System.Threading.CancellationToken cancellationToken)
         {
             if (request == null)
                 throw new System.ArgumentNullException("request");
@@ -197,7 +197,6 @@ namespace ChatApi.Client
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
                     request_.Content = content_;
                     request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
@@ -229,22 +228,7 @@ namespace ChatApi.Client
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<Message>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        if (status_ == 400)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ErrorResponse>("A server side error occurred.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            return;
                         }
                         else
                         {
@@ -401,18 +385,6 @@ namespace ChatApi.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("content")]
         public string Content { get; set; }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class ErrorResponse
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("message")]
-        public string Message { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("code")]
-        public string Code { get; set; }
 
     }
 
