@@ -1,4 +1,7 @@
 ﻿@page "/counter"
+@using System.Text.Json
+@using ChatApi.Client
+@* @implements IDisposable *@
 
 <PageTitle>Counter</PageTitle>
 
@@ -8,17 +11,65 @@
 
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
-@code {
-    private int currentCount = 0;
-
-    private void IncrementCount()
+<h2>Messages (@Messages.Count)</h2>
+<ul>
+    @foreach (var msg in Messages)
     {
-        currentCount++;
+        <li>@JsonSerializer.Serialize(msg)</li>
+    }
+    @Messages.Count
+</ul>
+
+@code {
+    private List<Message> Messages = new List<Message>();
+    private int currentCount = 0;
+    private static HttpClient httpClient = new HttpClient();
+    // private CancellationTokenSource? _cts;
+
+    private ChatApiClient client = new ChatApiClient("http://localhost:5000",httpClient);
+
+    private async Task IncrementCount()
+    {
+        var res = await client.CreateMessageAsync(new CreateMessageRequest()
+        {
+            Content = "hi",
+            GroupId = "1"
+        });
     }
 
     protected override async Task OnInitializedAsync()
     {
-        
+        // _cts = new CancellationTokenSource();
+        var sub = new ChatSseClient("http://localhost:5000", httpClient);
+
+        var s = sub.StreamMessagesAsync("1");
+        await foreach (var sseMessage in s)
+        {
+            Messages.Add(sseMessage.Data);
+            // await InvokeAsync(StateHasChanged);
+        }
+        //
+        // _ = Task.Run(async () =>
+        // {
+        //     try
+        //     {
+        //         var stream = sub.StreamMessagesAsync("1", _cts.Token);
+        //         await foreach (var sseMessage in stream.WithCancellation(_cts.Token))
+        //         {
+        //             Messages.Add(sseMessage.Data);
+        //             await InvokeAsync(StateHasChanged);
+        //         }
+        //     }
+        //     catch (OperationCanceledException)
+        //     {
+        //     }
+        // });
     }
+
+    // public void Dispose()
+    // {
+    //     _cts?.Cancel();
+    //     _cts?.Dispose();
+    // }
 
 }

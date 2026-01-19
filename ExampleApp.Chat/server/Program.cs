@@ -34,26 +34,35 @@ app.UseCors(c => c.AllowAnyHeader()
     .AllowAnyMethod()
     .AllowAnyOrigin()
     .SetIsOriginAllowed(_ => true));
-
-app.MapGet("/StreamMessagesMinimal", async (HttpContext ctx, ISseBackplane backplane, string groupId) =>
-{
-    await ctx.StreamSseAsync<server.Controllers.Message>(backplane, $"chat:{groupId}:Message");
-})
-.WithName("Chat_StreamMessagesMinimal")
-.Produces<server.Controllers.Message>(200, "text/event-stream");
-
+//
+// app.MapGet("/StreamMessagesMinimal", async (HttpContext ctx, ISseBackplane backplane, string groupId) =>
+// {
+//     await ctx.StreamSseAsync<server.Controllers.Message>(backplane, $"chat:{groupId}:Message");
+// })
+// .WithName("Chat_StreamMessagesMinimal")
+// .Produces<server.Controllers.Message>(200, "text/event-stream");
+//
 
 var currentDir = Directory.GetCurrentDirectory();
 var openApiSpecPath = Path.Combine(currentDir, "openapi.json");
 var clientPath = Path.Combine(currentDir, "../client/src/generated-client.ts");
 var sseClientPath = Path.Combine(currentDir, "../client/src/generated-sse-client.ts");
+var csharpClientPath = Path.Combine(currentDir, "../BlazorClient/Generated/ChatApiClient.cs");
+var csharpSseClientPath = Path.Combine(currentDir, "../BlazorClient/Generated/ChatSseClient.cs");
 
-await app.GenerateApiClientsFromOpenApi(clientPath, openApiSpecPath);
+await app.GenerateApiClientsFromOpenApi(clientPath, openApiSpecPath, csharpClientPath);
 
 TypeScriptEventSourceGenerator.Generate(
     openApiSpecPath: openApiSpecPath,
     outputPath: sseClientPath,
     baseUrlImport: "./utils/BASE_URL"
+);
+
+CSharpEventSourceGenerator.Generate(
+    openApiSpecPath: openApiSpecPath,
+    outputPath: csharpSseClientPath,
+    className: "ChatSseClient",
+    namespaceName: "ChatApi.Client"
 );
 
 app.Run();

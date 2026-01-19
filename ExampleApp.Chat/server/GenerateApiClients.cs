@@ -1,6 +1,8 @@
 using NJsonSchema.CodeGeneration.TypeScript;
+using NJsonSchema.CodeGeneration.CSharp;
 using NSwag;
 using NSwag.CodeGeneration.TypeScript;
+using NSwag.CodeGeneration.CSharp;
 using NSwag.Generation;
 
 namespace api.Etc;
@@ -10,7 +12,8 @@ public static class GenerateApiClientsExtensions
     public static async Task<string> GenerateApiClientsFromOpenApi(
         this WebApplication app,
         string clientOutputPath,
-        string openApiOutputPath)
+        string openApiOutputPath,
+        string? csharpClientOutputPath = null)
     {
         var document = await app.Services.GetRequiredService<IOpenApiDocumentGenerator>()
             .GenerateAsync("v1");
@@ -47,6 +50,32 @@ public static class GenerateApiClientsExtensions
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("OpenAPI JSON with documentation saved at: " + openApiOutputPath);
         logger.LogInformation("TypeScript client generated at: " + clientOutputPath);
+
+        if (!string.IsNullOrEmpty(csharpClientOutputPath))
+        {
+            var csharpSettings = new CSharpClientGeneratorSettings
+            {
+                ClassName = "ChatApiClient",
+                GenerateClientInterfaces = true,
+                UseBaseUrl = true,
+                InjectHttpClient = true,
+                GenerateExceptionClasses = true,
+                ExceptionClass = "ApiException",
+                CSharpGeneratorSettings =
+                {
+                    Namespace = "ChatApi.Client",
+                    JsonLibrary = CSharpJsonLibrary.SystemTextJson
+                }
+            };
+
+            var csharpGenerator = new CSharpClientGenerator(documentFromJson, csharpSettings);
+            var csharpCode = csharpGenerator.GenerateFile();
+
+            Directory.CreateDirectory(Path.GetDirectoryName(csharpClientOutputPath)!);
+            await File.WriteAllTextAsync(csharpClientOutputPath, csharpCode);
+
+            logger.LogInformation("C# client generated at: " + csharpClientOutputPath);
+        }
 
         return openApiOutputPath;
     }
