@@ -12,7 +12,7 @@ function App() {
 
     useEffect(() => {
         console.log('Connecting to SSE...');
-        const es = streamMessages<Message>(
+        const es = streamMessages(
             "1",
             (dto) => {
                 console.log('Received message:', dto);

@@ -1,7 +1,9 @@
 Aktuelt:
 
-- remove endpoint filtering
-
+- add support for TS return type upon stream
+    - adjust readme for codegen
+    
+- readme for statelesse.aspnetcore
 
 - tests
 - fungerer hangfire fint med det nye layout og forstår jeg det fuldt?

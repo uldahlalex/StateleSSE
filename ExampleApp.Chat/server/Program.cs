@@ -55,7 +55,8 @@ await app.GenerateApiClientsFromOpenApi(clientPath, openApiSpecPath, csharpClien
 TypeScriptEventSourceGenerator.Generate(
     openApiSpecPath: openApiSpecPath,
     outputPath: sseClientPath,
-    baseUrlImport: "./utils/BASE_URL"
+    baseUrlImport: "./utils/BASE_URL",
+    modelsImport: "./generated-client.ts"
 );
 
 CSharpEventSourceGenerator.Generate(

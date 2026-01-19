@@ -1,4 +1,5 @@
 import { BASE_URL } from './utils/BASE_URL';
+import type { Message } from './generated-client.ts';
 
 /**
  * Auto-generated EventSource client
@@ -13,7 +14,7 @@ import { BASE_URL } from './utils/BASE_URL';
  * @param onError - Optional error callback
  * @returns EventSource instance for Message
  */
-export function streamMessages<T = any>(groupId?: string, onMessage?: (event: T) => void, onError?: (error: Event) => void): EventSource {
+export function streamMessages(groupId?: string, onMessage?: (event: Message) => void, onError?: (error: Event) => void): EventSource {
     const queryParams = new URLSearchParams({ ...(groupId !== undefined ? { 'groupId': groupId } : {}) });
     const url = `${BASE_URL}/StreamMessages?${queryParams}`;
     
@@ -22,7 +23,7 @@ export function streamMessages<T = any>(groupId?: string, onMessage?: (event: T)
     if (onMessage) {
         es.onmessage = (e) => {
             try {
-                const data: T = JSON.parse(e.data);
+                const data: Message = JSON.parse(e.data);
                 onMessage(data);
             } catch (error) {
                 console.error('Failed to parse SSE event:', error);

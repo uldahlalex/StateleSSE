@@ -37,15 +37,28 @@ using StateleSSE.CodeGen;
 TypeScriptEventSourceGenerator.Generate(
     openApiSpecPath: "path/to/openapi.json",
     outputPath: "client/src/generated-sse-client.ts",
-    baseUrlImport: "./utils/BASE_URL"  // Will target an exported const (string) BASE_URL (example: "http://localhost:5000" or some production URL)
+    baseUrlImport: "./utils/BASE_URL",  // Will target an exported const (string) BASE_URL (example: "http://localhost:5000" or some production URL)
+    modelsImport: "./generated-client.ts"  // Optional: Import path for model types. When provided, generates type-safe functions without generics
 );
 ```
 
 #### Usage Examples
 
-TypeScript:
+TypeScript with type imports (when modelsImport is provided):
 ```typescript
-//In your TS client app, use the generated streamMessages<T>(params, onMessage, onError) method like this:
+//The generated function will use actual Message type instead of generic T:
+const es = streamMessages(
+    "room-123",
+    (msg) => console.log("Received:", msg),  // msg is typed as Message
+    (err) => console.error("Error:", err)
+);
+
+es.close();
+```
+
+TypeScript with generics (when modelsImport is not provided):
+```typescript
+//The generated function will use generic T = any:
 const es = streamMessages<Message>(
     "room-123",
     (msg) => console.log("Received:", msg),

@@ -14,12 +14,14 @@ public static class TypeScriptEventSourceGenerator
     /// <param name="openApiSpecPath">Path to OpenAPI JSON file (e.g., "openapi.json", "swagger.json")</param>
     /// <param name="outputPath">Output path for generated TypeScript file</param>
     /// <param name="baseUrlImport">Import path for BASE_URL constant (default: "./utils/BASE_URL")</param>
+    /// <param name="modelsImport">Optional import path for model types (e.g., "./generated-client.ts"). If null, uses generic types.</param>
     /// <param name="logOutput">Optional callback for diagnostic output. If null, writes to Console.</param>
     /// <exception cref="FileNotFoundException">Thrown when OpenAPI spec file is not found</exception>
     public static void Generate(
         string openApiSpecPath,
         string outputPath,
         string baseUrlImport = "./utils/BASE_URL",
+        string? modelsImport = null,
         Action<string>? logOutput = null)
     {
         logOutput ??= Console.WriteLine;
@@ -37,7 +39,7 @@ public static class TypeScriptEventSourceGenerator
             return;
         }
 
-        var typescript = GenerateTypeScript(endpoints, baseUrlImport);
+        var typescript = GenerateTypeScript(endpoints, baseUrlImport, modelsImport);
 
         var outputDir = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrEmpty(outputDir))
@@ -155,11 +157,20 @@ public static class TypeScriptEventSourceGenerator
 
     private static string GenerateTypeScript(
         List<EventSourceEndpoint> endpoints,
-        string baseUrlImport)
+        string baseUrlImport,
+        string? modelsImport)
     {
         var sb = new StringBuilder();
 
         sb.AppendLine($"import {{ BASE_URL }} from '{baseUrlImport}';");
+
+        if (!string.IsNullOrEmpty(modelsImport))
+        {
+            var eventTypes = endpoints.Select(e => e.EventType).Distinct().OrderBy(t => t);
+            var typeImports = string.Join(", ", eventTypes);
+            sb.AppendLine($"import type {{ {typeImports} }} from '{modelsImport}';");
+        }
+
         sb.AppendLine();
 
         sb.AppendLine("/**");
@@ -171,15 +182,17 @@ public static class TypeScriptEventSourceGenerator
 
         foreach (var endpoint in endpoints)
         {
-            GenerateSubscriptionFunction(sb, endpoint);
+            GenerateSubscriptionFunction(sb, endpoint, modelsImport);
         }
 
         return sb.ToString();
     }
 
-    private static void GenerateSubscriptionFunction(StringBuilder sb, EventSourceEndpoint endpoint)
+    private static void GenerateSubscriptionFunction(StringBuilder sb, EventSourceEndpoint endpoint, string? modelsImport)
     {
         var functionName = GenerateFunctionName(endpoint);
+        var hasModelsImport = !string.IsNullOrEmpty(modelsImport);
+        var eventType = hasModelsImport ? endpoint.EventType : "T";
 
         var hasParameters = endpoint.Parameters.Any();
         var requiredParams = endpoint.Parameters.Where(p => p.IsRequired)
@@ -190,7 +203,7 @@ public static class TypeScriptEventSourceGenerator
         var allParams = new List<string>();
         allParams.AddRange(requiredParams);
         allParams.AddRange(optionalParams);
-        allParams.Add("onMessage?: (event: T) => void");
+        allParams.Add($"onMessage?: (event: {eventType}) => void");
         allParams.Add("onError?: (error: Event) => void");
 
         var paramList = string.Join(", ", allParams);
@@ -207,7 +220,11 @@ public static class TypeScriptEventSourceGenerator
         sb.AppendLine($" * @returns EventSource instance for {endpoint.EventType}");
         sb.AppendLine(" */");
 
-        sb.AppendLine($"export function {functionName}<T = any>({paramList}): EventSource {{");
+        var functionSignature = hasModelsImport
+            ? $"export function {functionName}({paramList}): EventSource {{"
+            : $"export function {functionName}<T = any>({paramList}): EventSource {{";
+
+        sb.AppendLine(functionSignature);
 
         if (hasParameters)
         {
@@ -231,7 +248,7 @@ public static class TypeScriptEventSourceGenerator
         sb.AppendLine("    if (onMessage) {");
         sb.AppendLine("        es.onmessage = (e) => {");
         sb.AppendLine("            try {");
-        sb.AppendLine("                const data: T = JSON.parse(e.data);");
+        sb.AppendLine($"                const data: {eventType} = JSON.parse(e.data);");
         sb.AppendLine("                onMessage(data);");
         sb.AppendLine("            } catch (error) {");
         sb.AppendLine("                console.error('Failed to parse SSE event:', error);");

@@ -162,6 +162,7 @@ public static class CSharpEventSourceGenerator
     {
         var sb = new StringBuilder();
 
+        sb.AppendLine("using System.Text;");
         sb.AppendLine("using System.Text.Json;");
         sb.AppendLine();
         sb.AppendLine($"namespace {namespaceName};");
