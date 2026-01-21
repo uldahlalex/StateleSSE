@@ -1,267 +1,91 @@
 # StateleSSE
 
-A type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core.
+## What is it?
 
-## What is StateleSSE?
+Type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core.
 
-StateleSSE provides a clean, production-ready abstraction for building real-time Server-Sent Events APIs in .NET. It eliminates SSE boilerplate and enables horizontal scaling through a backplane architecture.
-
-Key features:
-- Type-safe event streaming with minimal boilerplate
-- Horizontal scaling via backplane abstraction (Redis or in-memory)
-- Channel-based pub/sub with flexible naming conventions
-- TypeScript client code generation
-- OpenAPI/Swagger integration
+Built for multi-client realtime web apps that scale. Features single-connection multi-event pattern to solve browser connection limits.
 
 ## Installation
 
-### Basic Setup (Single Server)
-
 ```bash
 dotnet add package StateleSSE.AspNetCore
 ```
 
-### Production Setup (Multi-Server with Redis)
+## Usage
 
-```bash
-dotnet add package StateleSSE.AspNetCore
-dotnet add package StateleSSE.Backplane.Redis
-```
+### Step 1: Add Backplane to DI
 
-## Quick Start
+Here demonstrated with a very basic Program.cs startup pipeline:
 
-### 1. Register the backplane
-
-**Development (in-memory):**
 ```csharp
-var builder = WebApplication.CreateBuilder(args);
+//using StackExchange.Redis; remove comment and have the StackExchange.Redis nuget package installed if you want to use redis for backplane instead of inmemory
+using StateleSSE.AspNetCore;
 
+var builder = WebApplication.CreateBuilder(args);
+/* this is required if you want to use redis for backplane - here im simply using a local redis db
+   builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    { var config = ConfigurationOptions.Parse( "localhost:6379" );
+        config.AbortOnConnectFail = false;
+        return ConnectionMultiplexer.Connect(config); });*/
 builder.Services.AddInMemorySseBackplane();
-builder.Services.AddControllers();
-
+//builder.Services.AddRedisSseBackplane(); Use this one instead if you want to use redis for backplane - comment out the inmemorybackplane
+builder.Services.AddControllers(); //You can also use minimal API or other API type - the library has no MVC dependency
 var app = builder.Build();
 app.MapControllers();
 app.Run();
 ```
 
-**Production (Redis):**
-```csharp
-using StateleSSE.Backplane.Redis.Extensions;
+### Step 2: Set up endpoints
 
-var builder = WebApplication.CreateBuilder(args);
+**Single-connection multi-event pattern (recommended):**
 
-builder.Services.AddRedisSseBackplane(options =>
-{
-    options.RedisConnectionString = "localhost:6379";
-    options.ChannelPrefix = "myapp";
-});
-builder.Services.AddControllers();
-
-var app = builder.Build();
-app.MapControllers();
-app.Run();
-```
-
-### 2. Define your event types
-
-```csharp
-public record MessageReceivedEvent(string Username, string Content, DateTime Timestamp);
-public record UserJoinedEvent(string Username);
-```
-
-### 3. Create an SSE endpoint
-
-**Basic approach (AspNetCore package):**
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
 [ApiController]
-[Route("api/chat")]
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
-    [HttpGet("subscribe/{roomId}")]
+    [HttpGet("events")]
     [Produces("text/event-stream")]
-    [ProducesResponseType(typeof(MessageReceivedEvent), 200)]
-    public Task SubscribeToRoom(string roomId)
+    [ProducesResponseType(typeof(ChatEventUnion), 200)]
+    public async Task StreamChatEvents(string roomId)
     {
         var channel = $"chat:{roomId}";
-        return HttpContext.StreamSseAsync(backplane, channel);
+        var eventTypes = new[]
+        {
+            typeof(MessageReceivedEvent),
+            typeof(UserJoinedEvent),
+            typeof(UserLeftEvent)
+        };
+        await HttpContext.StreamSseAsync(backplane, channel, eventTypes);
     }
-}
-```
 
-**Production approach (Redis backplane with SseControllerBase):**
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using StateleSSE.AspNetCore;
-using StateleSSE.Backplane.Redis;
-
-[ApiController]
-public class ChatController(ISseBackplane backplane) : SseControllerBase(backplane)
-{
-    [HttpGet("subscribe/{roomId}")]
-    [Produces("text/event-stream")]
-    [ProducesResponseType(typeof(MessageReceivedEvent), 200)]
-    public async Task SubscribeToRoom(string roomId)
+    [HttpPost("messages")]
+    public async Task SendMessage([FromBody] SendMessageRequest request)
     {
-        var channel = $"chat:{roomId}:MessageReceivedEvent";
-        await StreamEventType<MessageReceivedEvent>(channel);
+        var channel = $"chat:{request.RoomId}";
+        var evt = new MessageReceivedEvent(request.Username, request.Content, DateTime.UtcNow);
+        await backplane.PublishToGroup(channel, evt);
     }
 }
-```
 
-The `SseControllerBase` adds production features:
-- Automatic keepalives (prevents ANCM timeout in IIS/Azure)
-- Event IDs for reconnection tracking
-- Retry directive for automatic reconnection
-- nginx buffering prevention
+public record MessageReceivedEvent(string Username, string Content, DateTime Timestamp);
+public record UserJoinedEvent(string Username, DateTime Timestamp);
+public record UserLeftEvent(string Username, DateTime Timestamp);
 
-### 4. Publishing events
-
-```csharp
-[HttpPost("rooms/{roomId}/messages")]
-public async Task<IActionResult> SendMessage(
-    string roomId,
-    [FromBody] SendMessageRequest request)
+public class ChatEventUnion
 {
-    var evt = new MessageReceivedEvent(
-        request.Username,
-        request.Content,
-        DateTime.UtcNow
-    );
-
-    var channel = $"chat:{roomId}:MessageReceivedEvent";
-    await backplane.PublishToGroup(channel, evt);
-
-    return Ok();
+    public MessageReceivedEvent? MessageReceived { get; set; }
+    public UserJoinedEvent? UserJoined { get; set; }
+    public UserLeftEvent? UserLeft { get; set; }
 }
 
-public record SendMessageRequest(string Username, string Content);
+public record SendMessageRequest(string Username, string Content, string RoomId);
 ```
 
-### 5. Consume from a client
-
-```javascript
-const eventSource = new EventSource('/api/chat/subscribe/room-123');
-
-eventSource.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    console.log(`${data.Username}: ${data.Content}`);
-};
-
-eventSource.onerror = (error) => {
-    console.error('SSE error:', error);
-    eventSource.close();
-};
-```
-
-## Advanced Usage
-
-### Streaming with Initial State
-
-Send current state immediately when a client connects (basic approach):
-
-```csharp
-[HttpGet("subscribe/{gameId}")]
-public async Task SubscribeToGame(string gameId)
-{
-    var channel = $"game:{gameId}";
-
-    return await HttpContext.StreamSseWithInitialStateAsync(
-        backplane,
-        channel,
-        getInitialState: async () => await GetGameState(gameId)
-    );
-}
-```
-
-### Channel Naming Convention
-
-Use string interpolation for channel names. Common patterns:
-
-```csharp
-// Domain-scoped with event type (recommended for production)
-var channel = $"game:{gameId}:PlayerJoinedEvent";
-
-// Simple domain-scoped
-var channel = $"chat:{roomId}";
-
-// Broadcast channel
-var channel = "notifications:all";
-```
-
-Optional: `ChannelNamingExtensions` provides helper methods if you prefer:
-```csharp
-var channel = ChannelNamingExtensions.Channel<PlayerJoinedEvent>("game", gameId);
-```
-
-### Publishing to Multiple Channels
-
-```csharp
-// Publish to multiple rooms at once
-var channels = new[] { "chat:room-1", "chat:room-2", "chat:room-3" };
-await backplane.PublishToGroups(channels, evt);
-
-// Broadcast to all connected clients
-await backplane.PublishToAll(new ServerMaintenanceEvent());
-```
-
-### Backplane Diagnostics
-
-```csharp
-var diagnostics = backplane.GetDiagnostics();
-Console.WriteLine($"Active groups: {diagnostics.TotalGroups}");
-Console.WriteLine($"Total subscribers: {diagnostics.TotalLocalSubscribers}");
-
-foreach (var group in diagnostics.Groups)
-{
-    Console.WriteLine($"{group.GroupId}: {group.LocalSubscribers} subscribers");
-}
-```
-
-## Architecture
-
-### Backplane Pattern
-
-The `ISseBackplane` abstraction enables horizontal scaling:
-
-1. Clients connect to any server instance via SSE endpoints
-2. Each server subscribes to channels via the backplane
-3. When you publish an event, it's distributed across all server instances via the backplane
-4. Each server delivers events to its local SSE connections
-
-This allows you to scale to multiple servers while maintaining real-time event delivery.
-
-### Available Backplanes
-
-- **InMemoryBackplane**: Single-server deployments, development, testing
-- **RedisBackplane**: Production multi-server deployments using Redis pub/sub
-
-## TypeScript Code Generation
-
-StateleSSE can automatically generate type-safe TypeScript EventSource clients from your SSE endpoints using standard OpenAPI content-types.
-
-**Zero configuration required** - works with all OpenAPI frameworks (NSwag, Swashbuckle, Microsoft.AspNetCore.OpenApi) out of the box!
-
-### Setup
-
-**Step 1: Add your preferred OpenAPI library**
-
-Choose one:
-
-```bash
-# NSwag
-dotnet add package NSwag.AspNetCore
-
-# OR Swashbuckle
-dotnet add package Swashbuckle.AspNetCore
-
-# OR Microsoft.AspNetCore.OpenApi (.NET 9+)
-dotnet add package Microsoft.AspNetCore.OpenApi
-```
-
-**Step 2: Mark your SSE endpoints with standard attributes**
+**Alternative: Single event type endpoint:**
 
 ```csharp
 [HttpGet(nameof(StreamMessages))]
@@ -269,65 +93,58 @@ dotnet add package Microsoft.AspNetCore.OpenApi
 [ProducesResponseType(typeof(MessageReceivedEvent), 200)]
 public async Task StreamMessages(string roomId)
 {
-    var channel = $"chat:{roomId}:MessageReceivedEvent";
-    await StreamEventType<MessageReceivedEvent>(channel);
+    var channel = $"chat:{roomId}";
+    await HttpContext.StreamSseAsync<MessageReceivedEvent>(backplane, channel);
 }
 ```
 
-That's it! The `text/event-stream` content-type is automatically detected by all OpenAPI frameworks.
+### Step 3: Client usage
 
-**Step 3: Generate TypeScript client at startup**
-
-```csharp
-using StateleSSE.CodeGen;
-
-var app = builder.Build();
-
-app.MapOpenApi(); // or app.UseSwagger() for Swashbuckle
-
-// Generate TypeScript EventSource client
-TypeScriptEventSourceGenerator.Generate(
-    openApiSpecPath: "openapi.json",
-    outputPath: "../client/src/generated-sse-client.ts"
-);
-
-await app.RunAsync();
-```
-
-### Generated TypeScript
-
-The generator creates type-safe EventSource functions:
-
+**Browser (JavaScript/TypeScript):**
 ```typescript
-/**
- * Subscribe to MessageReceivedEvent events
- * @param roomid - RoomId
- * @returns EventSource instance for MessageReceivedEvent
- */
-export function streamMessages(roomid: string): EventSource {
-    const queryParams = new URLSearchParams({ roomid });
-    const url = `${BASE_URL}/StreamMessages?${queryParams}`;
-    return new EventSource(url);
-}
+const stream = new EventSource('/events?roomId=room1');
+
+stream.addEventListener('MessageReceivedEvent', (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    console.log(`${data.Username}: ${data.Content}`);
+});
+
+stream.addEventListener('UserJoinedEvent', (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    console.log(`${data.Username} joined`);
+});
 ```
 
-### Usage in your frontend
+**cURL (testing):**
+```bash
+# Terminal 1: Subscribe to the SSE stream
+curl -N http://localhost:5000/events?roomId=room1
 
-```typescript
-import { streamMessages } from './generated-sse-client';
-
-const es = streamMessages('room-123');
-
-es.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    console.log(data.Username, data.Content);
-};
-
-es.onerror = () => {
-    console.error('Connection lost');
-    es.close();
-};
+# Terminal 2: Send a message (will appear in Terminal 1)
+curl -X POST http://localhost:5000/messages \
+    -H "Content-Type: application/json" \
+    -d '{"Username":"Alice","Content":"Hello!","RoomId":"room1"}'
 ```
+
+## System vision
+
+I'd like to share my views on why I have designed the system this way:
+
+A lot of real-time frameworks have the following characteristics which I dislike:
+- Client-side management of connection (with things like WebSockets which can be open, closed, opening, etc...)
+- Weak and unopinionated "endpoint" / orchestration of communication. (like all network traffic all arriving to a single point in the client app, which now has to mediate traffic)
+- Bad support for web documentation standards / no living docs (no swagger/openapi, lack of source generators based around this standard. AsyncAPI is mostly geared towards "broker" oriented stuff )
+- Horizontal scaling and server side connection / user management can be very difficult (SignalR has a decent "Users/Connections/Groups" abstraction, which I'm inspired by)
+
+Most web devs have existing familiarity with request-response pattern in a simple client-server app with HTTP.
+The concept of this framework is: Custom HTTP endpoints that simply lets clients subscribe to a broadcast / stream and let them know which DTO they will receive upon that event.
+
+
+## CodeGen for Typescript & C# Client Code
+
+Can be found in StateleSSE.CodeGen at https://github.com/uldahlalex/StateleSSE.CodeGen
+
+Explained shortly: Use an OpenAPI generator like NSwag/Swashbuckle/etc to get a JSON spec. Use this JSON file to generate relevant client code for type-safe communication with your realtime API.
 
 ## License
 

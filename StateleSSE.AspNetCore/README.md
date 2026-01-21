@@ -2,9 +2,9 @@
 
 ## What is it?
 
-Standardized client/group management for server sent events with horizontal scaling & more.
+Type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core.
 
-Built for multi-client realtime web apps that scale (with Server Sent Events (SSE)).
+Built for multi-client realtime web apps that scale. Features single-connection multi-event pattern to solve browser connection limits.
 
 ## Installation
 
@@ -38,52 +38,92 @@ app.Run();
 
 ### Step 2: Set up endpoints
 
-*here demo'ed with a controller with a "subscribe/stream" and one broadcast method:*
+**Single-connection multi-event pattern (recommended):**
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.Extensions;
 
+[ApiController]
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
-    [HttpGet(nameof(StreamMessages))]
-    [Produces<Message>]
-    public async Task StreamMessages(string groupId)
+    [HttpGet("events")]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(ChatEventUnion), 200)]
+    public async Task StreamChatEvents(string roomId)
     {
-        var channel = $"chat:{groupId}:Message";
-        await HttpContext.StreamSseAsync<Message>(backplane, channel);
+        var channel = $"chat:{roomId}";
+        var eventTypes = new[]
+        {
+            typeof(MessageReceivedEvent),
+            typeof(UserJoinedEvent),
+            typeof(UserLeftEvent)
+        };
+        await HttpContext.StreamSseAsync(backplane, channel, eventTypes);
     }
 
-    [HttpPost(nameof(CreateMessage))]
-    public async Task CreateMessage([FromBody] CreateMessageRequest request)
+    [HttpPost("messages")]
+    public async Task SendMessage([FromBody] SendMessageRequest request)
     {
-        var channel = $"chat:{request.GroupId}:Message";
-        var message = new Message { Content = request.Content };
-        await backplane.PublishToGroup(channel, message);
+        var channel = $"chat:{request.RoomId}";
+        var evt = new MessageReceivedEvent(request.Username, request.Content, DateTime.UtcNow);
+        await backplane.PublishToGroup(channel, evt);
     }
 }
 
-public class Message
+public record MessageReceivedEvent(string Username, string Content, DateTime Timestamp);
+public record UserJoinedEvent(string Username, DateTime Timestamp);
+public record UserLeftEvent(string Username, DateTime Timestamp);
+
+public class ChatEventUnion
 {
-    public required string Content { get; set; }
+    public MessageReceivedEvent? MessageReceived { get; set; }
+    public UserJoinedEvent? UserJoined { get; set; }
+    public UserLeftEvent? UserLeft { get; set; }
 }
 
-public record CreateMessageRequest(string Content, string GroupId);
-
+public record SendMessageRequest(string Username, string Content, string RoomId);
 ```
 
-### Step 3: Profit:
+**Alternative: Single event type endpoint:**
 
+```csharp
+[HttpGet(nameof(StreamMessages))]
+[Produces("text/event-stream")]
+[ProducesResponseType(typeof(MessageReceivedEvent), 200)]
+public async Task StreamMessages(string roomId)
+{
+    var channel = $"chat:{roomId}";
+    await HttpContext.StreamSseAsync<MessageReceivedEvent>(backplane, channel);
+}
+```
+
+### Step 3: Client usage
+
+**Browser (JavaScript/TypeScript):**
+```typescript
+const stream = new EventSource('/events?roomId=room1');
+
+stream.addEventListener('MessageReceivedEvent', (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    console.log(`${data.Username}: ${data.Content}`);
+});
+
+stream.addEventListener('UserJoinedEvent', (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    console.log(`${data.Username} joined`);
+});
+```
+
+**cURL (testing):**
 ```bash
-#Start the API before running the cURL commands - here I'm just assuming port 5000 is used
-#Terminal 1: Subscribe to the SSE stream
-curl -N http://localhost:5000/StreamMessages?groupId=room1
+# Terminal 1: Subscribe to the SSE stream
+curl -N http://localhost:5000/events?roomId=room1
 
 # Terminal 2: Send a message (will appear in Terminal 1)
-curl -X POST http://localhost:5000/CreateMessage \
+curl -X POST http://localhost:5000/messages \
     -H "Content-Type: application/json" \
-    -d '{"Content":"Hello from curl!","GroupId":"room1"}'
+    -d '{"Username":"Alice","Content":"Hello!","RoomId":"room1"}'
 ```
 
 ## System vision

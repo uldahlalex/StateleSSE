@@ -2,11 +2,15 @@
 
 Q) What is this?
 
-A) When using contract-based development style where OpenAPI spec becomes the source of truth for typesafe http communication (like using NSwag codegeneration, etc).
+A) Type-safe EventSource client generation from OpenAPI specifications.
 
-However, making EventSource client communication is not supported with major frameworks.
+When using contract-based development where OpenAPI becomes the source of truth for type-safe HTTP communication, EventSource client generation is not supported by major frameworks.
 
-This library uses an existing OpenAPI JSON spec to create event source client syntax so you don't need to have magic strings in your source code (and minimizes boilerplate).
+This library generates type-safe EventSource clients from OpenAPI specs, supporting:
+- Single-event subscriptions
+- Multi-event subscriptions with typed event listeners (fluent API)
+- No magic strings in source code
+- Minimal boilerplate
 
 ## Usage
 
@@ -18,13 +22,34 @@ dotnet add package StateleSSE.CodeGen
 
 For triggering the source generation, we first need at least one valid endpoint.
 
-The generator looks for GET endpoints in an OpenAPI JSON spec. So for example, this controller GET method:
+The generator looks for GET endpoints in an OpenAPI JSON spec.
 
+**Multi-event endpoint:**
+```csharp
+[HttpGet("events")]
+[Produces("text/event-stream")]
+[ProducesResponseType(typeof(ChatEventUnion), 200)]
+public async Task StreamChatEvents(string roomId)
+{
+    var eventTypes = new[] { typeof(MessageReceivedEvent), typeof(UserJoinedEvent) };
+    await HttpContext.StreamSseAsync(backplane, $"chat:{roomId}", eventTypes);
+}
+
+public class ChatEventUnion
+{
+    public MessageReceivedEvent? MessageReceived { get; set; }
+    public UserJoinedEvent? UserJoined { get; set; }
+}
+```
+
+**Single-event endpoint:**
 ```csharp
 [HttpGet("StreamMessages")]
-public async Task StreamMessages(string groupId)
+[Produces("text/event-stream")]
+[ProducesResponseType(typeof(MessageReceivedEvent), 200)]
+public async Task StreamMessages(string roomId)
 {
-    await StreamEventType<Message>($"chat:{groupId}:Message"); //This method comes from the StateleSSE.AspNetCore package. This package does not technically require that Nuget, but I don't think anyone would use this CodeGen without the StateleSSE.AspNetCore
+    await HttpContext.StreamSseAsync<MessageReceivedEvent>(backplane, $"chat:{roomId}");
 }
 ```
 
@@ -44,28 +69,50 @@ TypeScriptEventSourceGenerator.Generate(
 
 #### Usage Examples
 
-TypeScript with type imports (when modelsImport is provided):
+**Multi-event endpoint (fluent API):**
 ```typescript
-//The generated function will use actual Message type instead of generic T:
+// Generated for endpoints with ChatEventUnion return type
+streamChatEvents('room-123')
+    .onMessageReceived((msg) => console.log('Message:', msg.Content))
+    .onUserJoined((user) => console.log('Joined:', user.Username))
+    .onError((err) => console.error('Error:', err));
+```
+
+**Single-event with type imports (when modelsImport is provided):**
+```typescript
 const es = streamMessages(
-    "room-123",
-    (msg) => console.log("Received:", msg),  // msg is typed as Message
-    (err) => console.error("Error:", err)
+    'room-123',
+    (msg) => console.log('Received:', msg),  // msg is typed as MessageReceivedEvent
+    (err) => console.error('Error:', err)
 );
 
 es.close();
 ```
 
-TypeScript with generics (when modelsImport is not provided):
+**Single-event with generics (when modelsImport is not provided):**
 ```typescript
-//The generated function will use generic T = any:
-const es = streamMessages<Message>(
-    "room-123",
-    (msg) => console.log("Received:", msg),
-    (err) => console.error("Error:", err)
+const es = streamMessages<MessageReceivedEvent>(
+    'room-123',
+    (msg) => console.log('Received:', msg),
+    (err) => console.error('Error:', err)
 );
 
 es.close();
+```
+
+**Manual subscription (if you prefer):**
+```typescript
+const stream = new EventSource('/events?roomId=room-123');
+
+stream.addEventListener('MessageReceivedEvent', (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    console.log('Message:', data);
+});
+
+stream.addEventListener('UserJoinedEvent', (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    console.log('User joined:', data);
+});
 ```
 
 

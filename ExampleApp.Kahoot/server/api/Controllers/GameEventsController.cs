@@ -84,4 +84,26 @@ public class GameEventsController(ISseBackplane backplane)
         var channel = $"game:{dto.GameId}:GameCreatedEvent";
         await HttpContext.StreamSseAsync<GameCreatedEvent>(backplane, channel);
     }
+
+    /// <summary>
+    /// Stream all game events on a single connection.
+    /// Use: Subscribe to all game events efficiently (1 connection instead of 5).
+    /// Client can listen to specific event types using EventSource.addEventListener().
+    /// </summary>
+    [HttpGet("all")]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(typeof(GameEventUnion), 200)]
+    public async Task StreamAllGameEvents([FromQuery] string gameId)
+    {
+        var channel = $"game:{gameId}";
+        var eventTypes = new[]
+        {
+            typeof(RoundStartedEvent),
+            typeof(PlayerJoinedEvent),
+            typeof(AnswerSubmittedEvent),
+            typeof(RoundEndedEvent),
+            typeof(GameCreatedEvent)
+        };
+        await HttpContext.StreamSseAsync(backplane, channel, eventTypes);
+    }
 }

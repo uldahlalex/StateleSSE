@@ -82,6 +82,7 @@ public static class TypeScriptEventSourceGenerator
             }
 
             string? eventType = null;
+            List<string>? multipleEventTypes = null;
 
             foreach (var responseProp in responses.EnumerateObject())
             {
@@ -93,12 +94,22 @@ public static class TypeScriptEventSourceGenerator
                     if (!contentTypeProp.Value.TryGetProperty("schema", out var schema))
                         continue;
 
-                    if (!schema.TryGetProperty("$ref", out var schemaRef))
-                        continue;
+                    if (schema.TryGetProperty("$ref", out var schemaRef))
+                    {
+                        var refPath = schemaRef.GetString();
+                        var typeName = refPath?.Split('/').LastOrDefault();
 
-                    var refPath = schemaRef.GetString();
-                    eventType = refPath?.Split('/').LastOrDefault();
-                    break;
+                        if (typeName != null && typeName.EndsWith("Union"))
+                        {
+                            multipleEventTypes = ExtractUnionTypes(spec, typeName);
+                            eventType = typeName;
+                        }
+                        else
+                        {
+                            eventType = typeName;
+                        }
+                        break;
+                    }
                 }
 
                 if (eventType != null)
@@ -148,11 +159,43 @@ public static class TypeScriptEventSourceGenerator
                 eventType!,
                 operationId,
                 summary,
-                parameters
+                parameters,
+                multipleEventTypes
             ));
         }
 
         return endpoints;
+    }
+
+    private static List<string> ExtractUnionTypes(JsonDocument spec, string unionTypeName)
+    {
+        var types = new List<string>();
+
+        if (!spec.RootElement.TryGetProperty("components", out var components))
+            return types;
+
+        if (!components.TryGetProperty("schemas", out var schemas))
+            return types;
+
+        if (!schemas.TryGetProperty(unionTypeName, out var unionSchema))
+            return types;
+
+        if (!unionSchema.TryGetProperty("properties", out var properties))
+            return types;
+
+        foreach (var prop in properties.EnumerateObject())
+        {
+            if (prop.Value.TryGetProperty("$ref", out var refValue))
+            {
+                var typeName = refValue.GetString()?.Split('/').LastOrDefault();
+                if (typeName != null && !typeName.Equals("string", StringComparison.OrdinalIgnoreCase))
+                {
+                    types.Add(typeName);
+                }
+            }
+        }
+
+        return types;
     }
 
     private static string GenerateTypeScript(
@@ -170,8 +213,11 @@ public static class TypeScriptEventSourceGenerator
 
         if (hasModelsImport)
         {
-            var eventTypes = endpoints.Select(e => e.EventType).Distinct().OrderBy(t => t);
-            var typeImports = string.Join(", ", eventTypes);
+            var allEventTypes = endpoints
+                .SelectMany(e => e.MultipleEventTypes ?? new List<string> { e.EventType })
+                .Distinct()
+                .OrderBy(t => t);
+            var typeImports = string.Join(", ", allEventTypes);
             sb.AppendLine($"import type {{ {typeImports} }} from '{modelsImport}';");
         }
 
@@ -186,11 +232,18 @@ public static class TypeScriptEventSourceGenerator
 
         foreach (var endpoint in endpoints)
         {
-            GenerateSubscriptionFunction(sb, endpoint, modelsImport);
-
-            if (hasModelsImport)
+            if (endpoint.MultipleEventTypes != null && endpoint.MultipleEventTypes.Count > 0)
             {
-                GenerateGenericSubscriptionFunction(sb, endpoint);
+                GenerateMultiEventSubscriptionFunction(sb, endpoint, modelsImport);
+            }
+            else
+            {
+                GenerateSubscriptionFunction(sb, endpoint, modelsImport);
+
+                if (hasModelsImport)
+                {
+                    GenerateGenericSubscriptionFunction(sb, endpoint);
+                }
             }
         }
 
@@ -322,6 +375,81 @@ public static class TypeScriptEventSourceGenerator
         sb.AppendLine();
     }
 
+    private static void GenerateMultiEventSubscriptionFunction(StringBuilder sb, EventSourceEndpoint endpoint, string? modelsImport)
+    {
+        var functionName = GenerateFunctionName(endpoint);
+        var hasModelsImport = !string.IsNullOrEmpty(modelsImport);
+
+        var requiredParams = endpoint.Parameters.Where(p => p.IsRequired)
+            .Select(p => $"{ToCamelCase(p.Name)}: {p.Type}").ToList();
+        var optionalParams = endpoint.Parameters.Where(p => !p.IsRequired)
+            .Select(p => $"{ToCamelCase(p.Name)}?: {p.Type}").ToList();
+
+        var allParams = new List<string>();
+        allParams.AddRange(requiredParams);
+        allParams.AddRange(optionalParams);
+
+        var paramList = allParams.Count > 0 ? string.Join(", ", allParams) : "";
+
+        sb.AppendLine("/**");
+        sb.AppendLine($" * {endpoint.Summary ?? $"Subscribe to multiple event types on a single connection"}");
+        sb.AppendLine($" * Streams: {string.Join(", ", endpoint.MultipleEventTypes!)}");
+        foreach (var param in endpoint.Parameters)
+        {
+            var optional = param.IsRequired ? "" : " (optional)";
+            sb.AppendLine($" * @param {ToCamelCase(param.Name)} - {param.Name}{optional}");
+        }
+        sb.AppendLine($" * @returns EventSource instance with typed event listeners");
+        sb.AppendLine(" */");
+        sb.AppendLine($"export function {functionName}({paramList}) {{");
+
+        if (endpoint.Parameters.Any())
+        {
+            var paramObj = string.Join(", ", endpoint.Parameters.Select(p =>
+            {
+                var paramName = ToCamelCase(p.Name);
+                return $"...({paramName} !== undefined ? {{ '{p.Name}': {paramName} }} : {{}})";
+            }));
+
+            sb.AppendLine($"    const queryParams = new URLSearchParams({{ {paramObj} }});");
+            sb.AppendLine($"    const url = `${{BASE_URL}}{endpoint.Path}?${{queryParams}}`;");
+        }
+        else
+        {
+            sb.AppendLine($"    const url = `${{BASE_URL}}{endpoint.Path}`;");
+        }
+
+        sb.AppendLine("    const es = new EventSource(url);");
+        sb.AppendLine("    ");
+        sb.AppendLine("    return {");
+        sb.AppendLine("        eventSource: es,");
+
+        foreach (var eventType in endpoint.MultipleEventTypes!)
+        {
+            var handlerName = $"on{eventType.Replace("Event", "")}";
+            sb.AppendLine($"        {handlerName}: (callback: (data: {eventType}) => void) => {{");
+            sb.AppendLine($"            es.addEventListener('{eventType}', (e) => {{");
+            sb.AppendLine("                try {");
+            sb.AppendLine($"                    const data: {eventType} = JSON.parse((e as MessageEvent).data);");
+            sb.AppendLine("                    callback(data);");
+            sb.AppendLine("                } catch (error) {");
+            sb.AppendLine($"                    console.error('Failed to parse {eventType}:', error);");
+            sb.AppendLine("                }");
+            sb.AppendLine("            });");
+            sb.AppendLine("            return this;");
+            sb.AppendLine("        },");
+        }
+
+        sb.AppendLine("        onError: (callback: (error: Event) => void) => {");
+        sb.AppendLine("            es.onerror = callback;");
+        sb.AppendLine("            return this;");
+        sb.AppendLine("        },");
+        sb.AppendLine("        close: () => es.close()");
+        sb.AppendLine("    };");
+        sb.AppendLine("}");
+        sb.AppendLine();
+    }
+
     private static string GenerateFunctionName(EventSourceEndpoint endpoint)
     {
         if (string.IsNullOrEmpty(endpoint.OperationId))
@@ -361,7 +489,8 @@ public static class TypeScriptEventSourceGenerator
         string EventType,
         string? OperationId,
         string? Summary,
-        List<EndpointParameter> Parameters
+        List<EndpointParameter> Parameters,
+        List<string>? MultipleEventTypes = null
     );
 
     private record EndpointParameter(string Name, string Type, bool IsRequired);
