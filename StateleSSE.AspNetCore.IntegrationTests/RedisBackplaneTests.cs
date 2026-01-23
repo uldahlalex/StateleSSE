@@ -52,7 +52,8 @@ public class RedisBackplaneTests : IAsyncLifetime
         if (_backplane1 == null)
             throw new InvalidOperationException("Test not initialized");
 
-        var (reader, subscriberId) = _backplane1.Subscribe("test-group");
+        var (reader, connectionId) = _backplane1.OpenConnection();
+        _backplane1.AddSubscription(connectionId, "test-group");
 
         var message = new TestMessage { Data = "test message" };
         await _backplane1.PublishToGroup("test-group", message);
@@ -65,7 +66,7 @@ public class RedisBackplaneTests : IAsyncLifetime
         receivedMessage.Should().NotBeNull();
         receivedMessage!.Data.Should().Be(message.Data);
 
-        _backplane1.Unsubscribe("test-group", subscriberId);
+        _backplane1.CloseConnection(connectionId);
     }
 
     [Fact]
@@ -74,8 +75,10 @@ public class RedisBackplaneTests : IAsyncLifetime
         if (_backplane1 == null || _backplane2 == null)
             throw new InvalidOperationException("Test not initialized");
 
-        var (reader1, sub1) = _backplane1.Subscribe("chat-room");
-        var (reader2, sub2) = _backplane2.Subscribe("chat-room");
+        var (reader1, conn1) = _backplane1.OpenConnection();
+        var (reader2, conn2) = _backplane2.OpenConnection();
+        _backplane1.AddSubscription(conn1, "chat-room");
+        _backplane2.AddSubscription(conn2, "chat-room");
 
         await Task.Delay(100);
 
@@ -97,18 +100,20 @@ public class RedisBackplaneTests : IAsyncLifetime
         receivedMessage1!.Data.Should().Be(message.Data);
         receivedMessage2!.Data.Should().Be(message.Data);
 
-        _backplane1.Unsubscribe("chat-room", sub1);
-        _backplane2.Unsubscribe("chat-room", sub2);
+        _backplane1.CloseConnection(conn1);
+        _backplane2.CloseConnection(conn2);
     }
 
     [Fact]
-    public async Task PublishToAll_DeliversToAllGroupsAcrossServers()
+    public async Task PublishToAll_DeliversToAllConnectionsAcrossServers()
     {
         if (_backplane1 == null || _backplane2 == null)
             throw new InvalidOperationException("Test not initialized");
 
-        var (reader1, sub1) = _backplane1.Subscribe("group1");
-        var (reader2, sub2) = _backplane2.Subscribe("group2");
+        var (reader1, conn1) = _backplane1.OpenConnection();
+        var (reader2, conn2) = _backplane2.OpenConnection();
+        _backplane1.AddSubscription(conn1, "group1");
+        _backplane2.AddSubscription(conn2, "group2");
 
         await Task.Delay(100);
 
@@ -130,19 +135,20 @@ public class RedisBackplaneTests : IAsyncLifetime
         receivedMessage1!.Data.Should().Be(message.Data);
         receivedMessage2!.Data.Should().Be(message.Data);
 
-        _backplane1.Unsubscribe("group1", sub1);
-        _backplane2.Unsubscribe("group2", sub2);
+        _backplane1.CloseConnection(conn1);
+        _backplane2.CloseConnection(conn2);
     }
 
     [Fact]
-    public async Task Unsubscribe_StopsReceivingMessages()
+    public async Task CloseConnection_StopsReceivingMessages()
     {
         if (_backplane1 == null)
             throw new InvalidOperationException("Test not initialized");
 
-        var (reader, subscriberId) = _backplane1.Subscribe("test-group");
+        var (reader, connectionId) = _backplane1.OpenConnection();
+        _backplane1.AddSubscription(connectionId, "test-group");
 
-        _backplane1.Unsubscribe("test-group", subscriberId);
+        _backplane1.CloseConnection(connectionId);
 
         await Task.Delay(100);
 
@@ -155,23 +161,95 @@ public class RedisBackplaneTests : IAsyncLifetime
     }
 
     [Fact]
-    public void GetDiagnostics_ReturnsLocalSubscriberInfo()
+    public async Task RemoveSubscription_StopsReceivingFromGroup()
     {
         if (_backplane1 == null)
             throw new InvalidOperationException("Test not initialized");
 
-        var (_, sub1) = _backplane1.Subscribe("group1");
-        var (_, sub2) = _backplane1.Subscribe("group1");
-        var (_, sub3) = _backplane1.Subscribe("group2");
+        var (reader, connectionId) = _backplane1.OpenConnection();
+        _backplane1.AddSubscription(connectionId, "group1");
+        _backplane1.AddSubscription(connectionId, "group2");
+
+        _backplane1.RemoveSubscription(connectionId, "group1");
+
+        await Task.Delay(100);
+
+        await _backplane1.PublishToGroup("group1", new TestMessage { Data = "should not receive" });
+        await _backplane1.PublishToGroup("group2", new TestMessage { Data = "should receive" });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var received = await reader.ReadAllAsync(cts.Token).Take(1).ToListAsync();
+
+        received.Should().HaveCount(1);
+        var jsonElement = (System.Text.Json.JsonElement)received[0];
+        var receivedMessage = System.Text.Json.JsonSerializer.Deserialize<TestMessage>(jsonElement.GetRawText());
+        receivedMessage!.Data.Should().Be("should receive");
+
+        _backplane1.CloseConnection(connectionId);
+    }
+
+    [Fact]
+    public void GetDiagnostics_ReturnsLocalConnectionInfo()
+    {
+        if (_backplane1 == null)
+            throw new InvalidOperationException("Test not initialized");
+
+        var (_, conn1) = _backplane1.OpenConnection();
+        var (_, conn2) = _backplane1.OpenConnection();
+        var (_, conn3) = _backplane1.OpenConnection();
+        _backplane1.AddSubscription(conn1, "group1");
+        _backplane1.AddSubscription(conn2, "group1");
+        _backplane1.AddSubscription(conn3, "group2");
 
         var diagnostics = _backplane1.GetDiagnostics();
 
+        diagnostics.TotalConnections.Should().BeGreaterOrEqualTo(3);
         diagnostics.TotalGroups.Should().BeGreaterOrEqualTo(2);
-        diagnostics.TotalLocalSubscribers.Should().BeGreaterOrEqualTo(3);
+        diagnostics.TotalSubscriptions.Should().BeGreaterOrEqualTo(3);
 
-        _backplane1.Unsubscribe("group1", sub1);
-        _backplane1.Unsubscribe("group1", sub2);
-        _backplane1.Unsubscribe("group2", sub3);
+        _backplane1.CloseConnection(conn1);
+        _backplane1.CloseConnection(conn2);
+        _backplane1.CloseConnection(conn3);
+    }
+
+    [Fact]
+    public void GetSubscriptions_ReturnsAllGroupsForConnection()
+    {
+        if (_backplane1 == null)
+            throw new InvalidOperationException("Test not initialized");
+
+        var (_, connectionId) = _backplane1.OpenConnection();
+        _backplane1.AddSubscription(connectionId, "group1");
+        _backplane1.AddSubscription(connectionId, "group2");
+        _backplane1.AddSubscription(connectionId, "group3");
+
+        var subscriptions = _backplane1.GetSubscriptions(connectionId);
+
+        subscriptions.Should().HaveCount(3);
+        subscriptions.Should().Contain(new[] { "group1", "group2", "group3" });
+
+        _backplane1.CloseConnection(connectionId);
+    }
+
+    [Fact]
+    public async Task Connection_SubscribedToMultipleGroups_ReceivesFromAll()
+    {
+        if (_backplane1 == null)
+            throw new InvalidOperationException("Test not initialized");
+
+        var (reader, connectionId) = _backplane1.OpenConnection();
+        _backplane1.AddSubscription(connectionId, "group1");
+        _backplane1.AddSubscription(connectionId, "group2");
+
+        await _backplane1.PublishToGroup("group1", new TestMessage { Data = "from group1" });
+        await _backplane1.PublishToGroup("group2", new TestMessage { Data = "from group2" });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var received = await reader.ReadAllAsync(cts.Token).Take(2).ToListAsync();
+
+        received.Should().HaveCount(2);
+
+        _backplane1.CloseConnection(connectionId);
     }
 }
 

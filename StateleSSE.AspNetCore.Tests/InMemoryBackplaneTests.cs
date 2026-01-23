@@ -10,7 +10,8 @@ public class InMemoryBackplaneTests
     public async Task PublishToGroup_SingleSubscriber_DeliversMessage()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (reader, subscriberId) = backplane.Subscribe("test-group");
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, "test-group");
 
         var message = new { Data = "test message" };
         await backplane.PublishToGroup("test-group", message);
@@ -32,8 +33,10 @@ public class InMemoryBackplaneTests
     public async Task PublishToGroup_MultipleSubscribers_DeliversToAll()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (reader1, sub1) = backplane.Subscribe("test-group");
-        var (reader2, sub2) = backplane.Subscribe("test-group");
+        var (reader1, conn1) = backplane.OpenConnection();
+        var (reader2, conn2) = backplane.OpenConnection();
+        backplane.AddSubscription(conn1, "test-group");
+        backplane.AddSubscription(conn2, "test-group");
 
         var message = new { Data = "broadcast" };
         await backplane.PublishToGroup("test-group", message);
@@ -62,12 +65,13 @@ public class InMemoryBackplaneTests
     }
 
     [Fact]
-    public async Task Unsubscribe_RemovesSubscriber_NoLongerReceivesMessages()
+    public async Task CloseConnection_NoLongerReceivesMessages()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (reader, subscriberId) = backplane.Subscribe("test-group");
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, "test-group");
 
-        backplane.Unsubscribe("test-group", subscriberId);
+        backplane.CloseConnection(connectionId);
 
         await backplane.PublishToGroup("test-group", new { Data = "should not receive" });
 
@@ -80,11 +84,35 @@ public class InMemoryBackplaneTests
     }
 
     [Fact]
-    public async Task PublishToAll_DeliversToAllGroups()
+    public async Task RemoveSubscription_NoLongerReceivesFromGroup()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (reader1, _) = backplane.Subscribe("group1");
-        var (reader2, _) = backplane.Subscribe("group2");
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, "group1");
+        backplane.AddSubscription(connectionId, "group2");
+
+        backplane.RemoveSubscription(connectionId, "group1");
+
+        await backplane.PublishToGroup("group1", new { Data = "should not receive" });
+        await backplane.PublishToGroup("group2", new { Data = "should receive" });
+
+        var cts = new CancellationTokenSource(100);
+        var received = await reader.ReadAllAsync(cts.Token).Take(1).ToListAsync();
+
+        received.Should().HaveCount(1);
+        received[0].Should().BeEquivalentTo(new { Data = "should receive" });
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public async Task PublishToAll_DeliversToAllConnections()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (reader1, conn1) = backplane.OpenConnection();
+        var (reader2, conn2) = backplane.OpenConnection();
+        backplane.AddSubscription(conn1, "group1");
+        backplane.AddSubscription(conn2, "group2");
 
         var message = new { Data = "broadcast to all" };
         await backplane.PublishToAll(message);
@@ -104,8 +132,10 @@ public class InMemoryBackplaneTests
     public void GetLocalSubscriberCount_ReturnsCorrectCount()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (_, sub1) = backplane.Subscribe("test-group");
-        var (_, sub2) = backplane.Subscribe("test-group");
+        var (_, conn1) = backplane.OpenConnection();
+        var (_, conn2) = backplane.OpenConnection();
+        backplane.AddSubscription(conn1, "test-group");
+        backplane.AddSubscription(conn2, "test-group");
 
         var count = backplane.GetLocalSubscriberCount("test-group");
 
@@ -118,9 +148,12 @@ public class InMemoryBackplaneTests
     public void GetLocalGroups_ReturnsAllGroupIds()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        backplane.Subscribe("group1");
-        backplane.Subscribe("group2");
-        backplane.Subscribe("group3");
+        var (_, conn1) = backplane.OpenConnection();
+        var (_, conn2) = backplane.OpenConnection();
+        var (_, conn3) = backplane.OpenConnection();
+        backplane.AddSubscription(conn1, "group1");
+        backplane.AddSubscription(conn2, "group2");
+        backplane.AddSubscription(conn3, "group3");
 
         var groups = backplane.GetLocalGroups().ToList();
 
@@ -134,29 +167,140 @@ public class InMemoryBackplaneTests
     public void GetDiagnostics_ReturnsCorrectStatistics()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        backplane.Subscribe("group1");
-        backplane.Subscribe("group1");
-        backplane.Subscribe("group2");
+        var (_, conn1) = backplane.OpenConnection();
+        var (_, conn2) = backplane.OpenConnection();
+        var (_, conn3) = backplane.OpenConnection();
+        backplane.AddSubscription(conn1, "group1");
+        backplane.AddSubscription(conn2, "group1");
+        backplane.AddSubscription(conn3, "group2");
 
         var diagnostics = backplane.GetDiagnostics();
 
+        diagnostics.TotalConnections.Should().Be(3);
         diagnostics.TotalGroups.Should().Be(2);
-        diagnostics.TotalLocalSubscribers.Should().Be(3);
+        diagnostics.TotalSubscriptions.Should().Be(3);
         diagnostics.Groups.Should().HaveCount(2);
+        diagnostics.Connections.Should().HaveCount(3);
 
         backplane.Dispose();
     }
 
     [Fact]
-    public void Subscribe_GeneratesUniqueSubscriberIds()
+    public void OpenConnection_GeneratesUniqueConnectionIds()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (_, sub1) = backplane.Subscribe("test-group");
-        var (_, sub2) = backplane.Subscribe("test-group");
+        var (_, conn1) = backplane.OpenConnection();
+        var (_, conn2) = backplane.OpenConnection();
 
-        sub1.Should().NotBe(sub2);
-        sub1.Should().NotBe(Guid.Empty);
-        sub2.Should().NotBe(Guid.Empty);
+        conn1.Should().NotBe(conn2);
+        conn1.Should().NotBe(Guid.Empty);
+        conn2.Should().NotBe(Guid.Empty);
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public void AddSubscription_ReturnsFalseForInvalidConnection()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+
+        var result = backplane.AddSubscription(Guid.NewGuid(), "test-group");
+
+        result.Should().BeFalse();
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public void AddSubscription_ReturnsFalseIfAlreadySubscribed()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (_, connectionId) = backplane.OpenConnection();
+
+        var first = backplane.AddSubscription(connectionId, "test-group");
+        var second = backplane.AddSubscription(connectionId, "test-group");
+
+        first.Should().BeTrue();
+        second.Should().BeFalse();
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public void RemoveSubscription_ReturnsFalseForInvalidConnection()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+
+        var result = backplane.RemoveSubscription(Guid.NewGuid(), "test-group");
+
+        result.Should().BeFalse();
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public void GetSubscriptions_ReturnsAllGroupsForConnection()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (_, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, "group1");
+        backplane.AddSubscription(connectionId, "group2");
+        backplane.AddSubscription(connectionId, "group3");
+
+        var subscriptions = backplane.GetSubscriptions(connectionId);
+
+        subscriptions.Should().HaveCount(3);
+        subscriptions.Should().Contain(new[] { "group1", "group2", "group3" });
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public void GetSubscriptions_ReturnsEmptyForInvalidConnection()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+
+        var subscriptions = backplane.GetSubscriptions(Guid.NewGuid());
+
+        subscriptions.Should().BeEmpty();
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public async Task Connection_SubscribedToMultipleGroups_ReceivesFromAll()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, "group1");
+        backplane.AddSubscription(connectionId, "group2");
+
+        await backplane.PublishToGroup("group1", new { Data = "from group1" });
+        await backplane.PublishToGroup("group2", new { Data = "from group2" });
+
+        var cts = new CancellationTokenSource(100);
+        var received = await reader.ReadAllAsync(cts.Token).Take(2).ToListAsync();
+
+        received.Should().HaveCount(2);
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public async Task PublishToGroups_DeduplicatesDeliveryToSameConnection()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, "group1");
+        backplane.AddSubscription(connectionId, "group2");
+
+        // Connection is subscribed to both groups, but should only receive message once
+        await backplane.PublishToGroups(new[] { "group1", "group2" }, new { Data = "deduplicated" });
+
+        var cts = new CancellationTokenSource(100);
+        var received = await reader.ReadAllAsync(cts.Token).Take(1).ToListAsync();
+
+        received.Should().HaveCount(1);
 
         backplane.Dispose();
     }
@@ -165,7 +309,7 @@ public class InMemoryBackplaneTests
     public void Dispose_CompletesAllChannels()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-        var (reader, _) = backplane.Subscribe("test-group");
+        var (reader, _) = backplane.OpenConnection();
 
         backplane.Dispose();
 

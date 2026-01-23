@@ -30,7 +30,7 @@
 
     private async Task IncrementCount()
     {
-        var res = await client.CreateMessageAsync(new CreateMessageRequest()
+        await client.CreateMessageAsync(new CreateMessageRequest()
         {
             Content = "hi",
             GroupId = "1"

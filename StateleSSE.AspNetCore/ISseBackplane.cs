@@ -10,20 +10,42 @@ namespace StateleSSE.AspNetCore;
 public interface ISseBackplane
 {
     /// <summary>
-    /// Subscribe a local client (SSE connection) to a group.
-    /// Returns a channel reader for receiving events and a unique subscriber ID.
+    /// Opens a new connection and returns a channel reader for receiving events.
+    /// The connection starts with no subscriptions - use AddSubscription to subscribe to groups.
     /// </summary>
-    /// <param name="groupId">The group identifier (e.g., "game:123", "weather:station1")</param>
-    /// <returns>Tuple of channel reader and subscriber ID</returns>
-    (ChannelReader<object> reader, Guid subscriberId) Subscribe(string groupId);
+    /// <returns>Tuple of channel reader for receiving events and unique connection ID</returns>
+    (ChannelReader<object> Reader, Guid ConnectionId) OpenConnection();
 
     /// <summary>
-    /// Unsubscribe a local client when the SSE connection closes.
-    /// Performs cleanup and removes the subscriber from the group.
+    /// Adds a subscription to a group for an existing connection.
+    /// Events published to this group will be forwarded to the connection's channel reader.
     /// </summary>
-    /// <param name="groupId">The group identifier</param>
-    /// <param name="subscriberId">The unique subscriber ID from Subscribe()</param>
-    void Unsubscribe(string groupId, Guid subscriberId);
+    /// <param name="connectionId">The connection ID from OpenConnection()</param>
+    /// <param name="groupId">The group identifier to subscribe to (e.g., "chat:room1", "game:123")</param>
+    /// <returns>True if subscription was added, false if connection doesn't exist or already subscribed</returns>
+    bool AddSubscription(Guid connectionId, string groupId);
+
+    /// <summary>
+    /// Removes a subscription from a group for an existing connection.
+    /// </summary>
+    /// <param name="connectionId">The connection ID from OpenConnection()</param>
+    /// <param name="groupId">The group identifier to unsubscribe from</param>
+    /// <returns>True if subscription was removed, false if connection doesn't exist or wasn't subscribed</returns>
+    bool RemoveSubscription(Guid connectionId, string groupId);
+
+    /// <summary>
+    /// Closes a connection and removes all its subscriptions.
+    /// Should be called when the SSE connection closes.
+    /// </summary>
+    /// <param name="connectionId">The connection ID from OpenConnection()</param>
+    void CloseConnection(Guid connectionId);
+
+    /// <summary>
+    /// Gets all group IDs that a connection is currently subscribed to.
+    /// </summary>
+    /// <param name="connectionId">The connection ID from OpenConnection()</param>
+    /// <returns>Collection of group IDs, or empty if connection doesn't exist</returns>
+    IReadOnlyCollection<string> GetSubscriptions(Guid connectionId);
 
     /// <summary>
     /// Publish an event to all subscribers in a specific group across all server instances.
@@ -41,16 +63,16 @@ public interface ISseBackplane
     Task PublishToGroups(IEnumerable<string> groupIds, object message);
 
     /// <summary>
-    /// Broadcast an event to all groups and all subscribers across all server instances.
+    /// Broadcast an event to all connections across all server instances.
     /// </summary>
     /// <param name="message">The event message to broadcast</param>
     Task PublishToAll(object message);
 
     /// <summary>
-    /// Get the number of local subscribers for a specific group on this server instance.
+    /// Get the number of local connections subscribed to a specific group on this server instance.
     /// </summary>
     /// <param name="groupId">The group identifier</param>
-    /// <returns>Number of local subscribers</returns>
+    /// <returns>Number of local connections subscribed to this group</returns>
     int GetLocalSubscriberCount(string groupId);
 
     /// <summary>
@@ -73,19 +95,29 @@ public interface ISseBackplane
 public record BackplaneDiagnostics
 {
     /// <summary>
+    /// Total number of active connections on this server
+    /// </summary>
+    public required int TotalConnections { get; init; }
+
+    /// <summary>
     /// Total number of groups with active subscribers on this server
     /// </summary>
     public required int TotalGroups { get; init; }
 
     /// <summary>
-    /// Total number of local subscribers across all groups on this server
+    /// Total number of subscriptions across all connections on this server
     /// </summary>
-    public required int TotalLocalSubscribers { get; init; }
+    public required int TotalSubscriptions { get; init; }
 
     /// <summary>
     /// Detailed information about each group
     /// </summary>
     public required GroupInfo[] Groups { get; init; }
+
+    /// <summary>
+    /// Detailed information about each connection
+    /// </summary>
+    public required ConnectionInfo[] Connections { get; init; }
 }
 
 /// <summary>
@@ -99,7 +131,28 @@ public record GroupInfo
     public required string GroupId { get; init; }
 
     /// <summary>
-    /// Number of local subscribers in this group on this server
+    /// Number of local connections subscribed to this group on this server
     /// </summary>
-    public required int LocalSubscribers { get; init; }
+    public required int SubscriberCount { get; init; }
+}
+
+/// <summary>
+/// Information about a specific connection on this server instance.
+/// </summary>
+public record ConnectionInfo
+{
+    /// <summary>
+    /// The connection identifier
+    /// </summary>
+    public required Guid ConnectionId { get; init; }
+
+    /// <summary>
+    /// Number of groups this connection is subscribed to
+    /// </summary>
+    public required int SubscriptionCount { get; init; }
+
+    /// <summary>
+    /// List of group IDs this connection is subscribed to
+    /// </summary>
+    public required string[] SubscribedGroups { get; init; }
 }

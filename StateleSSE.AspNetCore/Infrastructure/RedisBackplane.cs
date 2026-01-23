@@ -16,7 +16,8 @@ public class RedisBackplane : ISseBackplane, IDisposable
     private readonly string _channelPrefix;
     private readonly ILogger<RedisBackplane> _logger;
 
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, Channel<object>>> _localSubscribers = new();
+    private readonly ConcurrentDictionary<Guid, ConnectionState> _connections = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, byte>> _groupSubscribers = new();
 
     /// <summary>
     /// Creates a RedisBackplane instance.
@@ -47,49 +48,124 @@ public class RedisBackplane : ISseBackplane, IDisposable
             _channelPrefix, $"{_channelPrefix}:events");
     }
 
-    /// <summary>
-    /// Subscribe a local client (SSE connection) to a group.
-    /// Returns channel reader and unique subscriber ID.
-    /// </summary>
-    public (ChannelReader<object> reader, Guid subscriberId) Subscribe(string groupId)
+    /// <inheritdoc/>
+    public (ChannelReader<object> Reader, Guid ConnectionId) OpenConnection()
     {
         var channel = Channel.CreateUnbounded<object>();
-        var subscriberId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
+        var state = new ConnectionState(channel);
 
-        var channels = _localSubscribers.GetOrAdd(groupId, _ => new ConcurrentDictionary<Guid, Channel<object>>());
-        channels.TryAdd(subscriberId, channel);
+        _connections.TryAdd(connectionId, state);
 
-        _logger.LogDebug("New subscriber {SubscriberId} for group '{GroupId}'. Total local: {Count}",
-            subscriberId, groupId, channels.Count);
+        _logger.LogDebug("Opened connection {ConnectionId}. Total local connections: {Count}",
+            connectionId, _connections.Count);
 
-        return (channel.Reader, subscriberId);
+        return (channel.Reader, connectionId);
     }
 
-    /// <summary>
-    /// Unsubscribe a local client (cleanup when SSE connection closes).
-    /// </summary>
-    public void Unsubscribe(string groupId, Guid subscriberId)
+    /// <inheritdoc/>
+    public bool AddSubscription(Guid connectionId, string groupId)
     {
-        if (!_localSubscribers.TryGetValue(groupId, out var channels))
-            return;
-
-        if (channels.TryRemove(subscriberId, out var channel))
+        if (!_connections.TryGetValue(connectionId, out var state))
         {
-            channel.Writer.Complete();
-            _logger.LogDebug("Unsubscribed {SubscriberId} from group '{GroupId}'. Remaining local: {Count}",
-                subscriberId, groupId, channels.Count);
+            _logger.LogWarning("AddSubscription failed: connection {ConnectionId} not found", connectionId);
+            return false;
         }
 
-        if (channels.IsEmpty)
+        // Check if already subscribed
+        if (!state.SubscribedGroups.TryAdd(groupId, 0))
         {
-            _localSubscribers.TryRemove(groupId, out _);
-            _logger.LogDebug("No local subscribers left for group '{GroupId}', cleaning up", groupId);
+            _logger.LogDebug("Connection {ConnectionId} already subscribed to group '{GroupId}'",
+                connectionId, groupId);
+            return false;
         }
+
+        // Add to group's subscriber list
+        var subscribers = _groupSubscribers.GetOrAdd(groupId, _ => new ConcurrentDictionary<Guid, byte>());
+        subscribers.TryAdd(connectionId, 0);
+
+        _logger.LogDebug("Connection {ConnectionId} subscribed to group '{GroupId}'. Group now has {Count} local subscribers",
+            connectionId, groupId, subscribers.Count);
+
+        return true;
     }
 
-    /// <summary>
-    /// Publish message to ALL servers in a group via Redis pub/sub.
-    /// </summary>
+    /// <inheritdoc/>
+    public bool RemoveSubscription(Guid connectionId, string groupId)
+    {
+        if (!_connections.TryGetValue(connectionId, out var state))
+        {
+            _logger.LogWarning("RemoveSubscription failed: connection {ConnectionId} not found", connectionId);
+            return false;
+        }
+
+        if (!state.SubscribedGroups.TryRemove(groupId, out _))
+        {
+            _logger.LogDebug("Connection {ConnectionId} was not subscribed to group '{GroupId}'",
+                connectionId, groupId);
+            return false;
+        }
+
+        // Remove from group's subscriber list
+        if (_groupSubscribers.TryGetValue(groupId, out var subscribers))
+        {
+            subscribers.TryRemove(connectionId, out _);
+
+            if (subscribers.IsEmpty)
+            {
+                _groupSubscribers.TryRemove(groupId, out _);
+                _logger.LogDebug("No local subscribers left for group '{GroupId}', cleaning up", groupId);
+            }
+        }
+
+        _logger.LogDebug("Connection {ConnectionId} unsubscribed from group '{GroupId}'",
+            connectionId, groupId);
+
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public void CloseConnection(Guid connectionId)
+    {
+        if (!_connections.TryRemove(connectionId, out var state))
+        {
+            _logger.LogDebug("CloseConnection: connection {ConnectionId} not found (may already be closed)",
+                connectionId);
+            return;
+        }
+
+        // Remove from all subscribed groups
+        foreach (var groupId in state.SubscribedGroups.Keys)
+        {
+            if (_groupSubscribers.TryGetValue(groupId, out var subscribers))
+            {
+                subscribers.TryRemove(connectionId, out _);
+
+                if (subscribers.IsEmpty)
+                {
+                    _groupSubscribers.TryRemove(groupId, out _);
+                }
+            }
+        }
+
+        state.Channel.Writer.Complete();
+
+        _logger.LogDebug("Closed connection {ConnectionId}. Removed from {GroupCount} groups. Total local connections: {Count}",
+            connectionId, state.SubscribedGroups.Count, _connections.Count);
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyCollection<string> GetSubscriptions(Guid connectionId)
+    {
+        if (!_connections.TryGetValue(connectionId, out var state))
+        {
+            return Array.Empty<string>();
+        }
+
+        return state.SubscribedGroups.Keys.ToArray();
+    }
+
+    /// <inheritdoc/>
     public async Task PublishToGroup(string groupId, object message)
     {
         var payloadJson = JsonSerializer.Serialize(message);
@@ -113,18 +189,14 @@ public class RedisBackplane : ISseBackplane, IDisposable
             groupId, message.GetType().Name);
     }
 
-    /// <summary>
-    /// Publish message to multiple groups at once.
-    /// </summary>
+    /// <inheritdoc/>
     public async Task PublishToGroups(IEnumerable<string> groupIds, object message)
     {
         var tasks = groupIds.Select(groupId => PublishToGroup(groupId, message));
         await Task.WhenAll(tasks);
     }
 
-    /// <summary>
-    /// Publish message to ALL groups (broadcast to entire system).
-    /// </summary>
+    /// <inheritdoc/>
     public async Task PublishToAll(object message)
     {
         var payloadJson = JsonSerializer.Serialize(message);
@@ -156,18 +228,24 @@ public class RedisBackplane : ISseBackplane, IDisposable
 
             if (envelope.GroupId == "*")
             {
-                await BroadcastToAllLocalGroups(envelope.Payload);
+                await BroadcastToAllLocalConnections(envelope.Payload);
                 return;
             }
 
-            if (_localSubscribers.TryGetValue(envelope.GroupId, out var channels))
+            if (_groupSubscribers.TryGetValue(envelope.GroupId, out var subscribers))
             {
-                _logger.LogDebug("Forwarding Redis event to {Count} local subscribers of group '{GroupId}'",
-                    channels.Count, envelope.GroupId);
+                _logger.LogDebug("Forwarding Redis event to {Count} local connections subscribed to group '{GroupId}'",
+                    subscribers.Count, envelope.GroupId);
 
-                var tasks = channels.Values.Select(channel =>
-                    channel.Writer.WriteAsync(envelope.Payload).AsTask()
-                );
+                var tasks = new List<Task>();
+
+                foreach (var connectionId in subscribers.Keys)
+                {
+                    if (_connections.TryGetValue(connectionId, out var state))
+                    {
+                        tasks.Add(state.Channel.Writer.WriteAsync(envelope.Payload).AsTask());
+                    }
+                }
 
                 await Task.WhenAll(tasks);
             }
@@ -183,54 +261,47 @@ public class RedisBackplane : ISseBackplane, IDisposable
         }
     }
 
-    private async Task BroadcastToAllLocalGroups(object payload)
+    private async Task BroadcastToAllLocalConnections(object payload)
     {
-        var allTasks = new List<Task>();
+        _logger.LogDebug("Broadcasting to {Count} local connections", _connections.Count);
 
-        foreach (var (groupId, channels) in _localSubscribers)
-        {
-            _logger.LogDebug("Broadcasting to {Count} local subscribers in group '{GroupId}'",
-                channels.Count, groupId);
+        var tasks = _connections.Values.Select(state =>
+            state.Channel.Writer.WriteAsync(payload).AsTask()
+        );
 
-            var tasks = channels.Values.Select(channel =>
-                channel.Writer.WriteAsync(payload).AsTask()
-            );
-
-            allTasks.AddRange(tasks);
-        }
-
-        await Task.WhenAll(allTasks);
+        await Task.WhenAll(tasks);
     }
 
-    /// <summary>
-    /// Get count of local subscribers for a group (only on THIS server).
-    /// </summary>
+    /// <inheritdoc/>
     public int GetLocalSubscriberCount(string groupId)
     {
-        return _localSubscribers.TryGetValue(groupId, out var channels) ? channels.Count : 0;
+        return _groupSubscribers.TryGetValue(groupId, out var subscribers) ? subscribers.Count : 0;
     }
 
-    /// <summary>
-    /// Get all group IDs that have local subscribers on THIS server.
-    /// </summary>
+    /// <inheritdoc/>
     public IEnumerable<string> GetLocalGroups()
     {
-        return _localSubscribers.Keys;
+        return _groupSubscribers.Keys;
     }
 
-    /// <summary>
-    /// Get diagnostic info about this server's backplane state.
-    /// </summary>
+    /// <inheritdoc/>
     public BackplaneDiagnostics GetDiagnostics()
     {
         return new BackplaneDiagnostics
         {
-            TotalGroups = _localSubscribers.Count,
-            TotalLocalSubscribers = _localSubscribers.Values.Sum(c => c.Count),
-            Groups = _localSubscribers.Select(kvp => new GroupInfo
+            TotalConnections = _connections.Count,
+            TotalGroups = _groupSubscribers.Count,
+            TotalSubscriptions = _connections.Values.Sum(c => c.SubscribedGroups.Count),
+            Groups = _groupSubscribers.Select(kvp => new GroupInfo
             {
                 GroupId = kvp.Key,
-                LocalSubscribers = kvp.Value.Count
+                SubscriberCount = kvp.Value.Count
+            }).ToArray(),
+            Connections = _connections.Select(kvp => new ConnectionInfo
+            {
+                ConnectionId = kvp.Key,
+                SubscriptionCount = kvp.Value.SubscribedGroups.Count,
+                SubscribedGroups = kvp.Value.SubscribedGroups.Keys.ToArray()
             }).ToArray()
         };
     }
@@ -240,16 +311,20 @@ public class RedisBackplane : ISseBackplane, IDisposable
     {
         _subscriber.Unsubscribe((RedisChannel)$"{_channelPrefix}:events");
 
-        foreach (var groupChannels in _localSubscribers.Values)
+        foreach (var state in _connections.Values)
         {
-            foreach (var channel in groupChannels.Values)
-            {
-                channel.Writer.Complete();
-            }
+            state.Channel.Writer.Complete();
         }
 
-        _localSubscribers.Clear();
+        _connections.Clear();
+        _groupSubscribers.Clear();
         _logger.LogDebug("Disposed (prefix: '{ChannelPrefix}')", _channelPrefix);
+    }
+
+    private sealed class ConnectionState(Channel<object> channel)
+    {
+        public Channel<object> Channel { get; } = channel;
+        public ConcurrentDictionary<string, byte> SubscribedGroups { get; } = new();
     }
 }
 

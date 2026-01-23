@@ -6,29 +6,45 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/StreamMessages": {
+    "/api/chat/stream": {
       "get": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_StreamMessages",
-        "parameters": [
-          {
-            "name": "groupId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
+        "operationId": "Chat_Stream",
+        "responses": {
+          "200": {
+            "description": ""
           }
+        }
+      }
+    },
+    "/api/chat/subscribe/messages": {
+      "post": {
+        "tags": [
+          "Chat"
         ],
+        "operationId": "Chat_SubscribeToMessages",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
         "responses": {
           "200": {
             "description": "",
             "content": {
-              "application/json": {
+              "application/octet-stream": {
                 "schema": {
-                  "$ref": "#/components/schemas/Message"
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -36,24 +52,253 @@
         }
       }
     },
-    "/CreateMessage": {
+    "/api/chat/subscribe/typing": {
       "post": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_CreateMessage",
+        "operationId": "Chat_SubscribeToTyping",
         "requestBody": {
           "x-name": "request",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateMessageRequest"
+                "$ref": "#/components/schemas/SubscribeRequest"
               }
             }
           },
           "required": true,
           "x-position": 1
         },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/subscribe/presence": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_SubscribeToPresence",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/unsubscribe": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Unsubscribe",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsubscribeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/subscribe": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Subscribe",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenericSubscribeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/send": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_SendMessage",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/typing": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_SendTyping",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypingRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/presence": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_UpdatePresence",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/legacy/messages": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_StreamMessagesLegacy",
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -64,24 +309,87 @@
   },
   "components": {
     "schemas": {
-      "Message": {
+      "SubscribeRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roomId": {
+            "type": "string"
+          }
+        }
+      },
+      "UnsubscribeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "channel": {
+            "type": "string"
+          }
+        }
+      },
+      "GenericSubscribeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "channel": {
+            "type": "string"
+          }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roomId": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
           "content": {
             "type": "string"
           }
         }
       },
-      "CreateMessageRequest": {
+      "TypingRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "content": {
+          "roomId": {
             "type": "string"
           },
-          "groupId": {
+          "username": {
             "type": "string"
+          },
+          "isTyping": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PresenceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roomId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "online": {
+            "type": "boolean"
           }
         }
       }

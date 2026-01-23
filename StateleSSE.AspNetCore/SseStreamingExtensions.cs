@@ -11,85 +11,56 @@ namespace StateleSSE.AspNetCore;
 public static class SseStreamingExtensions
 {
     /// <summary>
-    /// Streams Server-Sent Events with production features:
-    /// - Automatic keepalives (prevents ANCM timeout)
-    /// - Event IDs for reconnection tracking
-    /// - Retry directive for automatic reconnection
-    /// - Type-safe event streaming
+    /// Opens an SSE connection without any initial subscriptions.
+    /// The connection ID is sent as the first event, which the client uses for subscription requests.
+    /// Use backplane.AddSubscription/RemoveSubscription to dynamically manage subscriptions.
     /// </summary>
-    /// <typeparam name="TEvent">The type of events to stream. Must be a class.</typeparam>
     /// <param name="context">The HTTP context.</param>
-    /// <param name="backplane">The SSE backplane implementation to subscribe to.</param>
-    /// <param name="channel">The channel name to subscribe to (e.g., "game:123:PlayerJoinedEvent").</param>
+    /// <param name="backplane">The SSE backplane implementation.</param>
     /// <param name="keepaliveInterval">Keepalive interval (default: 30s to prevent ANCM 120s timeout).</param>
     /// <param name="cancellationToken">Optional cancellation token. Defaults to RequestAborted.</param>
     /// <returns>A task that completes when the SSE stream ends.</returns>
-    public static async Task StreamSseAsync<TEvent>(
-        this HttpContext context,
-        ISseBackplane backplane,
-        string channel,
-        TimeSpan? keepaliveInterval = null,
-        CancellationToken cancellationToken = default) where TEvent : class
-    {
-        var interval = keepaliveInterval ?? TimeSpan.FromSeconds(30);
-        cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
-
-        context.Response.Headers.Append("Content-Type", "text/event-stream");
-        context.Response.Headers.Append("Cache-Control", "no-cache");
-        context.Response.Headers.Append("Connection", "keep-alive");
-        context.Response.Headers.Append("X-Accel-Buffering", "no");
-
-        await context.Response.WriteAsync("retry: 3000\n\n", cancellationToken);
-        await context.Response.Body.FlushAsync(cancellationToken);
-
-        var (reader, subscriberId) = backplane.Subscribe(channel);
-
-        using var keepaliveTimer = new PeriodicTimer(interval);
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        try
-        {
-            var keepaliveTask = SendKeepalives(context, keepaliveTimer, cts.Token);
-            var streamTask = StreamEvents<TEvent>(context, reader, cts.Token);
-
-            await Task.WhenAny(keepaliveTask, streamTask);
-        }
-        finally
-        {
-            cts.Cancel();
-            backplane.Unsubscribe(channel, subscriberId);
-        }
-    }
-
-    /// <summary>
-    /// Streams untyped Server-Sent Events with production features.
-    /// All messages are serialized as received without type filtering.
-    /// </summary>
-    /// <param name="context">The HTTP context.</param>
-    /// <param name="backplane">The SSE backplane implementation to subscribe to.</param>
-    /// <param name="channel">The channel name to subscribe to.</param>
-    /// <param name="keepaliveInterval">Keepalive interval (default: 30s).</param>
-    /// <param name="cancellationToken">Optional cancellation token. Defaults to RequestAborted.</param>
-    /// <returns>A task that completes when the SSE stream ends.</returns>
+    /// <example>
+    /// <code>
+    /// // Stream endpoint - opens connection
+    /// [HttpGet("stream")]
+    /// public async Task Stream()
+    /// {
+    ///     await HttpContext.StreamSseAsync(backplane);
+    /// }
+    ///
+    /// // Subscribe endpoint - adds subscription to existing connection
+    /// [HttpPost("subscribe")]
+    /// public IActionResult Subscribe([FromBody] SubscribeRequest request)
+    /// {
+    ///     var success = backplane.AddSubscription(request.ConnectionId, request.Channel);
+    ///     return success ? Ok() : NotFound();
+    /// }
+    /// </code>
+    /// </example>
     public static async Task StreamSseAsync(
         this HttpContext context,
         ISseBackplane backplane,
-        string channel,
         TimeSpan? keepaliveInterval = null,
         CancellationToken cancellationToken = default)
     {
         var interval = keepaliveInterval ?? TimeSpan.FromSeconds(30);
         cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
 
+        var (reader, connectionId) = backplane.OpenConnection();
+
         context.Response.Headers.Append("Content-Type", "text/event-stream");
         context.Response.Headers.Append("Cache-Control", "no-cache");
         context.Response.Headers.Append("Connection", "keep-alive");
         context.Response.Headers.Append("X-Accel-Buffering", "no");
 
+        // Send retry directive
         await context.Response.WriteAsync("retry: 3000\n\n", cancellationToken);
-        await context.Response.Body.FlushAsync(cancellationToken);
 
-        var (reader, subscriberId) = backplane.Subscribe(channel);
+        // Send connection ID as the first event
+        await context.Response.WriteAsync("event: connected\n", cancellationToken);
+        await context.Response.WriteAsync($"data: {{\"connectionId\":\"{connectionId}\"}}\n\n", cancellationToken);
+        await context.Response.Body.FlushAsync(cancellationToken);
 
         using var keepaliveTimer = new PeriodicTimer(interval);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -104,17 +75,115 @@ public static class SseStreamingExtensions
         finally
         {
             cts.Cancel();
-            backplane.Unsubscribe(channel, subscriberId);
+            backplane.CloseConnection(connectionId);
         }
     }
 
     /// <summary>
+    /// Opens an SSE connection and immediately subscribes to a single channel.
+    /// Events are streamed with the event type name.
+    /// </summary>
+    /// <typeparam name="TEvent">The type of events to stream. Must be a class.</typeparam>
+    /// <param name="context">The HTTP context.</param>
+    /// <param name="backplane">The SSE backplane implementation.</param>
+    /// <param name="channel">The channel name to subscribe to (e.g., "game:123:PlayerJoinedEvent").</param>
+    /// <param name="keepaliveInterval">Keepalive interval (default: 30s to prevent ANCM 120s timeout).</param>
+    /// <param name="cancellationToken">Optional cancellation token. Defaults to RequestAborted.</param>
+    /// <returns>A task that completes when the SSE stream ends.</returns>
+    public static async Task StreamSseAsync<TEvent>(
+        this HttpContext context,
+        ISseBackplane backplane,
+        string channel,
+        TimeSpan? keepaliveInterval = null,
+        CancellationToken cancellationToken = default) where TEvent : class
+    {
+        var interval = keepaliveInterval ?? TimeSpan.FromSeconds(30);
+        cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
+
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, channel);
+
+        context.Response.Headers.Append("Content-Type", "text/event-stream");
+        context.Response.Headers.Append("Cache-Control", "no-cache");
+        context.Response.Headers.Append("Connection", "keep-alive");
+        context.Response.Headers.Append("X-Accel-Buffering", "no");
+
+        await context.Response.WriteAsync("retry: 3000\n\n", cancellationToken);
+        await context.Response.Body.FlushAsync(cancellationToken);
+
+        using var keepaliveTimer = new PeriodicTimer(interval);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        try
+        {
+            var keepaliveTask = SendKeepalives(context, keepaliveTimer, cts.Token);
+            var streamTask = StreamEvents<TEvent>(context, reader, cts.Token);
+
+            await Task.WhenAny(keepaliveTask, streamTask);
+        }
+        finally
+        {
+            cts.Cancel();
+            backplane.CloseConnection(connectionId);
+        }
+    }
+
+    /// <summary>
+    /// Opens an SSE connection and immediately subscribes to a single channel.
+    /// All messages are serialized as received without type filtering.
+    /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <param name="backplane">The SSE backplane implementation.</param>
+    /// <param name="channel">The channel name to subscribe to.</param>
+    /// <param name="keepaliveInterval">Keepalive interval (default: 30s).</param>
+    /// <param name="cancellationToken">Optional cancellation token. Defaults to RequestAborted.</param>
+    /// <returns>A task that completes when the SSE stream ends.</returns>
+    public static async Task StreamSseAsync(
+        this HttpContext context,
+        ISseBackplane backplane,
+        string channel,
+        TimeSpan? keepaliveInterval = null,
+        CancellationToken cancellationToken = default)
+    {
+        var interval = keepaliveInterval ?? TimeSpan.FromSeconds(30);
+        cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
+
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, channel);
+
+        context.Response.Headers.Append("Content-Type", "text/event-stream");
+        context.Response.Headers.Append("Cache-Control", "no-cache");
+        context.Response.Headers.Append("Connection", "keep-alive");
+        context.Response.Headers.Append("X-Accel-Buffering", "no");
+
+        await context.Response.WriteAsync("retry: 3000\n\n", cancellationToken);
+        await context.Response.Body.FlushAsync(cancellationToken);
+
+        using var keepaliveTimer = new PeriodicTimer(interval);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        try
+        {
+            var keepaliveTask = SendKeepalives(context, keepaliveTimer, cts.Token);
+            var streamTask = StreamEventsUntyped(context, reader, cts.Token);
+
+            await Task.WhenAny(keepaliveTask, streamTask);
+        }
+        finally
+        {
+            cts.Cancel();
+            backplane.CloseConnection(connectionId);
+        }
+    }
+
+    /// <summary>
+    /// Opens an SSE connection and immediately subscribes to a single channel.
     /// Streams multiple event types on a single SSE connection with named events.
     /// Each event type is sent with its type name as the SSE event field.
     /// Client can subscribe to specific event types using EventSource.addEventListener().
     /// </summary>
     /// <param name="context">The HTTP context.</param>
-    /// <param name="backplane">The SSE backplane implementation to subscribe to.</param>
+    /// <param name="backplane">The SSE backplane implementation.</param>
     /// <param name="channel">The channel name to subscribe to.</param>
     /// <param name="eventTypes">The event types to stream. Must all be classes.</param>
     /// <param name="keepaliveInterval">Keepalive interval (default: 30s).</param>
@@ -131,6 +200,9 @@ public static class SseStreamingExtensions
         var interval = keepaliveInterval ?? TimeSpan.FromSeconds(30);
         cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
 
+        var (reader, connectionId) = backplane.OpenConnection();
+        backplane.AddSubscription(connectionId, channel);
+
         context.Response.Headers.Append("Content-Type", "text/event-stream");
         context.Response.Headers.Append("Cache-Control", "no-cache");
         context.Response.Headers.Append("Connection", "keep-alive");
@@ -138,8 +210,6 @@ public static class SseStreamingExtensions
 
         await context.Response.WriteAsync("retry: 3000\n\n", cancellationToken);
         await context.Response.Body.FlushAsync(cancellationToken);
-
-        var (reader, subscriberId) = backplane.Subscribe(channel);
 
         using var keepaliveTimer = new PeriodicTimer(interval);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -154,7 +224,7 @@ public static class SseStreamingExtensions
         finally
         {
             cts.Cancel();
-            backplane.Unsubscribe(channel, subscriberId);
+            backplane.CloseConnection(connectionId);
         }
     }
 
