@@ -6,12 +6,12 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/api/chat/stream": {
+    "/api/chat/events": {
       "get": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_Stream",
+        "operationId": "Chat_Events",
         "responses": {
           "200": {
             "description": ""
@@ -19,78 +19,12 @@
         }
       }
     },
-    "/api/chat/subscribe/messages": {
+    "/api/chat/subscribe": {
       "post": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_SubscribeToMessages",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscribeRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/subscribe/typing": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_SubscribeToTyping",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscribeRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/subscribe/presence": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_SubscribeToPresence",
+        "operationId": "Chat_Subscribe",
         "requestBody": {
           "x-name": "request",
           "content": {
@@ -151,45 +85,23 @@
         }
       }
     },
-    "/api/chat/subscribe": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_Subscribe",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenericSubscribeRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/send": {
+    "/api/chat/rooms/{roomId}/messages": {
       "post": {
         "tags": [
           "Chat"
         ],
         "operationId": "Chat_SendMessage",
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
         "requestBody": {
           "x-name": "request",
           "content": {
@@ -200,7 +112,7 @@
             }
           },
           "required": true,
-          "x-position": 1
+          "x-position": 2
         },
         "responses": {
           "200": {
@@ -217,12 +129,23 @@
         }
       }
     },
-    "/api/chat/typing": {
+    "/api/chat/rooms/{roomId}/typing": {
       "post": {
         "tags": [
           "Chat"
         ],
         "operationId": "Chat_SendTyping",
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
         "requestBody": {
           "x-name": "request",
           "content": {
@@ -233,7 +156,7 @@
             }
           },
           "required": true,
-          "x-position": 1
+          "x-position": 2
         },
         "responses": {
           "200": {
@@ -250,12 +173,23 @@
         }
       }
     },
-    "/api/chat/presence": {
+    "/api/chat/rooms/{roomId}/presence": {
       "post": {
         "tags": [
           "Chat"
         ],
         "operationId": "Chat_UpdatePresence",
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
         "requestBody": {
           "x-name": "request",
           "content": {
@@ -266,7 +200,7 @@
             }
           },
           "required": true,
-          "x-position": 1
+          "x-position": 2
         },
         "responses": {
           "200": {
@@ -279,29 +213,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/chat/legacy/messages": {
-      "get": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_StreamMessagesLegacy",
-        "parameters": [
-          {
-            "name": "roomId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
           }
         }
       }
@@ -317,7 +228,7 @@
             "type": "string",
             "format": "guid"
           },
-          "roomId": {
+          "channel": {
             "type": "string"
           }
         }
@@ -335,26 +246,10 @@
           }
         }
       },
-      "GenericSubscribeRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "channel": {
-            "type": "string"
-          }
-        }
-      },
       "SendMessageRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "roomId": {
-            "type": "string"
-          },
           "author": {
             "type": "string"
           },
@@ -367,9 +262,6 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "roomId": {
-            "type": "string"
-          },
           "username": {
             "type": "string"
           },
@@ -382,9 +274,6 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "roomId": {
-            "type": "string"
-          },
           "username": {
             "type": "string"
           },

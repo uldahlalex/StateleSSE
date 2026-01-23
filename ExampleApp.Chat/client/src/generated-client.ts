@@ -17,8 +17,8 @@ export class ChatClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    stream(): Promise<void> {
-        let url_ = this.baseUrl + "/api/chat/stream";
+    events(): Promise<void> {
+        let url_ = this.baseUrl + "/api/chat/events";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -28,11 +28,11 @@ export class ChatClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processStream(_response);
+            return this.processEvents(_response);
         });
     }
 
-    protected processStream(response: Response): Promise<void> {
+    protected processEvents(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -47,8 +47,8 @@ export class ChatClient {
         return Promise.resolve<void>(null as any);
     }
 
-    subscribeToMessages(request: SubscribeRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/subscribe/messages";
+    subscribe(request: SubscribeRequest): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/api/chat/subscribe";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(request);
@@ -63,95 +63,11 @@ export class ChatClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSubscribeToMessages(_response);
+            return this.processSubscribe(_response);
         });
     }
 
-    protected processSubscribeToMessages(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
-    }
-
-    subscribeToTyping(request: SubscribeRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/subscribe/typing";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSubscribeToTyping(_response);
-        });
-    }
-
-    protected processSubscribeToTyping(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
-    }
-
-    subscribeToPresence(request: SubscribeRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/subscribe/presence";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSubscribeToPresence(_response);
-        });
-    }
-
-    protected processSubscribeToPresence(response: Response): Promise<FileResponse> {
+    protected processSubscribe(response: Response): Promise<FileResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200 || status === 206) {
@@ -215,50 +131,11 @@ export class ChatClient {
         return Promise.resolve<FileResponse>(null as any);
     }
 
-    subscribe(request: GenericSubscribeRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/subscribe";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSubscribe(_response);
-        });
-    }
-
-    protected processSubscribe(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
-    }
-
-    sendMessage(request: SendMessageRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/send";
+    sendMessage(roomId: string, request: SendMessageRequest): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/api/chat/rooms/{roomId}/messages";
+        if (roomId === undefined || roomId === null)
+            throw new globalThis.Error("The parameter 'roomId' must be defined.");
+        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(request);
@@ -299,8 +176,11 @@ export class ChatClient {
         return Promise.resolve<FileResponse>(null as any);
     }
 
-    sendTyping(request: TypingRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/typing";
+    sendTyping(roomId: string, request: TypingRequest): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/api/chat/rooms/{roomId}/typing";
+        if (roomId === undefined || roomId === null)
+            throw new globalThis.Error("The parameter 'roomId' must be defined.");
+        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(request);
@@ -341,8 +221,11 @@ export class ChatClient {
         return Promise.resolve<FileResponse>(null as any);
     }
 
-    updatePresence(request: PresenceRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/presence";
+    updatePresence(roomId: string, request: PresenceRequest): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/api/chat/rooms/{roomId}/presence";
+        if (roomId === undefined || roomId === null)
+            throw new globalThis.Error("The parameter 'roomId' must be defined.");
+        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(request);
@@ -382,45 +265,11 @@ export class ChatClient {
         }
         return Promise.resolve<FileResponse>(null as any);
     }
-
-    streamMessagesLegacy(roomId: string | undefined): Promise<void> {
-        let url_ = this.baseUrl + "/api/chat/legacy/messages?";
-        if (roomId === null)
-            throw new globalThis.Error("The parameter 'roomId' cannot be null.");
-        else if (roomId !== undefined)
-            url_ += "roomId=" + encodeURIComponent("" + roomId) + "&";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processStreamMessagesLegacy(_response);
-        });
-    }
-
-    protected processStreamMessagesLegacy(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
 }
 
 export interface SubscribeRequest {
     connectionId?: string;
-    roomId?: string;
+    channel?: string;
 }
 
 export interface UnsubscribeRequest {
@@ -428,25 +277,17 @@ export interface UnsubscribeRequest {
     channel?: string;
 }
 
-export interface GenericSubscribeRequest {
-    connectionId?: string;
-    channel?: string;
-}
-
 export interface SendMessageRequest {
-    roomId?: string;
     author?: string;
     content?: string;
 }
 
 export interface TypingRequest {
-    roomId?: string;
     username?: string;
     isTyping?: boolean;
 }
 
 export interface PresenceRequest {
-    roomId?: string;
     username?: string;
     online?: boolean;
 }

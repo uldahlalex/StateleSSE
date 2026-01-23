@@ -104,7 +104,7 @@ public class KahootGameController(IQuizRepository repo, IAuthService authService
         repo.Add(game);
         await repo.SaveChangesAsync();
 
-        await backplane.PublishToGroup($"game:{game.Id}", new GameCreatedEvent(
+        await backplane.Publish($"game:{game.Id}", new GameCreatedEvent(
             game.Id,
             quizInfo.Name,
             request.HostUserId,
@@ -144,7 +144,7 @@ public class KahootGameController(IQuizRepository repo, IAuthService authService
         var playerCount = await repo.GamememberQuery()
             .CountAsync(gm => gm.Gameid == request.GameId);
 
-        await backplane.PublishToGroup($"game:{request.GameId}", new PlayerJoinedEvent(
+        await backplane.Publish($"game:{request.GameId}", new PlayerJoinedEvent(
             request.UserId,
             userName,
             playerCount,
@@ -181,7 +181,7 @@ public class KahootGameController(IQuizRepository repo, IAuthService authService
         repo.Add(gameround);
         await repo.SaveChangesAsync();
 
-        await backplane.PublishToGroup($"game:{request.GameId}", new RoundStartedEvent(
+        await backplane.Publish($"game:{request.GameId}", new RoundStartedEvent(
             gameround.Id,
             questionInfo.Id,
             questionInfo.Description,
@@ -221,7 +221,7 @@ public class KahootGameController(IQuizRepository repo, IAuthService authService
         var answerCount = await repo.AnswerQuery()
             .CountAsync(a => a.Gameround == request.RoundId);
 
-        await backplane.PublishToGroup($"game:{request.GameId}", new AnswerSubmittedEvent(
+        await backplane.Publish($"game:{request.GameId}", new AnswerSubmittedEvent(
             request.UserId,
             answerCount,
             DateTime.UtcNow
@@ -254,7 +254,7 @@ public class KahootGameController(IQuizRepository repo, IAuthService authService
 
         var leaderboard = await CalculateLeaderboard(request.GameId);
 
-        await backplane.PublishToGroup($"game:{request.GameId}", new RoundEndedEvent(
+        await backplane.Publish($"game:{request.GameId}", new RoundEndedEvent(
             request.RoundId,
             correctOptionId,
             results,

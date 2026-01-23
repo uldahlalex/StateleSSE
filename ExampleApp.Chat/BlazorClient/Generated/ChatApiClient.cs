@@ -28,32 +28,18 @@ namespace ChatApi.Client
     public partial interface IChatApiClient
     {
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task StreamAsync();
+        System.Threading.Tasks.Task EventsAsync();
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task StreamAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task EventsAsync(System.Threading.CancellationToken cancellationToken);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeToMessagesAsync(SubscribeRequest request);
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeToMessagesAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken);
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeToTypingAsync(SubscribeRequest request);
+        System.Threading.Tasks.Task<FileResponse> SubscribeAsync(SubscribeRequest request);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeToTypingAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken);
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeToPresenceAsync(SubscribeRequest request);
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeToPresenceAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<FileResponse> SubscribeAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<FileResponse> UnsubscribeAsync(UnsubscribeRequest request);
@@ -63,39 +49,25 @@ namespace ChatApi.Client
         System.Threading.Tasks.Task<FileResponse> UnsubscribeAsync(UnsubscribeRequest request, System.Threading.CancellationToken cancellationToken);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeAsync(GenericSubscribeRequest request);
+        System.Threading.Tasks.Task<FileResponse> SendMessageAsync(string roomId, SendMessageRequest request);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SubscribeAsync(GenericSubscribeRequest request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<FileResponse> SendMessageAsync(string roomId, SendMessageRequest request, System.Threading.CancellationToken cancellationToken);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SendMessageAsync(SendMessageRequest request);
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SendMessageAsync(SendMessageRequest request, System.Threading.CancellationToken cancellationToken);
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SendTypingAsync(TypingRequest request);
+        System.Threading.Tasks.Task<FileResponse> SendTypingAsync(string roomId, TypingRequest request);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> SendTypingAsync(TypingRequest request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<FileResponse> SendTypingAsync(string roomId, TypingRequest request, System.Threading.CancellationToken cancellationToken);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(PresenceRequest request);
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(PresenceRequest request, System.Threading.CancellationToken cancellationToken);
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task StreamMessagesLegacyAsync(string roomId);
+        System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(string roomId, PresenceRequest request);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task StreamMessagesLegacyAsync(string roomId, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(string roomId, PresenceRequest request, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -148,14 +120,14 @@ namespace ChatApi.Client
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task StreamAsync()
+        public virtual System.Threading.Tasks.Task EventsAsync()
         {
-            return StreamAsync(System.Threading.CancellationToken.None);
+            return EventsAsync(System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task StreamAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task EventsAsync(System.Threading.CancellationToken cancellationToken)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -167,8 +139,8 @@ namespace ChatApi.Client
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/stream"
-                    urlBuilder_.Append("api/chat/stream");
+                    // Operation Path: "api/chat/events"
+                    urlBuilder_.Append("api/chat/events");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -218,14 +190,14 @@ namespace ChatApi.Client
         }
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> SubscribeToMessagesAsync(SubscribeRequest request)
+        public virtual System.Threading.Tasks.Task<FileResponse> SubscribeAsync(SubscribeRequest request)
         {
-            return SubscribeToMessagesAsync(request, System.Threading.CancellationToken.None);
+            return SubscribeAsync(request, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> SubscribeToMessagesAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FileResponse> SubscribeAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken)
         {
             if (request == null)
                 throw new System.ArgumentNullException("request");
@@ -245,170 +217,8 @@ namespace ChatApi.Client
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/subscribe/messages"
-                    urlBuilder_.Append("api/chat/subscribe/messages");
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200 || status_ == 206)
-                        {
-                            var responseStream_ = response_.Content == null ? System.IO.Stream.Null : await ReadAsStreamAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            var fileResponse_ = new FileResponse(status_, headers_, responseStream_, null, response_);
-                            disposeClient_ = false; disposeResponse_ = false; // response and client are disposed by FileResponse
-                            return fileResponse_;
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> SubscribeToTypingAsync(SubscribeRequest request)
-        {
-            return SubscribeToTypingAsync(request, System.Threading.CancellationToken.None);
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> SubscribeToTypingAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken)
-        {
-            if (request == null)
-                throw new System.ArgumentNullException("request");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(request, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/octet-stream"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/subscribe/typing"
-                    urlBuilder_.Append("api/chat/subscribe/typing");
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200 || status_ == 206)
-                        {
-                            var responseStream_ = response_.Content == null ? System.IO.Stream.Null : await ReadAsStreamAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            var fileResponse_ = new FileResponse(status_, headers_, responseStream_, null, response_);
-                            disposeClient_ = false; disposeResponse_ = false; // response and client are disposed by FileResponse
-                            return fileResponse_;
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> SubscribeToPresenceAsync(SubscribeRequest request)
-        {
-            return SubscribeToPresenceAsync(request, System.Threading.CancellationToken.None);
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> SubscribeToPresenceAsync(SubscribeRequest request, System.Threading.CancellationToken cancellationToken)
-        {
-            if (request == null)
-                throw new System.ArgumentNullException("request");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(request, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/octet-stream"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/subscribe/presence"
-                    urlBuilder_.Append("api/chat/subscribe/presence");
+                    // Operation Path: "api/chat/subscribe"
+                    urlBuilder_.Append("api/chat/subscribe");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -542,15 +352,18 @@ namespace ChatApi.Client
         }
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> SubscribeAsync(GenericSubscribeRequest request)
+        public virtual System.Threading.Tasks.Task<FileResponse> SendMessageAsync(string roomId, SendMessageRequest request)
         {
-            return SubscribeAsync(request, System.Threading.CancellationToken.None);
+            return SendMessageAsync(roomId, request, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> SubscribeAsync(GenericSubscribeRequest request, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FileResponse> SendMessageAsync(string roomId, SendMessageRequest request, System.Threading.CancellationToken cancellationToken)
         {
+            if (roomId == null)
+                throw new System.ArgumentNullException("roomId");
+
             if (request == null)
                 throw new System.ArgumentNullException("request");
 
@@ -569,8 +382,10 @@ namespace ChatApi.Client
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/subscribe"
-                    urlBuilder_.Append("api/chat/subscribe");
+                    // Operation Path: "api/chat/rooms/{roomId}/messages"
+                    urlBuilder_.Append("api/chat/rooms/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(roomId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/messages");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -623,15 +438,18 @@ namespace ChatApi.Client
         }
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> SendMessageAsync(SendMessageRequest request)
+        public virtual System.Threading.Tasks.Task<FileResponse> SendTypingAsync(string roomId, TypingRequest request)
         {
-            return SendMessageAsync(request, System.Threading.CancellationToken.None);
+            return SendTypingAsync(roomId, request, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> SendMessageAsync(SendMessageRequest request, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FileResponse> SendTypingAsync(string roomId, TypingRequest request, System.Threading.CancellationToken cancellationToken)
         {
+            if (roomId == null)
+                throw new System.ArgumentNullException("roomId");
+
             if (request == null)
                 throw new System.ArgumentNullException("request");
 
@@ -650,8 +468,10 @@ namespace ChatApi.Client
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/send"
-                    urlBuilder_.Append("api/chat/send");
+                    // Operation Path: "api/chat/rooms/{roomId}/typing"
+                    urlBuilder_.Append("api/chat/rooms/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(roomId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/typing");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -704,15 +524,18 @@ namespace ChatApi.Client
         }
 
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> SendTypingAsync(TypingRequest request)
+        public virtual System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(string roomId, PresenceRequest request)
         {
-            return SendTypingAsync(request, System.Threading.CancellationToken.None);
+            return UpdatePresenceAsync(roomId, request, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> SendTypingAsync(TypingRequest request, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(string roomId, PresenceRequest request, System.Threading.CancellationToken cancellationToken)
         {
+            if (roomId == null)
+                throw new System.ArgumentNullException("roomId");
+
             if (request == null)
                 throw new System.ArgumentNullException("request");
 
@@ -731,8 +554,10 @@ namespace ChatApi.Client
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/typing"
-                    urlBuilder_.Append("api/chat/typing");
+                    // Operation Path: "api/chat/rooms/{roomId}/presence"
+                    urlBuilder_.Append("api/chat/rooms/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(roomId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/presence");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -763,163 +588,6 @@ namespace ChatApi.Client
                             var fileResponse_ = new FileResponse(status_, headers_, responseStream_, null, response_);
                             disposeClient_ = false; disposeResponse_ = false; // response and client are disposed by FileResponse
                             return fileResponse_;
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(PresenceRequest request)
-        {
-            return UpdatePresenceAsync(request, System.Threading.CancellationToken.None);
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> UpdatePresenceAsync(PresenceRequest request, System.Threading.CancellationToken cancellationToken)
-        {
-            if (request == null)
-                throw new System.ArgumentNullException("request");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(request, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/octet-stream"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/presence"
-                    urlBuilder_.Append("api/chat/presence");
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200 || status_ == 206)
-                        {
-                            var responseStream_ = response_.Content == null ? System.IO.Stream.Null : await ReadAsStreamAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            var fileResponse_ = new FileResponse(status_, headers_, responseStream_, null, response_);
-                            disposeClient_ = false; disposeResponse_ = false; // response and client are disposed by FileResponse
-                            return fileResponse_;
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task StreamMessagesLegacyAsync(string roomId)
-        {
-            return StreamMessagesLegacyAsync(roomId, System.Threading.CancellationToken.None);
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task StreamMessagesLegacyAsync(string roomId, System.Threading.CancellationToken cancellationToken)
-        {
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-                    request_.Method = new System.Net.Http.HttpMethod("GET");
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/chat/legacy/messages"
-                    urlBuilder_.Append("api/chat/legacy/messages");
-                    urlBuilder_.Append('?');
-                    if (roomId != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("roomId")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(roomId, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            return;
                         }
                         else
                         {
@@ -1077,8 +745,8 @@ namespace ChatApi.Client
         [System.Text.Json.Serialization.JsonPropertyName("connectionId")]
         public System.Guid ConnectionId { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("roomId")]
-        public string RoomId { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("channel")]
+        public string Channel { get; set; }
 
     }
 
@@ -1095,23 +763,8 @@ namespace ChatApi.Client
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class GenericSubscribeRequest
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("connectionId")]
-        public System.Guid ConnectionId { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("channel")]
-        public string Channel { get; set; }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class SendMessageRequest
     {
-
-        [System.Text.Json.Serialization.JsonPropertyName("roomId")]
-        public string RoomId { get; set; }
 
         [System.Text.Json.Serialization.JsonPropertyName("author")]
         public string Author { get; set; }
@@ -1125,9 +778,6 @@ namespace ChatApi.Client
     public partial class TypingRequest
     {
 
-        [System.Text.Json.Serialization.JsonPropertyName("roomId")]
-        public string RoomId { get; set; }
-
         [System.Text.Json.Serialization.JsonPropertyName("username")]
         public string Username { get; set; }
 
@@ -1139,9 +789,6 @@ namespace ChatApi.Client
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class PresenceRequest
     {
-
-        [System.Text.Json.Serialization.JsonPropertyName("roomId")]
-        public string RoomId { get; set; }
 
         [System.Text.Json.Serialization.JsonPropertyName("username")]
         public string Username { get; set; }

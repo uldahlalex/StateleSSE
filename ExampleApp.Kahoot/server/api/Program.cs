@@ -228,8 +228,8 @@ public class Program
                     Timestamp: weatherData.Timestamp
                 );
 
-                await backplane.PublishToGroup($"weather:{weatherData.StationId}", weatherEvent);
-                await backplane.PublishToGroup("weather:all", weatherEvent);
+                await backplane.Publish($"weather:{weatherData.StationId}", weatherEvent);
+                await backplane.Publish("weather:all", weatherEvent);
 
                 logger.LogInformation("Processed weather data from station {StationId}: {Temp}°C, {Humidity}%, {Pressure}hPa",
                     weatherData.StationId, weatherData.Temperature, weatherData.Humidity, weatherData.Pressure);
