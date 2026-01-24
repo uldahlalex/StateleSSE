@@ -12,83 +12,24 @@
           "Chat"
         ],
         "operationId": "Chat_Events",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "format": "guid"
-                }
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
-            }
+            },
+            "x-position": 1
           }
-        }
-      }
-    },
-    "/subscribe": {
-      "post": {
-        "tags": [
-          "Chat"
         ],
-        "operationId": "Chat_Subscribe",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChannelRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/unsubscribe": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_Unsubscribe",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChannelRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
+            "description": ""
           }
         }
       }
@@ -228,15 +169,6 @@
   },
   "components": {
     "schemas": {
-      "ChannelRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "channel": {
-            "type": "string"
-          }
-        }
-      },
       "SendMessageRequest": {
         "type": "object",
         "additionalProperties": false,

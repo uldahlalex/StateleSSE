@@ -1,38 +1,29 @@
-import {useEffect} from "react";
+import {useEffect, useState} from "react";
 import {ChatClient} from "./generated-ts-client.ts";
-import {customFetch} from "./utils/customFetch.ts";
 
-const local = "http://localhost:5000";
-const prod = "https://...";
+const BASE_URL = 'http://localhost:5000';
 
-const isProd = import.meta.env.PROD;
-
-const final = isProd ? prod : local;
-
-const es = new EventSource(final);
-const apiClient = new ChatClient(final, customFetch)
-
+const es = new EventSource(BASE_URL)
+const chatClient = new ChatClient(BASE_URL)
 export default function Chat() {
 
+    const [ messages, setMessages] = useState<any[]>([])
+
     useEffect(() => {
-        es.addEventListener("connected", dto => {
-            console.log(dto.data)
-            const connId = JSON.parse(dto.data).connectionId;
-            localStorage.setItem('Conn', connId)
-        })
+        if(es && es.readyState == es.OPEN && chatClient) {
+            es.addEventListener('room:123:messages', (dto) => {
+                setMessages((prev) => [...prev, dto])
+            })
 
-        if(localStorage.getItem('Conn')==null)
-            return;
-        apiClient.subscribe({
-            channel: "chat:123"
-        }).then(r => {
-            console.log(r)
-        })
+        }
 
-    }, [localStorage]);
+    }, []);
 
     return <>
 
+        {
+            JSON.stringify(messages)
+        }
     </>
 
 }

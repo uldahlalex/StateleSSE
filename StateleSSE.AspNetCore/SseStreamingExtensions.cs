@@ -10,29 +10,24 @@ public static class SseStreamingExtensions
     private static readonly TimeSpan DefaultKeepalive = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Stream SSE events to the client. Sends connectionId as first "connected" event.
-    /// Client uses connectionId to subscribe to channels via separate API calls.
+    /// Stream SSE events to the client with URL-based channel subscriptions.
     /// Events are sent with channel name as SSE event type for client-side routing.
     /// </summary>
     /// <example>
     /// <code>
     /// // Minimal API
-    /// app.MapGet("/events", (HttpContext ctx, ISseBackplane bp) => ctx.StreamSseAsync(bp));
-    /// app.MapPost("/subscribe", (SubscribeRequest req, ISseBackplane bp) =>
-    ///     bp.Subscribe(req.ConnectionId, req.Channel) ? Results.Ok() : Results.NotFound());
+    /// app.MapGet("/events", (HttpContext ctx, ISseBackplane bp, [FromQuery] string[] channel)
+    ///     => ctx.StreamSseAsync(bp, channel));
     ///
     /// // Client
-    /// const es = new EventSource('/events');
-    /// es.addEventListener('connected', e => {
-    ///     const { connectionId } = JSON.parse(e.data);
-    ///     fetch('/subscribe', { method: 'POST', body: JSON.stringify({ connectionId, channel: 'chat:room1' }) });
-    /// });
-    /// es.addEventListener('chat:room1', e => console.log(JSON.parse(e.data)));
+    /// const es = new EventSource('/events?channel=chat:room1:messages&amp;channel=chat:room1:typing');
+    /// es.addEventListener('chat:room1:messages', e => console.log(JSON.parse(e.data)));
     /// </code>
     /// </example>
-    public static async Task<Guid> StreamSseAsync(
+    public static async Task StreamSseAsync(
         this HttpContext context,
         ISseBackplane backplane,
+        IEnumerable<string> channels,
         CancellationToken cancellationToken = default)
     {
         cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
@@ -45,12 +40,16 @@ public static class SseStreamingExtensions
 
         var (reader, connectionId) = backplane.Connect();
 
+        // Subscribe to all requested channels
+        foreach (var channel in channels)
+        {
+            backplane.Subscribe(connectionId, channel);
+        }
+
         try
         {
-            // Send retry directive and connection ID
-            await response.WriteAsync("retry: 3000\n", cancellationToken);
-            await response.WriteAsync("event: connected\n", cancellationToken);
-            await response.WriteAsync($"data: {{\"connectionId\":\"{connectionId}\"}}\n\n", cancellationToken);
+            // Send retry directive
+            await response.WriteAsync("retry: 3000\n\n", cancellationToken);
             await response.Body.FlushAsync(cancellationToken);
 
             // Start keepalive task
@@ -69,7 +68,6 @@ public static class SseStreamingExtensions
             }
 
             cts.Cancel();
-            return connectionId;
         }
         finally
         {

@@ -17,9 +17,9 @@ public class GameEventsController(ISseBackplane backplane) : ControllerBase
     /// </summary>
     [HttpGet("events")]
     [Produces("text/event-stream")]
-    public async Task Events()
+    public async Task Events(string[] channels)
     {
-        await HttpContext.StreamSseAsync(backplane);
+        await HttpContext.StreamSseAsync(backplane, channels);
     }
 
     /// <summary>
