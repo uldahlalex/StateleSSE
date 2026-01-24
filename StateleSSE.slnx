@@ -2,7 +2,6 @@
     <Project Path="StateleSSE.AspNetCore.IntegrationTests/StateleSSE.AspNetCore.IntegrationTests.csproj" />
     <Project Path="StateleSSE.AspNetCore.Tests/StateleSSE.AspNetCore.Tests.csproj" />
     <Project Path="StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
-    <Project Path="StateleSSE.CodeGen/StateleSSE.CodeGen.csproj" />
     <Folder Name="/ExampleApp.Kahoot/">
         <Project Path="ExampleApp.Kahoot/server/api/api.csproj" />
         <Project Path="ExampleApp.Kahoot/server/dataaccess/dataaccess.csproj" />

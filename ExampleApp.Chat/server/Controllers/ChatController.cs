@@ -1,39 +1,53 @@
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
-[ApiController]
-[Route("api/chat")]
+
+
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     /// <summary>
     /// SSE stream endpoint. Returns connectionId as first event.
     /// </summary>
-    [HttpGet("events")]
+    [HttpGet("")]
     [Produces("text/event-stream")]
     [Produces<Guid>]
     public async Task Events()
     {
-        var connectionId = await HttpContext.StreamSseAsync(backplane);
+        _ = await HttpContext.StreamSseAsync(backplane);
     }
 
     /// <summary>
-    /// Subscribe to a channel.
+    /// Subscribe to a channel. ConnectionId is read from Conn header.
     /// </summary>
     [HttpPost("subscribe")]
-    public IActionResult Subscribe([FromBody] SubscribeRequest request)
+    public IActionResult Subscribe([FromBody] ChannelRequest request)
     {
-        var success = backplane.Subscribe(request.ConnectionId, request.Channel);
+        if (!TryGetConnectionId(out var connectionId))
+            return BadRequest("Missing Conn header");
+
+        var success = backplane.Subscribe(connectionId, request.Channel);
         return success ? Ok() : NotFound("Connection not found");
     }
 
     /// <summary>
-    /// Unsubscribe from a channel.
+    /// Unsubscribe from a channel. ConnectionId is read from Conn header.
     /// </summary>
     [HttpPost("unsubscribe")]
-    public IActionResult Unsubscribe([FromBody] UnsubscribeRequest request)
+    public IActionResult Unsubscribe([FromBody] ChannelRequest request)
     {
-        var success = backplane.Unsubscribe(request.ConnectionId, request.Channel);
+        if (!TryGetConnectionId(out var connectionId))
+            return BadRequest("Missing Conn header");
+
+        var success = backplane.Unsubscribe(connectionId, request.Channel);
         return success ? Ok() : NotFound("Connection or subscription not found");
+    }
+
+    private bool TryGetConnectionId(out Guid connectionId)
+    {
+        connectionId = Guid.Empty;
+        if (!Request.Headers.TryGetValue("Conn", out var header))
+            return false;
+        return Guid.TryParse(header, out connectionId);
     }
 
     /// <summary>
@@ -87,8 +101,7 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
 }
 
 // Request DTOs
-public record SubscribeRequest(Guid ConnectionId, string Channel);
-public record UnsubscribeRequest(Guid ConnectionId, string Channel);
+public record ChannelRequest(string Channel);
 public record SendMessageRequest(string Author, string Content);
 public record TypingRequest(string Username, bool IsTyping);
 public record PresenceRequest(string Username, bool Online);

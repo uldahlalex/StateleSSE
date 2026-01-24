@@ -6,7 +6,7 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/api/chat/events": {
+    "/": {
       "get": {
         "tags": [
           "Chat"
@@ -27,7 +27,7 @@
         }
       }
     },
-    "/api/chat/subscribe": {
+    "/subscribe": {
       "post": {
         "tags": [
           "Chat"
@@ -38,7 +38,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SubscribeRequest"
+                "$ref": "#/components/schemas/ChannelRequest"
               }
             }
           },
@@ -60,7 +60,7 @@
         }
       }
     },
-    "/api/chat/unsubscribe": {
+    "/unsubscribe": {
       "post": {
         "tags": [
           "Chat"
@@ -71,7 +71,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UnsubscribeRequest"
+                "$ref": "#/components/schemas/ChannelRequest"
               }
             }
           },
@@ -93,7 +93,7 @@
         }
       }
     },
-    "/api/chat/rooms/{roomId}/messages": {
+    "/rooms/{roomId}/messages": {
       "post": {
         "tags": [
           "Chat"
@@ -137,7 +137,7 @@
         }
       }
     },
-    "/api/chat/rooms/{roomId}/typing": {
+    "/rooms/{roomId}/typing": {
       "post": {
         "tags": [
           "Chat"
@@ -181,7 +181,7 @@
         }
       }
     },
-    "/api/chat/rooms/{roomId}/presence": {
+    "/rooms/{roomId}/presence": {
       "post": {
         "tags": [
           "Chat"
@@ -228,27 +228,10 @@
   },
   "components": {
     "schemas": {
-      "SubscribeRequest": {
+      "ChannelRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "channel": {
-            "type": "string"
-          }
-        }
-      },
-      "UnsubscribeRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
           "channel": {
             "type": "string"
           }

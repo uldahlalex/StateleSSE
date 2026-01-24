@@ -1,8 +1,6 @@
 using api.Etc;
 using StackExchange.Redis;
-using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
-using StateleSSE.CodeGen;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
@@ -37,27 +35,7 @@ app.UseCors(c =>
     .AllowAnyOrigin()
     .SetIsOriginAllowed(_ => true));
 
-var currentDir = Directory.GetCurrentDirectory();
-var openApiSpecPath = Path.Combine(currentDir, "openapi.json");
-var clientPath = Path.Combine(currentDir, "../client/src/generated-client.ts");
-var sseClientPath = Path.Combine(currentDir, "../client/src/generated-sse-client.ts");
-var csharpClientPath = Path.Combine(currentDir, "../BlazorClient/Generated/ChatApiClient.cs");
-var csharpSseClientPath = Path.Combine(currentDir, "../BlazorClient/Generated/ChatSseClient.cs");
+app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
 
-await app.GenerateApiClientsFromOpenApi(clientPath, openApiSpecPath, csharpClientPath);
-
-TypeScriptEventSourceGenerator.Generate(
-    openApiSpecPath: openApiSpecPath,
-    outputPath: sseClientPath,
-    baseUrlImport: "./utils/BASE_URL",
-    modelsImport: "./generated-client.ts"
-);
-
-CSharpEventSourceGenerator.Generate(
-    openApiSpecPath: openApiSpecPath,
-    outputPath: csharpSseClientPath,
-    className: "ChatSseClient",
-    namespaceName: "ChatApi.Client"
-);
 
 app.Run();

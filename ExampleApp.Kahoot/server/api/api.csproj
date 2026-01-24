@@ -13,9 +13,6 @@
     <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj')">
         <PackageReference Include="StateleSSE.AspNetCore" Version="*" />
     </ItemGroup>
-    <ItemGroup Condition="Exists('$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj')">
-        <ProjectReference Include="$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj" />
-    </ItemGroup>
     <ItemGroup Condition="!Exists('$(RepoRoot)StateleSSE.CodeGen/StateleSSE.CodeGen.csproj')">
         <PackageReference Include="StateleSSE.CodeGen" Version="*" />
     </ItemGroup>

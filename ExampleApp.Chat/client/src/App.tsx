@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BASE_URL } from './utils/BASE_URL';
+import { SseClient, createSseClient } from './sse-client';
 import { styles } from './Styles.tsx';
 
 // ========================================
@@ -27,49 +28,40 @@ interface PresenceUpdate {
 }
 
 // ========================================
-// SSE Hook - Uses native EventSource
+// Global SSE Client - single connection for the app
+// ========================================
+
+const sse = createSseClient(`${BASE_URL}/api/chat/events`, BASE_URL);
+
+// ========================================
+// SSE Hook - Uses SseClient (connectionId is hidden)
 // ========================================
 
 function useSse(roomId: string) {
-  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    const es = new EventSource(`${BASE_URL}/api/chat/events`);
-    eventSourceRef.current = es;
+    // Listen for connection status
+    const unsubStatus = sse.onStatus(setStatus);
 
-    es.addEventListener('connected', (e) => {
-      const data = JSON.parse(e.data);
-      setConnectionId(data.connectionId);
-      setStatus('connected');
+    // Subscribe to channels for this room (connectionId attached automatically)
+    const channels = [
+      `chat:${roomId}:messages`,
+      `chat:${roomId}:typing`,
+      `chat:${roomId}:presence`,
+    ];
 
-      // Subscribe to all channels for this room
-      const channels = [
-        `chat:${roomId}:messages`,
-        `chat:${roomId}:typing`,
-        `chat:${roomId}:presence`,
-      ];
+    channels.forEach((channel) => sse.subscribe(channel));
 
-      channels.forEach((channel) => {
-        fetch(`${BASE_URL}/api/chat/subscribe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId: data.connectionId, channel }),
-        });
-      });
-    });
-
-    es.addEventListener(`chat:${roomId}:messages`, (e) => {
-      const msg: ChatMessage = JSON.parse(e.data);
+    // Listen for events on each channel
+    const unsubMessages = sse.on<ChatMessage>(`chat:${roomId}:messages`, (msg) => {
       setMessages((prev) => [...prev, msg]);
     });
 
-    es.addEventListener(`chat:${roomId}:typing`, (e) => {
-      const data: TypingIndicator = JSON.parse(e.data);
+    const unsubTyping = sse.on<TypingIndicator>(`chat:${roomId}:typing`, (data) => {
       setTypingUsers((prev) => {
         const next = new Set(prev);
         if (data.isTyping) {
@@ -81,8 +73,7 @@ function useSse(roomId: string) {
       });
     });
 
-    es.addEventListener(`chat:${roomId}:presence`, (e) => {
-      const data: PresenceUpdate = JSON.parse(e.data);
+    const unsubPresence = sse.on<PresenceUpdate>(`chat:${roomId}:presence`, (data) => {
       setOnlineUsers((prev) => {
         const next = new Set(prev);
         if (data.online) {
@@ -94,41 +85,38 @@ function useSse(roomId: string) {
       });
     });
 
-    es.onerror = () => {
-      setStatus('disconnected');
-    };
-
     return () => {
-      es.close();
+      unsubStatus();
+      unsubMessages();
+      unsubTyping();
+      unsubPresence();
+      channels.forEach((channel) => sse.unsubscribe(channel));
     };
   }, [roomId]);
 
-  return { connectionId, status, messages, typingUsers, onlineUsers };
+  return { status, messages, typingUsers, onlineUsers };
 }
 
 // ========================================
-// API Client
+// API Client - uses sse.fetch() to auto-attach connectionId header
 // ========================================
 
 const api = {
   sendMessage: (roomId: string, author: string, content: string) =>
-    fetch(`${BASE_URL}/api/chat/rooms/${roomId}/messages`, {
+    sse.fetch(`/api/chat/rooms/${roomId}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ author, content }),
     }),
 
   sendTyping: (roomId: string, username: string, isTyping: boolean) =>
-    fetch(`${BASE_URL}/api/chat/rooms/${roomId}/typing`, {
+    sse.fetch(`/api/chat/rooms/${roomId}/typing`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, isTyping }),
     }),
 
   updatePresence: (roomId: string, username: string, online: boolean) =>
-    fetch(`${BASE_URL}/api/chat/rooms/${roomId}/presence`, {
+    sse.fetch(`/api/chat/rooms/${roomId}/presence`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, online }),
     }),
 };
@@ -145,7 +133,7 @@ export default function App() {
     return (
       <div style={styles.loginContainer}>
         <h1>Chat Demo</h1>
-        <p>Using native EventSource with StateleSSE</p>
+        <p>Using StateleSSE with hidden connectionId</p>
         <input
           type="text"
           placeholder="Enter your username"
@@ -173,7 +161,7 @@ export default function App() {
 // ========================================
 
 function ChatRoom({ roomId, username }: { roomId: string; username: string }) {
-  const { connectionId, status, messages, typingUsers, onlineUsers } = useSse(roomId);
+  const { status, messages, typingUsers, onlineUsers } = useSse(roomId);
   const [content, setContent] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -240,7 +228,6 @@ function ChatRoom({ roomId, username }: { roomId: string; username: string }) {
             }}
           />
           <span>{status}</span>
-          {connectionId && <span style={styles.connectionId}>{connectionId.slice(0, 8)}...</span>}
         </div>
       </header>
 

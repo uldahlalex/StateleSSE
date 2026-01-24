@@ -18,7 +18,7 @@ export class ChatClient {
     }
 
     events(): Promise<string> {
-        let url_ = this.baseUrl + "/api/chat/events";
+        let url_ = this.baseUrl + "/";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -50,8 +50,8 @@ export class ChatClient {
         return Promise.resolve<string>(null as any);
     }
 
-    subscribe(request: SubscribeRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/subscribe";
+    subscribe(request: ChannelRequest): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/subscribe";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(request);
@@ -92,8 +92,8 @@ export class ChatClient {
         return Promise.resolve<FileResponse>(null as any);
     }
 
-    unsubscribe(request: UnsubscribeRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/unsubscribe";
+    unsubscribe(request: ChannelRequest): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/unsubscribe";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(request);
@@ -135,7 +135,7 @@ export class ChatClient {
     }
 
     sendMessage(roomId: string, request: SendMessageRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/rooms/{roomId}/messages";
+        let url_ = this.baseUrl + "/rooms/{roomId}/messages";
         if (roomId === undefined || roomId === null)
             throw new globalThis.Error("The parameter 'roomId' must be defined.");
         url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
@@ -180,7 +180,7 @@ export class ChatClient {
     }
 
     sendTyping(roomId: string, request: TypingRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/rooms/{roomId}/typing";
+        let url_ = this.baseUrl + "/rooms/{roomId}/typing";
         if (roomId === undefined || roomId === null)
             throw new globalThis.Error("The parameter 'roomId' must be defined.");
         url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
@@ -225,7 +225,7 @@ export class ChatClient {
     }
 
     updatePresence(roomId: string, request: PresenceRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/chat/rooms/{roomId}/presence";
+        let url_ = this.baseUrl + "/rooms/{roomId}/presence";
         if (roomId === undefined || roomId === null)
             throw new globalThis.Error("The parameter 'roomId' must be defined.");
         url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
@@ -270,13 +270,7 @@ export class ChatClient {
     }
 }
 
-export interface SubscribeRequest {
-    connectionId?: string;
-    channel?: string;
-}
-
-export interface UnsubscribeRequest {
-    connectionId?: string;
+export interface ChannelRequest {
     channel?: string;
 }
 
