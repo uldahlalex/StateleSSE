@@ -14,15 +14,10 @@
         "operationId": "Chat_Events",
         "parameters": [
           {
-            "name": "channel",
+            "name": "channels",
             "in": "query",
-            "style": "form",
-            "explode": true,
             "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+              "type": "string"
             },
             "x-position": 1
           }
@@ -203,6 +198,36 @@
           "online": {
             "type": "boolean"
           }
+        }
+      },
+      "Channels": {
+        "type": "object",
+        "description": "String constants from Channels",
+        "additionalProperties": false,
+        "properties": {
+          "RoomMessages": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Constant value: \"rooms/{roomId}/messages\"",
+            "default": "rooms/{roomId}/messages"
+          },
+          "RoomTyping": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Constant value: \"rooms/{roomId}/typing\"",
+            "default": "rooms/{roomId}/typing"
+          },
+          "RoomPresence": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Constant value: \"rooms/{roomId}/presence\"",
+            "default": "rooms/{roomId}/presence"
+          }
+        },
+        "x-constant-values": {
+          "RoomMessages": "rooms/{roomId}/messages",
+          "RoomTyping": "rooms/{roomId}/typing",
+          "RoomPresence": "rooms/{roomId}/presence"
         }
       }
     }

@@ -1,17 +1,21 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
+using ExampleApp.Chat;
 
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     /// <summary>
     /// SSE stream endpoint. Subscribes to channels specified in query params.
-    /// Example: /events?channel=chat:room1:messages&amp;channel=chat:room1:typing
+    /// Example: /events?channels=rooms/123/messages,rooms/123/typing
     /// </summary>
     [HttpGet("")]
     [Produces("text/event-stream")]
-    public async Task Events([FromQuery] string[] channel)
+    public async Task Events([FromQuery] string channels)
     {
-        await HttpContext.StreamSseAsync(backplane, channel);
+        var channelList = channels?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        Console.WriteLine(JsonSerializer.Serialize(channelList));
+        await HttpContext.StreamSseAsync(backplane, channelList);
     }
 
     /// <summary>
@@ -29,7 +33,7 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
             Timestamp = DateTime.UtcNow.ToString("o")
         };
 
-        await backplane.Publish($"chat:{roomId}:messages", message);
+        await backplane.Publish(Channels.Resolve(Channels.RoomMessages, roomId), message);
         return Ok(message);
     }
 
@@ -39,11 +43,11 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     [HttpPost("rooms/{roomId}/typing")]
     public async Task<IActionResult> SendTyping(string roomId, [FromBody] TypingRequest request)
     {
-        await backplane.Publish($"chat:{roomId}:typing", new
+        await backplane.Publish(Channels.Resolve(Channels.RoomTyping, roomId), new TypingEvent
         {
-            roomId,
-            request.Username,
-            request.IsTyping
+            RoomId = roomId,
+            Username = request.Username,
+            IsTyping = request.IsTyping
         });
         return Ok();
     }
@@ -54,11 +58,11 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     [HttpPost("rooms/{roomId}/presence")]
     public async Task<IActionResult> UpdatePresence(string roomId, [FromBody] PresenceRequest request)
     {
-        await backplane.Publish($"chat:{roomId}:presence", new
+        await backplane.Publish(Channels.Resolve(Channels.RoomPresence, roomId), new PresenceEvent
         {
-            roomId,
-            request.Username,
-            request.Online
+            RoomId = roomId,
+            Username = request.Username,
+            Online = request.Online
         });
         return Ok();
     }
@@ -69,7 +73,7 @@ public record SendMessageRequest(string Author, string Content);
 public record TypingRequest(string Username, bool IsTyping);
 public record PresenceRequest(string Username, bool Online);
 
-// Response DTOs
+// Event DTOs (published to channels)
 public class ChatMessage
 {
     public required string Id { get; set; }
@@ -77,4 +81,18 @@ public class ChatMessage
     public required string Author { get; set; }
     public required string Content { get; set; }
     public required string Timestamp { get; set; }
+}
+
+public class TypingEvent
+{
+    public required string RoomId { get; set; }
+    public required string Username { get; set; }
+    public required bool IsTyping { get; set; }
+}
+
+public class PresenceEvent
+{
+    public required string RoomId { get; set; }
+    public required string Username { get; set; }
+    public required bool Online { get; set; }
 }

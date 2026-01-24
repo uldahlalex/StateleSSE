@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react";
 import {ChatClient} from "./generated-ts-client.ts";
 
+
 const BASE_URL = 'http://localhost:5000';
 
 let es = new EventSource(BASE_URL)
@@ -10,6 +11,7 @@ export default function Chat() {
     const [ messages, setMessages] = useState<any[]>([])
 
     useEffect(() => {
+
         const channels = ['room:123:messages', 'room:123:typing'];
          es = new EventSource(`${BASE_URL}?channels=${encodeURIComponent(channels.join(','))}`);
         if(es && es.readyState == es.OPEN && chatClient) {
@@ -29,7 +31,7 @@ export default function Chat() {
                 author: "bob",
                 content: "hi"
             }).then(r => {
-
+                console.log(r)
             })
         }}>
             add

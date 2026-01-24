@@ -1,4 +1,5 @@
 using api.Etc;
+using server;
 using StackExchange.Redis;
 using StateleSSE.AspNetCore.Extensions;
 
@@ -15,7 +16,10 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 
 // builder.Services.AddInMemorySseBackplane();
 builder.Services.AddRedisSseBackplane();
-builder.Services.AddOpenApiDocument();
+builder.Services.AddOpenApiDocument(config =>
+{
+    config.AddStringConstants(typeof(ExampleApp.Chat.Channels));
+});
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

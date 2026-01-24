@@ -17,12 +17,12 @@ export class ChatClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    events(channel: string[] | undefined): Promise<void> {
+    events(channels: string | undefined): Promise<void> {
         let url_ = this.baseUrl + "/?";
-        if (channel === null)
-            throw new globalThis.Error("The parameter 'channel' cannot be null.");
-        else if (channel !== undefined)
-            channel && channel.forEach(item => { url_ += "channel=" + encodeURIComponent("" + item) + "&"; });
+        if (channels === null)
+            throw new globalThis.Error("The parameter 'channels' cannot be null.");
+        else if (channels !== undefined)
+            url_ += "channels=" + encodeURIComponent("" + channels) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -200,6 +200,16 @@ export interface TypingRequest {
 export interface PresenceRequest {
     username?: string;
     online?: boolean;
+}
+
+/** String constants from Channels */
+export interface Channels {
+    /** Constant value: "rooms/{roomId}/messages" */
+    readonly RoomMessages?: string;
+    /** Constant value: "rooms/{roomId}/typing" */
+    readonly RoomTyping?: string;
+    /** Constant value: "rooms/{roomId}/presence" */
+    readonly RoomPresence?: string;
 }
 
 export interface FileResponse {
