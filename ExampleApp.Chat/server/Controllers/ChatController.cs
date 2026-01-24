@@ -10,9 +10,10 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     /// </summary>
     [HttpGet("events")]
     [Produces("text/event-stream")]
+    [Produces<Guid>]
     public async Task Events()
     {
-        await HttpContext.StreamSseAsync(backplane);
+        var connectionId = await HttpContext.StreamSseAsync(backplane);
     }
 
     /// <summary>

@@ -30,7 +30,7 @@ public static class SseStreamingExtensions
     /// es.addEventListener('chat:room1', e => console.log(JSON.parse(e.data)));
     /// </code>
     /// </example>
-    public static async Task StreamSseAsync(
+    public static async Task<Guid> StreamSseAsync(
         this HttpContext context,
         ISseBackplane backplane,
         CancellationToken cancellationToken = default)
@@ -69,6 +69,7 @@ public static class SseStreamingExtensions
             }
 
             cts.Cancel();
+            return connectionId;
         }
         finally
         {
