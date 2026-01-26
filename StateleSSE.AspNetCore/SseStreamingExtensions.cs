@@ -22,7 +22,7 @@ public sealed class SseStream : IAsyncDisposable
     }
 
     /// <summary>
-    /// Write an SSE event to the stream.
+    /// Write an SSE event to the stream with a named event type.
     /// </summary>
     public async Task WriteAsync(string eventType, JsonElement data, CancellationToken cancellationToken = default)
     {
@@ -34,13 +34,35 @@ public sealed class SseStream : IAsyncDisposable
     }
 
     /// <summary>
-    /// Write an SSE event with raw string data.
+    /// Write an SSE event with raw string data and named event type.
     /// </summary>
     public async Task WriteAsync(string eventType, string data, CancellationToken cancellationToken = default)
     {
         _eventId++;
         await _response.WriteAsync($"id: {_eventId}\n", cancellationToken);
         await _response.WriteAsync($"event: {eventType}\n", cancellationToken);
+        await _response.WriteAsync($"data: {data}\n\n", cancellationToken);
+        await _response.Body.FlushAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Write an SSE event without a named event type (received via onmessage).
+    /// </summary>
+    public async Task WriteAsync(JsonElement data, CancellationToken cancellationToken = default)
+    {
+        _eventId++;
+        await _response.WriteAsync($"id: {_eventId}\n", cancellationToken);
+        await _response.WriteAsync($"data: {data.GetRawText()}\n\n", cancellationToken);
+        await _response.Body.FlushAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Write an SSE event without a named event type (received via onmessage).
+    /// </summary>
+    public async Task WriteAsync(string data, CancellationToken cancellationToken = default)
+    {
+        _eventId++;
+        await _response.WriteAsync($"id: {_eventId}\n", cancellationToken);
         await _response.WriteAsync($"data: {data}\n\n", cancellationToken);
         await _response.Body.FlushAsync(cancellationToken);
     }
@@ -71,6 +93,7 @@ public sealed class SseStream : IAsyncDisposable
         }
     }
 
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         _keepaliveCts.Cancel();
@@ -80,9 +103,9 @@ public sealed class SseStream : IAsyncDisposable
 }
 
 /// <summary>
-/// Represents a connection to the backplane with subscriptions.
+/// Represents a client connection to the backplane.
 /// </summary>
-public sealed class BackplaneConnection : IDisposable
+public sealed class BackplaneConnection : IAsyncDisposable
 {
     private readonly ISseBackplane _backplane;
 
@@ -93,23 +116,52 @@ public sealed class BackplaneConnection : IDisposable
         ConnectionId = connectionId;
     }
 
+    /// <summary>
+    /// The unique connection ID for this client.
+    /// </summary>
     public Guid ConnectionId { get; }
+
+    /// <summary>
+    /// The channel reader for receiving events.
+    /// </summary>
     public ChannelReader<SseEvent> Reader { get; }
 
-    public void Subscribe(string channel) => _backplane.Subscribe(ConnectionId, channel);
+    /// <summary>
+    /// Add this client to a group.
+    /// </summary>
+    public Task JoinGroupAsync(string groupName) =>
+        _backplane.Groups.AddToGroupAsync(ConnectionId, groupName);
 
-    public void Subscribe(IEnumerable<string> channels)
+    /// <summary>
+    /// Add this client to multiple groups.
+    /// </summary>
+    public async Task JoinGroupsAsync(IEnumerable<string> groupNames)
     {
-        foreach (var channel in channels)
-            _backplane.Subscribe(ConnectionId, channel);
+        foreach (var groupName in groupNames)
+            await _backplane.Groups.AddToGroupAsync(ConnectionId, groupName);
     }
 
-    public void Unsubscribe(string channel) => _backplane.Unsubscribe(ConnectionId, channel);
+    /// <summary>
+    /// Remove this client from a group.
+    /// </summary>
+    public Task LeaveGroupAsync(string groupName) =>
+        _backplane.Groups.RemoveFromGroupAsync(ConnectionId, groupName);
 
+    /// <summary>
+    /// Get all groups this client belongs to.
+    /// </summary>
+    public Task<IReadOnlyList<string>> GetGroupsAsync() =>
+        _backplane.Groups.GetClientGroupsAsync(ConnectionId);
+
+    /// <summary>
+    /// Read all events from the connection.
+    /// </summary>
     public IAsyncEnumerable<SseEvent> ReadAllAsync(CancellationToken cancellationToken = default)
         => Reader.ReadAllAsync(cancellationToken);
 
-    public void Dispose() => _backplane.Disconnect(ConnectionId);
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync() =>
+        await _backplane.DisconnectAsync(ConnectionId);
 }
 
 /// <summary>
@@ -141,7 +193,7 @@ public static class SseStreamingExtensions
     }
 
     /// <summary>
-    /// Creates a connection to the backplane.
+    /// Creates a client connection to the backplane.
     /// </summary>
     public static BackplaneConnection CreateConnection(this ISseBackplane backplane)
     {
@@ -150,85 +202,43 @@ public static class SseStreamingExtensions
     }
 
     /// <summary>
-    /// Stream SSE events to the client with URL-based channel subscriptions.
-    /// Events are sent with channel name as SSE event type for client-side routing.
+    /// Stream SSE events to the client with URL-based group subscriptions.
+    /// Events are sent with group name as SSE event type for client-side routing.
     /// </summary>
     /// <example>
     /// <code>
     /// // Minimal API
-    /// app.MapGet("/events", (HttpContext ctx, ISseBackplane bp, [FromQuery] string[] channel)
-    ///     => ctx.StreamSseAsync(bp, channel));
+    /// app.MapGet("/events", (HttpContext ctx, ISseBackplane bp, [FromQuery] string[] group)
+    ///     => ctx.StreamSseAsync(bp, group));
     ///
     /// // Client
-    /// const es = new EventSource('/events?channel=chat:room1:messages&amp;channel=chat:room1:typing');
+    /// const es = new EventSource('/events?group=chat:room1:messages&amp;group=chat:room1:typing');
     /// es.addEventListener('chat:room1:messages', e => console.log(JSON.parse(e.data)));
     /// </code>
     /// </example>
     public static async Task StreamSseAsync(
         this HttpContext context,
         ISseBackplane backplane,
-        IEnumerable<string> channels,
+        IEnumerable<string> groups,
         CancellationToken cancellationToken = default)
     {
         cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
 
-        var response = context.Response;
-        response.Headers.ContentType = "text/event-stream";
-        response.Headers.CacheControl = "no-cache";
-        response.Headers.Connection = "keep-alive";
-        response.Headers["X-Accel-Buffering"] = "no";
+        await using var sse = await context.OpenSseStreamAsync(cancellationToken: cancellationToken);
+        await using var connection = backplane.CreateConnection();
 
-        var (reader, connectionId) = backplane.Connect();
+        await connection.JoinGroupsAsync(groups);
 
-        // Subscribe to all requested channels
-        foreach (var channel in channels)
+        await foreach (var evt in connection.ReadAllAsync(cancellationToken))
         {
-            backplane.Subscribe(connectionId, channel);
-        }
-
-        try
-        {
-            // Send retry directive
-            await response.WriteAsync("retry: 3000\n\n", cancellationToken);
-            await response.Body.FlushAsync(cancellationToken);
-
-            // Start keepalive task
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var keepaliveTask = SendKeepalives(response, DefaultKeepalive, cts.Token);
-
-            // Stream events with channel as SSE event type
-            var eventId = 0;
-            await foreach (var evt in reader.ReadAllAsync(cancellationToken))
+            if (evt.Group != null)
             {
-                eventId++;
-                await response.WriteAsync($"id: {eventId}\n", cancellationToken);
-                await response.WriteAsync($"event: {evt.Channel}\n", cancellationToken);
-                await response.WriteAsync($"data: {evt.Data.GetRawText()}\n\n", cancellationToken);
-                await response.Body.FlushAsync(cancellationToken);
+                await sse.WriteAsync(evt.Group, evt.Data, cancellationToken);
             }
-
-            cts.Cancel();
-        }
-        finally
-        {
-            backplane.Disconnect(connectionId);
-        }
-    }
-
-    private static async Task SendKeepalives(HttpResponse response, TimeSpan interval, CancellationToken ct)
-    {
-        using var timer = new PeriodicTimer(interval);
-        try
-        {
-            while (await timer.WaitForNextTickAsync(ct))
+            else
             {
-                await response.WriteAsync(": keepalive\n\n", ct);
-                await response.Body.FlushAsync(ct);
+                await sse.WriteAsync(evt.Data, cancellationToken);
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when connection closes
         }
     }
 }

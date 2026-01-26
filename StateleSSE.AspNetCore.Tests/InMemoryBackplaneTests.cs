@@ -11,14 +11,14 @@ public class InMemoryBackplaneTests
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
         var (reader, connectionId) = backplane.Connect();
-        backplane.Subscribe(connectionId, "test-channel");
+        await backplane.Groups.AddToGroupAsync(connectionId, "test-group");
 
-        await backplane.Publish("test-channel", new { Data = "test message" });
+        await backplane.Clients.GroupAsync("test-group", new { Data = "test message" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
-        received.Channel.Should().Be("test-channel");
+        received.Group.Should().Be("test-group");
         received.Data.GetProperty("Data").GetString().Should().Be("test message");
 
         backplane.Dispose();
@@ -30,10 +30,10 @@ public class InMemoryBackplaneTests
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
         var (reader1, conn1) = backplane.Connect();
         var (reader2, conn2) = backplane.Connect();
-        backplane.Subscribe(conn1, "test-channel");
-        backplane.Subscribe(conn2, "test-channel");
+        await backplane.Groups.AddToGroupAsync(conn1, "test-group");
+        await backplane.Groups.AddToGroupAsync(conn2, "test-group");
 
-        await backplane.Publish("test-channel", new { Data = "broadcast" });
+        await backplane.Clients.GroupAsync("test-group", new { Data = "broadcast" });
 
         var cts = new CancellationTokenSource(100);
 
@@ -51,7 +51,7 @@ public class InMemoryBackplaneTests
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
 
-        var act = async () => await backplane.Publish("empty-channel", new { Data = "test" });
+        var act = async () => await backplane.Clients.GroupAsync("empty-group", new { Data = "test" });
 
         await act.Should().NotThrowAsync();
 
@@ -63,11 +63,11 @@ public class InMemoryBackplaneTests
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
         var (reader, connectionId) = backplane.Connect();
-        backplane.Subscribe(connectionId, "test-channel");
+        await backplane.Groups.AddToGroupAsync(connectionId, "test-group");
 
-        backplane.Disconnect(connectionId);
+        await backplane.DisconnectAsync(connectionId);
 
-        await backplane.Publish("test-channel", new { Data = "should not receive" });
+        await backplane.Clients.GroupAsync("test-group", new { Data = "should not receive" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).ToListAsync();
@@ -78,23 +78,23 @@ public class InMemoryBackplaneTests
     }
 
     [Fact]
-    public async Task Unsubscribe_NoLongerReceivesFromChannel()
+    public async Task RemoveFromGroup_NoLongerReceivesFromGroup()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
         var (reader, connectionId) = backplane.Connect();
-        backplane.Subscribe(connectionId, "channel1");
-        backplane.Subscribe(connectionId, "channel2");
+        await backplane.Groups.AddToGroupAsync(connectionId, "group1");
+        await backplane.Groups.AddToGroupAsync(connectionId, "group2");
 
-        backplane.Unsubscribe(connectionId, "channel1");
+        await backplane.Groups.RemoveFromGroupAsync(connectionId, "group1");
 
-        await backplane.Publish("channel1", new { Data = "should not receive" });
-        await backplane.Publish("channel2", new { Data = "should receive" });
+        await backplane.Clients.GroupAsync("group1", new { Data = "should not receive" });
+        await backplane.Clients.GroupAsync("group2", new { Data = "should receive" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).Take(1).ToListAsync();
 
         received.Should().HaveCount(1);
-        received[0].Channel.Should().Be("channel2");
+        received[0].Group.Should().Be("group2");
         received[0].Data.GetProperty("Data").GetString().Should().Be("should receive");
 
         backplane.Dispose();
@@ -115,60 +115,113 @@ public class InMemoryBackplaneTests
     }
 
     [Fact]
-    public void Subscribe_ReturnsFalseForInvalidConnection()
+    public async Task GetMemberCount_ReturnsCorrectCount()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (_, conn1) = backplane.Connect();
+        var (_, conn2) = backplane.Connect();
 
-        var result = backplane.Subscribe(Guid.NewGuid(), "test-channel");
+        await backplane.Groups.AddToGroupAsync(conn1, "test-group");
+        await backplane.Groups.AddToGroupAsync(conn2, "test-group");
 
-        result.Should().BeFalse();
+        var count = await backplane.Groups.GetMemberCountAsync("test-group");
+
+        count.Should().Be(2);
 
         backplane.Dispose();
     }
 
     [Fact]
-    public void Subscribe_ReturnsFalseIfAlreadySubscribed()
+    public async Task GetMembers_ReturnsAllMembers()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (_, conn1) = backplane.Connect();
+        var (_, conn2) = backplane.Connect();
+
+        await backplane.Groups.AddToGroupAsync(conn1, "test-group");
+        await backplane.Groups.AddToGroupAsync(conn2, "test-group");
+
+        var members = await backplane.Groups.GetMembersAsync("test-group");
+
+        members.Should().Contain(new[] { conn1, conn2 });
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public async Task GetClientGroups_ReturnsAllGroups()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
         var (_, connectionId) = backplane.Connect();
 
-        var first = backplane.Subscribe(connectionId, "test-channel");
-        var second = backplane.Subscribe(connectionId, "test-channel");
+        await backplane.Groups.AddToGroupAsync(connectionId, "group1");
+        await backplane.Groups.AddToGroupAsync(connectionId, "group2");
 
-        first.Should().BeTrue();
-        second.Should().BeFalse();
+        var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
 
-        backplane.Dispose();
-    }
-
-    [Fact]
-    public void Unsubscribe_ReturnsFalseForInvalidConnection()
-    {
-        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
-
-        var result = backplane.Unsubscribe(Guid.NewGuid(), "test-channel");
-
-        result.Should().BeFalse();
+        groups.Should().Contain(new[] { "group1", "group2" });
 
         backplane.Dispose();
     }
 
     [Fact]
-    public async Task Connection_SubscribedToMultipleChannels_ReceivesFromAll()
+    public async Task Connection_SubscribedToMultipleGroups_ReceivesFromAll()
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
         var (reader, connectionId) = backplane.Connect();
-        backplane.Subscribe(connectionId, "channel1");
-        backplane.Subscribe(connectionId, "channel2");
+        await backplane.Groups.AddToGroupAsync(connectionId, "group1");
+        await backplane.Groups.AddToGroupAsync(connectionId, "group2");
 
-        await backplane.Publish("channel1", new { Data = "from channel1" });
-        await backplane.Publish("channel2", new { Data = "from channel2" });
+        await backplane.Clients.GroupAsync("group1", new { Data = "from group1" });
+        await backplane.Clients.GroupAsync("group2", new { Data = "from group2" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).Take(2).ToListAsync();
 
         received.Should().HaveCount(2);
-        received.Select(e => e.Channel).Should().Contain(new[] { "channel1", "channel2" });
+        received.Select(e => e.Group).Should().Contain(new[] { "group1", "group2" });
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public async Task SendToAll_DeliversToAllConnections()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (reader1, _) = backplane.Connect();
+        var (reader2, _) = backplane.Connect();
+
+        await backplane.Clients.AllAsync(new { Data = "broadcast to all" });
+
+        var cts = new CancellationTokenSource(100);
+
+        var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
+        var received2 = await reader2.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
+
+        received1.Data.GetProperty("Data").GetString().Should().Be("broadcast to all");
+        received2.Data.GetProperty("Data").GetString().Should().Be("broadcast to all");
+        received1.Group.Should().BeNull();
+        received2.Group.Should().BeNull();
+
+        backplane.Dispose();
+    }
+
+    [Fact]
+    public async Task SendToClient_DeliversToSpecificClient()
+    {
+        var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
+        var (reader1, conn1) = backplane.Connect();
+        var (reader2, _) = backplane.Connect();
+
+        await backplane.Clients.ClientAsync(conn1, new { Data = "only for conn1" });
+
+        var cts = new CancellationTokenSource(100);
+
+        var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
+        received1.Data.GetProperty("Data").GetString().Should().Be("only for conn1");
+
+        // conn2 should not receive anything - verify by checking TryRead returns false
+        reader2.TryRead(out _).Should().BeFalse();
 
         backplane.Dispose();
     }

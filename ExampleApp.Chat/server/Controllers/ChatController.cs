@@ -6,34 +6,41 @@ using ExampleApp.Chat;
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     /// <summary>
-    /// SSE stream endpoint. Subscribes to channels specified in query params.
+    /// SSE stream endpoint. Subscribes to groups specified in query params.
     /// Example: /events?channels=rooms/123/messages,rooms/123/typing
     /// </summary>
     [HttpGet("")]
     [Produces("text/event-stream")]
     public async Task Events([FromQuery] string channels)
     {
-        var channelList = channels?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
-       
-        await using var sse = await HttpContext.OpenSseStreamAsync();
-        using var connection = backplane.CreateConnection();                                                                                                                                 
+        var groupList = channels?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
 
-        foreach (var channel in channelList)
+        await using var sse = await HttpContext.OpenSseStreamAsync();
+        await using var connection = backplane.CreateConnection();
+
+        foreach (var group in groupList)
         {
-            connection.Subscribe(channel);                                                                                                                                                
-            
+            await connection.JoinGroupAsync(group);
         }
-        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))                                                                                                        
-        {                                                                                                                                                                             
-            await sse.WriteAsync(evt.Channel, evt.Data);                                                                                                                              
-        } 
+
+        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
+        {
+            if (evt.Group != null)
+            {
+                await sse.WriteAsync(evt.Group, evt.Data);
+            }
+            else
+            {
+                await sse.WriteAsync(evt.Data);
+            }
+        }
     }
 
     /// <summary>
     /// Send a message to a chat room.
     /// </summary>
     [HttpPost("rooms/{roomId}/messages")]
-    public async Task<IActionResult> SendMessage(string roomId, [FromBody] SendMessageRequest request)
+    public async Task SendMessage(string roomId, [FromBody] SendMessageRequest request)
     {
         var message = new ChatMessage
         {
@@ -44,41 +51,39 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
             Timestamp = DateTime.UtcNow.ToString("o")
         };
 
-        await backplane.Publish("rooms/"+roomId+"/messages", message);
-        return Ok(message);
+        await backplane.Clients.GroupAsync("rooms/" + roomId + "/messages", message);
     }
 
     /// <summary>
     /// Send a typing indicator.
     /// </summary>
     [HttpPost("rooms/{roomId}/typing")]
-    public async Task<IActionResult> SendTyping(string roomId, [FromBody] TypingRequest request)
+    public async Task SendTyping(string roomId, [FromBody] TypingRequest request)
     {
-        await backplane.Publish("rooms/"+roomId+"/typing", new TypingEvent
+        await backplane.Clients.GroupAsync("rooms/" + roomId + "/typing", new TypingEvent
         {
             RoomId = roomId,
             Username = request.Username,
             IsTyping = request.IsTyping
         });
-        return Ok();
     }
 
     /// <summary>
-    /// Update presence status.
+    /// Update presence status. Returns the number of online users in the room.
     /// </summary>
     [HttpPost("rooms/{roomId}/presence")]
     public async Task<IActionResult> UpdatePresence(string roomId, [FromBody] PresenceRequest request)
     {
-        await backplane.GetSubscribers("rooms/" + roomId);
-        
-        //count
-        
-        await backplane.Publish("rooms/"+roomId+"/presence", new PresenceEvent
+        // Get the count of clients in this room's presence group
+        var onlineCount = await backplane.Groups.GetMemberCountAsync("rooms/" + roomId + "/presence");
+
+        await backplane.Clients.GroupAsync("rooms/" + roomId + "/presence", new PresenceEvent
         {
             RoomId = roomId,
-            OnlineUsers =  //the number of online users
+            OnlineUsers = onlineCount
         });
-        return Ok();
+
+        return Ok(new { OnlineUsers = onlineCount });
     }
 }
 
@@ -87,7 +92,7 @@ public record SendMessageRequest(string Author, string Content);
 public record TypingRequest(string Username, bool IsTyping);
 public record PresenceRequest(string Username, bool Online);
 
-// Event DTOs (published to channels)
+// Event DTOs (published to groups)
 public class ChatMessage
 {
     public required string Id { get; set; }

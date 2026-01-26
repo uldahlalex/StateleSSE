@@ -8,10 +8,24 @@ namespace StateleSSE.AspNetCore.Infrastructure;
 /// <summary>
 /// In-memory implementation of ISseBackplane for single-server deployments.
 /// </summary>
-public class InMemoryBackplane(ILogger<InMemoryBackplane> logger) : ISseBackplane, IDisposable
+public class InMemoryBackplane : ISseBackplane, IDisposable
 {
+    private readonly ILogger<InMemoryBackplane> _logger;
     private readonly ConcurrentDictionary<Guid, ConnectionState> _connections = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, byte>> _channelSubscribers = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, byte>> _groups = new();
+
+    private readonly InMemoryClients _clients;
+    private readonly InMemoryGroups _groupsApi;
+
+    /// <summary>
+    /// Creates an InMemoryBackplane instance with logging.
+    /// </summary>
+    public InMemoryBackplane(ILogger<InMemoryBackplane> logger)
+    {
+        _logger = logger;
+        _clients = new InMemoryClients(this);
+        _groupsApi = new InMemoryGroups(this);
+    }
 
     /// <summary>
     /// Creates an InMemoryBackplane instance without logging.
@@ -19,6 +33,12 @@ public class InMemoryBackplane(ILogger<InMemoryBackplane> logger) : ISseBackplan
     public InMemoryBackplane() : this(Microsoft.Extensions.Logging.Abstractions.NullLogger<InMemoryBackplane>.Instance)
     {
     }
+
+    /// <inheritdoc/>
+    public IBackplaneClients Clients => _clients;
+
+    /// <inheritdoc/>
+    public IBackplaneGroups Groups => _groupsApi;
 
     /// <inheritdoc/>
     public (ChannelReader<SseEvent> Reader, Guid ConnectionId) Connect()
@@ -29,103 +49,34 @@ public class InMemoryBackplane(ILogger<InMemoryBackplane> logger) : ISseBackplan
 
         _connections.TryAdd(connectionId, state);
 
-        logger.LogDebug("Connected {ConnectionId}. Total: {Count}", connectionId, _connections.Count);
+        _logger.LogDebug("Client {ConnectionId} connected. Total: {Count}", connectionId, _connections.Count);
 
         return (channel.Reader, connectionId);
     }
 
     /// <inheritdoc/>
-    public bool Subscribe(Guid connectionId, string channel)
-    {
-        if (!_connections.TryGetValue(connectionId, out var state))
-        {
-            logger.LogWarning("Subscribe failed: connection {ConnectionId} not found", connectionId);
-            return false;
-        }
-
-        if (!state.Channels.TryAdd(channel, 0))
-        {
-            return false; // Already subscribed
-        }
-
-        var subscribers = _channelSubscribers.GetOrAdd(channel, _ => new ConcurrentDictionary<Guid, byte>());
-        subscribers.TryAdd(connectionId, 0);
-
-        logger.LogDebug("{ConnectionId} subscribed to '{Channel}'", connectionId, channel);
-        return true;
-    }
-
-    /// <inheritdoc/>
-    public bool Unsubscribe(Guid connectionId, string channel)
-    {
-        if (!_connections.TryGetValue(connectionId, out var state))
-        {
-            return false;
-        }
-
-        if (!state.Channels.TryRemove(channel, out _))
-        {
-            return false;
-        }
-
-        if (_channelSubscribers.TryGetValue(channel, out var subscribers))
-        {
-            subscribers.TryRemove(connectionId, out _);
-            if (subscribers.IsEmpty)
-            {
-                _channelSubscribers.TryRemove(channel, out _);
-            }
-        }
-
-        logger.LogDebug("{ConnectionId} unsubscribed from '{Channel}'", connectionId, channel);
-        return true;
-    }
-
-    /// <inheritdoc/>
-    public async Task Publish(string channel, object data)
-    {
-        var json = JsonSerializer.SerializeToElement(data);
-        var sseEvent = new SseEvent(channel, json);
-
-        if (_channelSubscribers.TryGetValue(channel, out var subscribers))
-        {
-            var tasks = new List<Task>();
-
-            foreach (var connectionId in subscribers.Keys)
-            {
-                if (_connections.TryGetValue(connectionId, out var state))
-                {
-                    tasks.Add(state.Channel.Writer.WriteAsync(sseEvent).AsTask());
-                }
-            }
-
-            await Task.WhenAll(tasks);
-            logger.LogDebug("Published to '{Channel}' ({Count} subscribers)", channel, subscribers.Count);
-        }
-    }
-
-    /// <inheritdoc/>
-    public void Disconnect(Guid connectionId)
+    public Task DisconnectAsync(Guid connectionId)
     {
         if (!_connections.TryRemove(connectionId, out var state))
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        foreach (var channel in state.Channels.Keys)
+        foreach (var groupName in state.Groups.Keys)
         {
-            if (_channelSubscribers.TryGetValue(channel, out var subscribers))
+            if (_groups.TryGetValue(groupName, out var members))
             {
-                subscribers.TryRemove(connectionId, out _);
-                if (subscribers.IsEmpty)
+                members.TryRemove(connectionId, out _);
+                if (members.IsEmpty)
                 {
-                    _channelSubscribers.TryRemove(channel, out _);
+                    _groups.TryRemove(groupName, out _);
                 }
             }
         }
 
         state.Channel.Writer.Complete();
-        logger.LogDebug("Disconnected {ConnectionId}", connectionId);
+        _logger.LogDebug("Client {ConnectionId} disconnected", connectionId);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -136,12 +87,152 @@ public class InMemoryBackplane(ILogger<InMemoryBackplane> logger) : ISseBackplan
             state.Channel.Writer.Complete();
         }
         _connections.Clear();
-        _channelSubscribers.Clear();
+        _groups.Clear();
+    }
+
+    internal async Task SendToClientAsync(Guid connectionId, object data, string? groupName = null)
+    {
+        if (_connections.TryGetValue(connectionId, out var state))
+        {
+            var json = JsonSerializer.SerializeToElement(data);
+            var evt = new SseEvent(groupName, json);
+            await state.Channel.Writer.WriteAsync(evt);
+        }
+    }
+
+    internal async Task SendToAllAsync(object data)
+    {
+        var json = JsonSerializer.SerializeToElement(data);
+        var evt = new SseEvent(null, json);
+
+        var tasks = _connections.Values
+            .Select(state => state.Channel.Writer.WriteAsync(evt).AsTask());
+
+        await Task.WhenAll(tasks);
+        _logger.LogDebug("Sent to all clients ({Count})", _connections.Count);
+    }
+
+    internal async Task SendToGroupAsync(string groupName, object data)
+    {
+        if (!_groups.TryGetValue(groupName, out var members))
+        {
+            return;
+        }
+
+        var json = JsonSerializer.SerializeToElement(data);
+        var evt = new SseEvent(groupName, json);
+
+        var tasks = members.Keys
+            .Where(id => _connections.ContainsKey(id))
+            .Select(id => _connections[id].Channel.Writer.WriteAsync(evt).AsTask());
+
+        await Task.WhenAll(tasks);
+        _logger.LogDebug("Sent to group '{Group}' ({Count} members)", groupName, members.Count);
+    }
+
+    internal Task AddToGroupAsync(Guid connectionId, string groupName)
+    {
+        if (!_connections.TryGetValue(connectionId, out var state))
+        {
+            _logger.LogWarning("AddToGroup failed: client {ConnectionId} not found", connectionId);
+            return Task.CompletedTask;
+        }
+
+        state.Groups.TryAdd(groupName, 0);
+
+        var members = _groups.GetOrAdd(groupName, _ => new ConcurrentDictionary<Guid, byte>());
+        members.TryAdd(connectionId, 0);
+
+        _logger.LogDebug("Client {ConnectionId} added to group '{Group}'", connectionId, groupName);
+        return Task.CompletedTask;
+    }
+
+    internal Task RemoveFromGroupAsync(Guid connectionId, string groupName)
+    {
+        if (_connections.TryGetValue(connectionId, out var state))
+        {
+            state.Groups.TryRemove(groupName, out _);
+        }
+
+        if (_groups.TryGetValue(groupName, out var members))
+        {
+            members.TryRemove(connectionId, out _);
+            if (members.IsEmpty)
+            {
+                _groups.TryRemove(groupName, out _);
+            }
+        }
+
+        _logger.LogDebug("Client {ConnectionId} removed from group '{Group}'", connectionId, groupName);
+        return Task.CompletedTask;
+    }
+
+    internal Task<int> GetGroupMemberCountAsync(string groupName)
+    {
+        var count = _groups.TryGetValue(groupName, out var members) ? members.Count : 0;
+        return Task.FromResult(count);
+    }
+
+    internal Task<IReadOnlyList<Guid>> GetGroupMembersAsync(string groupName)
+    {
+        IReadOnlyList<Guid> result = _groups.TryGetValue(groupName, out var members)
+            ? members.Keys.ToList()
+            : Array.Empty<Guid>();
+        return Task.FromResult(result);
+    }
+
+    internal Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId)
+    {
+        IReadOnlyList<string> result = _connections.TryGetValue(connectionId, out var state)
+            ? state.Groups.Keys.ToList()
+            : Array.Empty<string>();
+        return Task.FromResult(result);
     }
 
     private sealed class ConnectionState(Channel<SseEvent> channel)
     {
         public Channel<SseEvent> Channel { get; } = channel;
-        public ConcurrentDictionary<string, byte> Channels { get; } = new();
+        public ConcurrentDictionary<string, byte> Groups { get; } = new();
+    }
+
+    private sealed class InMemoryClients(InMemoryBackplane backplane) : IBackplaneClients
+    {
+        public Task AllAsync(object data) => backplane.SendToAllAsync(data);
+
+        public Task ClientAsync(Guid connectionId, object data) =>
+            backplane.SendToClientAsync(connectionId, data);
+
+        public async Task ClientsAsync(IEnumerable<Guid> connectionIds, object data)
+        {
+            var tasks = connectionIds.Select(id => backplane.SendToClientAsync(id, data));
+            await Task.WhenAll(tasks);
+        }
+
+        public Task GroupAsync(string groupName, object data) =>
+            backplane.SendToGroupAsync(groupName, data);
+
+        public async Task GroupsAsync(IEnumerable<string> groupNames, object data)
+        {
+            var tasks = groupNames.Select(g => backplane.SendToGroupAsync(g, data));
+            await Task.WhenAll(tasks);
+        }
+    }
+
+    private sealed class InMemoryGroups(InMemoryBackplane backplane) : IBackplaneGroups
+    {
+        public Task AddToGroupAsync(Guid connectionId, string groupName) =>
+            backplane.AddToGroupAsync(connectionId, groupName);
+
+        public Task RemoveFromGroupAsync(Guid connectionId, string groupName) =>
+            backplane.RemoveFromGroupAsync(connectionId, groupName);
+
+        public Task<int> GetMemberCountAsync(string groupName) =>
+            backplane.GetGroupMemberCountAsync(groupName);
+
+        public Task<IReadOnlyList<Guid>> GetMembersAsync(string groupName) =>
+            backplane.GetGroupMembersAsync(groupName);
+
+        public Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId) =>
+            backplane.GetClientGroupsAsync(connectionId);
     }
 }

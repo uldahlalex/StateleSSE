@@ -5,7 +5,7 @@ namespace api.Controllers;
 
 /// <summary>
 /// SSE streaming endpoints for Kahoot game events.
-/// Uses simplified StateleSSE API with channel-based routing.
+/// Uses simplified StateleSSE API with group-based routing.
 /// </summary>
 [ApiController]
 [Route("api/game")]
@@ -13,7 +13,7 @@ public class GameEventsController(ISseBackplane backplane) : ControllerBase
 {
     /// <summary>
     /// SSE stream endpoint. Returns connectionId as first event.
-    /// Client subscribes to channels like "game:{gameId}:events" to receive game events.
+    /// Client subscribes to groups like "game:{gameId}:events" to receive game events.
     /// </summary>
     [HttpGet("events")]
     [Produces("text/event-stream")]
@@ -23,23 +23,23 @@ public class GameEventsController(ISseBackplane backplane) : ControllerBase
     }
 
     /// <summary>
-    /// Subscribe to a channel.
+    /// Subscribe to a group.
     /// </summary>
     [HttpPost("subscribe")]
-    public IActionResult Subscribe([FromBody] SubscribeRequest request)
+    public async Task<IActionResult> Subscribe([FromBody] SubscribeRequest request)
     {
-        var success = backplane.Subscribe(request.ConnectionId, request.Channel);
-        return success ? Ok() : NotFound("Connection not found");
+        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Channel);
+        return Ok();
     }
 
     /// <summary>
-    /// Unsubscribe from a channel.
+    /// Unsubscribe from a group.
     /// </summary>
     [HttpPost("unsubscribe")]
-    public IActionResult Unsubscribe([FromBody] UnsubscribeRequest request)
+    public async Task<IActionResult> Unsubscribe([FromBody] UnsubscribeRequest request)
     {
-        var success = backplane.Unsubscribe(request.ConnectionId, request.Channel);
-        return success ? Ok() : NotFound("Connection or subscription not found");
+        await backplane.Groups.RemoveFromGroupAsync(request.ConnectionId, request.Channel);
+        return Ok();
     }
 }
 
