@@ -44,7 +44,7 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
             Timestamp = DateTime.UtcNow.ToString("o")
         };
 
-        await backplane.Publish(Channels.Resolve(Channels.RoomMessages, roomId), message);
+        await backplane.Publish("rooms/"+roomId+"/messages", message);
         return Ok(message);
     }
 
@@ -54,7 +54,7 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     [HttpPost("rooms/{roomId}/typing")]
     public async Task<IActionResult> SendTyping(string roomId, [FromBody] TypingRequest request)
     {
-        await backplane.Publish(Channels.Resolve(Channels.RoomTyping, roomId), new TypingEvent
+        await backplane.Publish("rooms/"+roomId+"/typing", new TypingEvent
         {
             RoomId = roomId,
             Username = request.Username,
@@ -69,11 +69,14 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     [HttpPost("rooms/{roomId}/presence")]
     public async Task<IActionResult> UpdatePresence(string roomId, [FromBody] PresenceRequest request)
     {
-        await backplane.Publish(Channels.Resolve(Channels.RoomPresence, roomId), new PresenceEvent
+        await backplane.GetSubscribers("rooms/" + roomId);
+        
+        //count
+        
+        await backplane.Publish("rooms/"+roomId+"/presence", new PresenceEvent
         {
             RoomId = roomId,
-            Username = request.Username,
-            Online = request.Online
+            OnlineUsers =  //the number of online users
         });
         return Ok();
     }
@@ -104,6 +107,5 @@ public class TypingEvent
 public class PresenceEvent
 {
     public required string RoomId { get; set; }
-    public required string Username { get; set; }
-    public required bool Online { get; set; }
+    public required int OnlineUsers { get; set; }
 }
