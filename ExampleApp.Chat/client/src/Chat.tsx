@@ -16,12 +16,27 @@ export default function Chat() {
         es.addEventListener('rooms/123/messages', (event) => {
             setMessages((prev) => [...prev, JSON.parse(event.data)]);
         });
+        es.addEventListener('rooms/123/typing', (event) => {
+            console.log("someone is typing")
+            console.log(event)
+        });
 
         return () => es.close();
     }, []);
 
     return <>
 
+        <input onChange={e => {
+            chatClient.sendTyping(
+                "123",
+            {
+                username: "bob",
+                    isTyping: true
+            }
+            ).then(r => {
+
+            })
+        }} />
 
         <button onClick={() => {
             chatClient.sendMessage("123", {

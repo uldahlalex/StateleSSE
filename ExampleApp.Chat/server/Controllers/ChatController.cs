@@ -14,8 +14,19 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     public async Task Events([FromQuery] string channels)
     {
         var channelList = channels?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
-        Console.WriteLine(JsonSerializer.Serialize(channelList));
-        await HttpContext.StreamSseAsync(backplane, channelList);
+       
+        await using var sse = await HttpContext.OpenSseStreamAsync();
+        using var connection = backplane.CreateConnection();                                                                                                                                 
+
+        foreach (var channel in channelList)
+        {
+            connection.Subscribe(channel);                                                                                                                                                
+            
+        }
+        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))                                                                                                        
+        {                                                                                                                                                                             
+            await sse.WriteAsync(evt.Channel, evt.Data);                                                                                                                              
+        } 
     }
 
     /// <summary>
