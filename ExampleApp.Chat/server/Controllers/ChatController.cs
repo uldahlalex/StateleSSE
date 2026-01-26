@@ -75,12 +75,12 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     public async Task<IActionResult> UpdatePresence(string roomId, [FromBody] PresenceRequest request)
     {
         // Get the count of clients in this room's presence group
-        var onlineCount = await backplane.Groups.GetMemberCountAsync("rooms/" + roomId + "/presence");
+        var onlineCount = await backplane.Groups.GetMembersAsync("rooms/" + roomId + "/presence");
 
         await backplane.Clients.GroupAsync("rooms/" + roomId + "/presence", new PresenceEvent
         {
             RoomId = roomId,
-            OnlineUsers = onlineCount
+            OnlineUsers = onlineCount.Count
         });
 
         return Ok(new { OnlineUsers = onlineCount });
