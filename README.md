@@ -36,7 +36,7 @@ app.Run();
 ```csharp
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore;  // Required for OpenSseStreamAsync, CreateConnection extensions
 
 [ApiController]
 [Route("api/realtime")]

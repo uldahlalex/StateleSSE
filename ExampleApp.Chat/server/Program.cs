@@ -16,6 +16,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 
 // builder.Services.AddInMemorySseBackplane();
 builder.Services.AddRedisSseBackplane();
+builder.Services.AddOpenApiDocument(config =>
+{
+});
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

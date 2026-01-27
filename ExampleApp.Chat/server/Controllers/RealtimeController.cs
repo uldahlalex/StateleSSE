@@ -19,10 +19,7 @@ public class RealtimeController(ISseBackplane backplane) : ControllerBase
         await using var connection = backplane.CreateConnection();
 
         // Send connectionId immediately - client needs this to join groups
-        await sse.WriteAsync("connected", JsonSerializer.Serialize(new
-        {
-            connectionId = connection.ConnectionId
-        }));
+        await sse.WriteAsync("connected", JsonSerializer.Serialize(new ConnectionResponse(connection.ConnectionId)));
 
         await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
         {

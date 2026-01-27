@@ -6,141 +6,72 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/": {
+    "/Connect": {
       "get": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_Events",
-        "parameters": [
-          {
-            "name": "channels",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/rooms/{roomId}/messages": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_SendMessage",
-        "parameters": [
-          {
-            "name": "roomId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendMessageRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/rooms/{roomId}/typing": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_SendTyping",
-        "parameters": [
-          {
-            "name": "roomId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TypingRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/rooms/{roomId}/presence": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_UpdatePresence",
-        "parameters": [
-          {
-            "name": "roomId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PresenceRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
+        "operationId": "Chat_Connect",
         "responses": {
           "200": {
             "description": "",
             "content": {
-              "application/octet-stream": {
+              "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "binary"
+                  "$ref": "#/components/schemas/ConnectionResponse"
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/JoinGroup": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_JoinGroup",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinGroupRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/SendMessageToGroup": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_SendMessageToGroup",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendGroupMessageRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
           }
         }
       }
@@ -387,52 +318,13 @@
   },
   "components": {
     "schemas": {
-      "SendMessageRequest": {
+      "ConnectionResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "author": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          }
-        }
-      },
-      "TypingRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "username": {
-            "type": "string"
-          },
-          "isTyping": {
-            "type": "boolean"
-          }
-        }
-      },
-      "PresenceRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "username": {
-            "type": "string"
-          },
-          "online": {
-            "type": "boolean"
-          }
-        }
-      },
-      "JoinGroupResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "group": {
-            "type": "string"
-          },
-          "memberCount": {
-            "type": "integer",
-            "format": "int32"
+          "connectionId": {
+            "type": "string",
+            "format": "guid"
           }
         }
       },
@@ -446,6 +338,34 @@
           },
           "group": {
             "type": "string"
+          }
+        }
+      },
+      "SendGroupMessageRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "connectionId": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": "string"
+          }
+        }
+      },
+      "JoinGroupResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -545,36 +465,6 @@
               "type": "string"
             }
           }
-        }
-      },
-      "Channels": {
-        "type": "object",
-        "description": "String constants from Channels",
-        "additionalProperties": false,
-        "properties": {
-          "RoomMessages": {
-            "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"rooms/{roomId}/messages\"",
-            "default": "rooms/{roomId}/messages"
-          },
-          "RoomTyping": {
-            "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"rooms/{roomId}/typing\"",
-            "default": "rooms/{roomId}/typing"
-          },
-          "RoomPresence": {
-            "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"rooms/{roomId}/presence\"",
-            "default": "rooms/{roomId}/presence"
-          }
-        },
-        "x-constant-values": {
-          "RoomMessages": "rooms/{roomId}/messages",
-          "RoomTyping": "rooms/{roomId}/typing",
-          "RoomPresence": "rooms/{roomId}/presence"
         }
       }
     }

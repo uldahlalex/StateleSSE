@@ -17,26 +17,59 @@ export class ChatClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    events(channels: string | undefined): Promise<void> {
-        let url_ = this.baseUrl + "/?";
-        if (channels === null)
-            throw new globalThis.Error("The parameter 'channels' cannot be null.");
-        else if (channels !== undefined)
-            url_ += "channels=" + encodeURIComponent("" + channels) + "&";
+    connect(): Promise<ConnectionResponse> {
+        let url_ = this.baseUrl + "/Connect";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
             method: "GET",
             headers: {
+                "Accept": "application/json"
             }
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processEvents(_response);
+            return this.processConnect(_response);
         });
     }
 
-    protected processEvents(response: Response): Promise<void> {
+    protected processConnect(response: Response): Promise<ConnectionResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ConnectionResponse;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ConnectionResponse>(null as any);
+    }
+
+    joinGroup(request: JoinGroupRequest): Promise<void> {
+        let url_ = this.baseUrl + "/JoinGroup";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processJoinGroup(_response);
+        });
+    }
+
+    protected processJoinGroup(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -51,14 +84,11 @@ export class ChatClient {
         return Promise.resolve<void>(null as any);
     }
 
-    sendMessage(roomId: string, request: SendMessageRequest): Promise<void> {
-        let url_ = this.baseUrl + "/rooms/{roomId}/messages";
-        if (roomId === undefined || roomId === null)
-            throw new globalThis.Error("The parameter 'roomId' must be defined.");
-        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
+    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<void> {
+        let url_ = this.baseUrl + "/SendMessageToGroup";
         url_ = url_.replace(/[?&]$/, "");
 
-        const content_ = JSON.stringify(request);
+        const content_ = JSON.stringify(dto);
 
         let options_: RequestInit = {
             body: content_,
@@ -69,11 +99,11 @@ export class ChatClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSendMessage(_response);
+            return this.processSendMessageToGroup(_response);
         });
     }
 
-    protected processSendMessage(response: Response): Promise<void> {
+    protected processSendMessageToGroup(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -86,88 +116,6 @@ export class ChatClient {
             });
         }
         return Promise.resolve<void>(null as any);
-    }
-
-    sendTyping(roomId: string, request: TypingRequest): Promise<void> {
-        let url_ = this.baseUrl + "/rooms/{roomId}/typing";
-        if (roomId === undefined || roomId === null)
-            throw new globalThis.Error("The parameter 'roomId' must be defined.");
-        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSendTyping(_response);
-        });
-    }
-
-    protected processSendTyping(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    updatePresence(roomId: string, request: PresenceRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/rooms/{roomId}/presence";
-        if (roomId === undefined || roomId === null)
-            throw new globalThis.Error("The parameter 'roomId' must be defined.");
-        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processUpdatePresence(_response);
-        });
-    }
-
-    protected processUpdatePresence(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
     }
 }
 
@@ -484,29 +432,24 @@ export class RealtimeClient {
     }
 }
 
-export interface SendMessageRequest {
-    author?: string;
-    content?: string;
-}
-
-export interface TypingRequest {
-    username?: string;
-    isTyping?: boolean;
-}
-
-export interface PresenceRequest {
-    username?: string;
-    online?: boolean;
-}
-
-export interface JoinGroupResponse {
-    group?: string;
-    memberCount?: number;
+export interface ConnectionResponse {
+    connectionId?: string;
 }
 
 export interface JoinGroupRequest {
     connectionId?: string;
     group?: string;
+}
+
+export interface SendGroupMessageRequestDto {
+    message?: string;
+    connectionId?: string;
+    groupId?: string;
+}
+
+export interface JoinGroupResponse {
+    group?: string;
+    memberCount?: number;
 }
 
 export interface LeaveGroupResponse {
@@ -544,16 +487,6 @@ export interface BroadcastRequest {
 export interface ConnectionGroupsResponse {
     connectionId?: string;
     groups?: string[];
-}
-
-/** String constants from Channels */
-export interface Channels {
-    /** Constant value: "rooms/{roomId}/messages" */
-    readonly RoomMessages?: string;
-    /** Constant value: "rooms/{roomId}/typing" */
-    readonly RoomTyping?: string;
-    /** Constant value: "rooms/{roomId}/presence" */
-    readonly RoomPresence?: string;
 }
 
 export interface FileResponse {

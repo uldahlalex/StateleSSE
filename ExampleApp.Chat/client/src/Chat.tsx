@@ -1,75 +1,68 @@
-import {useEffect, useState} from "react";
-import {ChatClient} from "./generated-ts-client.ts";
-
-const BASE_URL = 'http://localhost:5000';
-const channels = ['rooms/123/messages', 'rooms/123/typing', 'rooms/123/presence'];
-const es = new EventSource(`${BASE_URL}?channels=${encodeURIComponent(channels.join(','))}`);
-
-
-
+import {useEffect, useRef, useState} from "react";
+import {BASE_URL} from "./utils/BASE_URL.ts";
+import {ChatClient, type ConnectionResponse} from "./generated-ts-client.ts";
 
 const chatClient = new ChatClient(BASE_URL)
+
 export default function Chat() {
 
-    const [ messages, setMessages] = useState<any[]>([])
-    const [viewing, setViewing] = useState<number | undefined>(undefined)
+    const esRef = useRef<EventSource>(
+      undefined
+    )
+    const [connetionId, setConnectionId] = useState<string | undefined>(undefined)
+
 
     useEffect(() => {
+        const es = new EventSource(BASE_URL + "/connect");
+        esRef.current = es;
 
-        if(es.readyState!=es.OPEN)
-            return;
-
-        es.addEventListener('rooms/123/messages', (event) => {
-            setMessages((prev) => [...prev, JSON.parse(event.data)]);
+        es.addEventListener("connected", (e) => {
+            const data = JSON.parse(e.data) as ConnectionResponse;
+            setConnectionId(data.connectionId);
         });
-        es.addEventListener('rooms/123/typing', (event) => {
-            console.log("someone is typing")
-            console.log(event)
-        });
-        es.addEventListener('rooms/123/presence', (event) => {
-            const data = JSON.parse(event.data);
-            console.log(data)
-            setViewing(data.OnlineUsers)
-        })
 
-            const enterRoom = chatClient.updatePresence("123", {
-                online: true,
-                username: "bobby"
-            })
 
-    }, [es.readyState]);
+    }, [])
+
 
     return <>
-online users:
-    {
-        viewing
-    }
 
-        <input onChange={e => {
-            chatClient.sendTyping(
-                "123",
-            {
-                username: "bob",
-                    isTyping: true
-            }
-            ).then(r => {
+        {
+            connetionId  && <>
+                <Group groupId={"abc"} connectionId={connetionId!} />
+                <Group groupId={"xyz"} connectionId={connetionId!} />
+            </>
+        }
 
-            })
-        }} />
+
+    </>
+}
+
+interface GroupParams {
+    groupId: string;
+    connectionId: string
+}
+
+export  function Group(params: GroupParams) {
+
+    useEffect(() => {
+        chatClient.joinGroup({
+            connectionId: params.connectionId,
+            group: params.groupId
+        })
+        addEventListener(params.groupId, (e) => {
+            console.log(e)
+        })
+    }, []);
+
+    return <>
 
         <button onClick={() => {
-            chatClient.sendMessage("123", {
-                author: "bob",
-                content: "hi"
-            }).then(r => {
-                console.log(r)
+            chatClient.sendMessageToGroup({
+                groupId: params.groupId,
+                connectionId: params.connectionId,
+                message: "hello world from "+params.connectionId
             })
-        }}>
-            add
-        </button>
-        {
-            JSON.stringify(messages)
-        }
+        }}>Send to group {params.groupId}</button>
     </>
-
 }
