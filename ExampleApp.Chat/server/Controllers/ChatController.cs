@@ -31,7 +31,7 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     /// Join a group. Single subscription - all event types come through the same group.
     /// </summary>
     [HttpPost(nameof(JoinGroup))]
-    [Produces<JoinedPayload>]
+    [Produces<JoinGroupResponse>]
     public async Task JoinGroup([FromBody] JoinGroupRequest request)
     {
         // Single group subscription (not group/joined + group/message)
@@ -39,10 +39,10 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
         var members = await backplane.Groups.GetMembersAsync(request.Group);
 
         // Event type is in the payload, not the group name
-        await backplane.Clients.GroupAsync(request.Group,  new JoinedPayload
+        await backplane.Clients.GroupAsync(request.Group,  new JoinGroupResponse()
             {
-                ConnectionId = request.ConnectionId,
-                MemberCount = members.Count
+              
+                Members = members.Select(m => m.ToString()).ToList()
             });
 
     }
@@ -72,10 +72,9 @@ public abstract record BaseResponseDto
     public string EventType { get; set; }
 }
 
-// Connection
 public record ConnectionResponse(Guid ConnectionId) : BaseResponseDto;
 
-// Requests
+
 public record JoinGroupRequest(Guid ConnectionId, string Group);
 
 public record SendGroupMessageRequestDto : BaseResponseDto
@@ -85,20 +84,12 @@ public record SendGroupMessageRequestDto : BaseResponseDto
     public string GroupId { get; set; } = "";
 }
 
-// Responses
 public record JoinGroupResponse : BaseResponseDto
 {
-    public string Group { get; set; } = "";
-    public int MemberCount { get; set; }
+    public List<string> Members { get; set; }
 }
 
 
-// Event payloads
-public record JoinedPayload : BaseResponseDto
-{
-    public Guid ConnectionId { get; set; }
-    public int MemberCount { get; set; }
-}
 
 public record MessagePayload : BaseResponseDto
 {

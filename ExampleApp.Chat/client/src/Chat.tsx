@@ -1,6 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { BASE_URL } from "./utils/BASE_URL.ts";
-import {type BaseResponseDto, ChatClient, type JoinedPayload, type MessagePayload} from "./generated-ts-client.ts";
+import {
+    type BaseResponseDto,
+    ChatClient,
+    type JoinGroupResponse,
+    type MessagePayload
+} from "./generated-ts-client.ts";
 import { GlobalContext } from "./GlobalContext.tsx";
 
 const chatClient = new ChatClient(BASE_URL);
@@ -32,14 +37,14 @@ interface GroupParams {
 export function Group(params: GroupParams) {
     const context = useContext(GlobalContext);
     const [messages, setMessages] = useState<MessagePayload[]>([]);
-    const [memberCount, setMemberCount] = useState<number>(0);
+    const [members, setMembers] = useState<string[]>([]);
 
     useEffect(() => {
         if (!context.connectionId || !context.eventSource) return;
 
         // Reset state on connectionId change
         setMessages([]);
-        setMemberCount(0);
+        setMembers([]);
 
         chatClient.joinGroup({
             connectionId: context.connectionId,
@@ -51,9 +56,10 @@ export function Group(params: GroupParams) {
         const handler = (e: MessageEvent) => {
             const event = JSON.parse(e.data) as BaseResponseDto;
             switch (event.eventType) {
-                case "JoinedPayload":
-                    const joined = event as JoinedPayload;
-                    setMemberCount(joined.memberCount!);
+                case "JoinGroupResponse":
+                    const joined = event as JoinGroupResponse;
+                    console.log(members)
+                    setMembers(joined.members!);
                     break;
                 case "MessagePayload":
                     const msg = event as MessagePayload;
@@ -69,8 +75,11 @@ export function Group(params: GroupParams) {
 
     return (
         <div style={{ border: "1px solid #ccc", padding: 10, margin: 10 }}>
+           Connection ID: {
+                context.connectionId
+            }
             <h3>Group: {params.groupId}</h3>
-            <p>Members: {memberCount}</p>
+            <p>Members: {JSON.stringify(members)}m total: {members.length}</p>
 
             <button
                 onClick={() => {

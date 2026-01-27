@@ -61,7 +61,7 @@ public class RedisBackplaneTests : IAsyncLifetime
         var received = await reader.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
         received.Group.Should().Be("test-group");
-        received.Data.GetProperty("Data").GetString().Should().Be("test message");
+        received.Data.GetProperty("data").GetString().Should().Be("test message");
 
         await _backplane1.DisconnectAsync(connectionId);
     }
@@ -86,8 +86,8 @@ public class RedisBackplaneTests : IAsyncLifetime
         var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
         var received2 = await reader2.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
-        received1.Data.GetProperty("Data").GetString().Should().Be("cross-server message");
-        received2.Data.GetProperty("Data").GetString().Should().Be("cross-server message");
+        received1.Data.GetProperty("data").GetString().Should().Be("cross-server message");
+        received2.Data.GetProperty("data").GetString().Should().Be("cross-server message");
 
         await _backplane1.DisconnectAsync(conn1);
         await _backplane2.DisconnectAsync(conn2);
@@ -136,7 +136,7 @@ public class RedisBackplaneTests : IAsyncLifetime
 
         received.Should().HaveCount(1);
         received[0].Group.Should().Be("group2");
-        received[0].Data.GetProperty("Data").GetString().Should().Be("should receive");
+        received[0].Data.GetProperty("data").GetString().Should().Be("should receive");
 
         await _backplane1.DisconnectAsync(connectionId);
     }
@@ -181,8 +181,8 @@ public class RedisBackplaneTests : IAsyncLifetime
         var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
         var received2 = await reader2.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
-        received1.Data.GetProperty("Data").GetString().Should().Be("broadcast to all");
-        received2.Data.GetProperty("Data").GetString().Should().Be("broadcast to all");
+        received1.Data.GetProperty("data").GetString().Should().Be("broadcast to all");
+        received2.Data.GetProperty("data").GetString().Should().Be("broadcast to all");
         received1.Group.Should().BeNull();
         received2.Group.Should().BeNull();
 
@@ -207,7 +207,7 @@ public class RedisBackplaneTests : IAsyncLifetime
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
-        received1.Data.GetProperty("Data").GetString().Should().Be("only for conn1");
+        received1.Data.GetProperty("data").GetString().Should().Be("only for conn1");
 
         // conn2 should not receive anything
         reader2.TryRead(out _).Should().BeFalse();

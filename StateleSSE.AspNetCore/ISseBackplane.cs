@@ -9,6 +9,22 @@ namespace StateleSSE.AspNetCore;
 public readonly record struct SseEvent(string? Group, JsonElement Data);
 
 /// <summary>
+/// Event args for client disconnection.
+/// </summary>
+public class ClientDisconnectedEventArgs : EventArgs
+{
+    /// <summary>
+    /// The connection ID of the disconnected client.
+    /// </summary>
+    public Guid ConnectionId { get; init; }
+
+    /// <summary>
+    /// The groups the client was a member of at disconnection time.
+    /// </summary>
+    public IReadOnlyList<string> Groups { get; init; } = [];
+}
+
+/// <summary>
 /// Backplane interface for SSE with horizontal scaling support.
 /// Modeled after SignalR's Clients/Groups pattern.
 /// </summary>
@@ -33,6 +49,11 @@ public interface ISseBackplane
     /// Close a client connection and remove from all groups.
     /// </summary>
     Task DisconnectAsync(Guid connectionId);
+
+    /// <summary>
+    /// Raised when a client disconnects. Use this to broadcast "user left" events.
+    /// </summary>
+    event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
 }
 
 /// <summary>

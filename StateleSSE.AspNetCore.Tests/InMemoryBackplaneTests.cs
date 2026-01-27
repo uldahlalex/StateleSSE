@@ -19,7 +19,7 @@ public class InMemoryBackplaneTests
         var received = await reader.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
         received.Group.Should().Be("test-group");
-        received.Data.GetProperty("Data").GetString().Should().Be("test message");
+        received.Data.GetProperty("data").GetString().Should().Be("test message");
 
         backplane.Dispose();
     }
@@ -40,8 +40,8 @@ public class InMemoryBackplaneTests
         var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
         var received2 = await reader2.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
-        received1.Data.GetProperty("Data").GetString().Should().Be("broadcast");
-        received2.Data.GetProperty("Data").GetString().Should().Be("broadcast");
+        received1.Data.GetProperty("data").GetString().Should().Be("broadcast");
+        received2.Data.GetProperty("data").GetString().Should().Be("broadcast");
 
         backplane.Dispose();
     }
@@ -95,7 +95,7 @@ public class InMemoryBackplaneTests
 
         received.Should().HaveCount(1);
         received[0].Group.Should().Be("group2");
-        received[0].Data.GetProperty("Data").GetString().Should().Be("should receive");
+        received[0].Data.GetProperty("data").GetString().Should().Be("should receive");
 
         backplane.Dispose();
     }
@@ -198,8 +198,8 @@ public class InMemoryBackplaneTests
         var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
         var received2 = await reader2.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
 
-        received1.Data.GetProperty("Data").GetString().Should().Be("broadcast to all");
-        received2.Data.GetProperty("Data").GetString().Should().Be("broadcast to all");
+        received1.Data.GetProperty("data").GetString().Should().Be("broadcast to all");
+        received2.Data.GetProperty("data").GetString().Should().Be("broadcast to all");
         received1.Group.Should().BeNull();
         received2.Group.Should().BeNull();
 
@@ -218,7 +218,7 @@ public class InMemoryBackplaneTests
         var cts = new CancellationTokenSource(100);
 
         var received1 = await reader1.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
-        received1.Data.GetProperty("Data").GetString().Should().Be("only for conn1");
+        received1.Data.GetProperty("data").GetString().Should().Be("only for conn1");
 
         // conn2 should not receive anything - verify by checking TryRead returns false
         reader2.TryRead(out _).Should().BeFalse();

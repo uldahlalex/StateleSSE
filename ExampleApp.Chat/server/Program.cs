@@ -1,6 +1,7 @@
 using api.Etc;
 using server;
 using StackExchange.Redis;
+using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,7 +15,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         return ConnectionMultiplexer.Connect(config);
     });
 
-// builder.Services.AddInMemorySseBackplane();
+//builder.Services.AddInMemorySseBackplane();
 builder.Services.AddRedisSseBackplane();
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -38,7 +39,15 @@ app.UseCors(c =>
     .AllowAnyOrigin()
     .SetIsOriginAllowed(_ => true));
 
-app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
 
+app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
+var backplane = app.Services.GetRequiredService<ISseBackplane>();                                                                                                                         
+backplane.OnClientDisconnected += async (_, e) =>                                                                                                                                         
+{                                                                                                                                                                                         
+    foreach (var group in e.Groups)                                                                                                                                                       
+    {                                                                                                                                                                                     
+        await backplane.Clients.GroupAsync(group, new { eventType = "UserLeft", e.ConnectionId });                                                                                        
+    }                                                                                                                                                                                     
+};    
 
 app.Run();

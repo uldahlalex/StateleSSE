@@ -80,6 +80,9 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     public IBackplaneGroups Groups => _groupsApi;
 
     /// <inheritdoc/>
+    public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
+
+    /// <inheritdoc/>
     public (ChannelReader<SseEvent> Reader, Guid ConnectionId) Connect()
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
@@ -116,6 +119,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
         // Get groups before removing connection
         var groups = await _db.SetMembersAsync($"{_prefix}:conn:{connectionId}:groups");
+        var clientGroups = groups.Select(g => g.ToString()).ToList();
 
         // Remove from all groups in Redis
         foreach (var group in groups)
@@ -135,10 +139,23 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
         state.Channel.Writer.Complete();
         _logger.LogDebug("Client {ConnectionId} disconnected", connectionId);
+
+        // Raise disconnection event
+        OnClientDisconnected?.Invoke(this, new ClientDisconnectedEventArgs
+        {
+            ConnectionId = connectionId,
+            Groups = clientGroups
+        });
     }
 
     internal async Task AddToGroupAsync(Guid connectionId, string groupName)
     {
+        if (connectionId == Guid.Empty)
+        {
+            _logger.LogWarning("Attempted to add empty GUID to group '{Group}'", groupName);
+            return;
+        }
+
         // Add connection to group members
         await _db.SetAddAsync($"{_prefix}:group:{groupName}:members", connectionId.ToString());
 
@@ -175,7 +192,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     internal async Task<IReadOnlyList<Guid>> GetGroupMembersAsync(string groupName)
     {
         var members = await _db.SetMembersAsync($"{_prefix}:group:{groupName}:members");
-        return members.Select(m => Guid.Parse(m.ToString())).ToList();
+        return members
+            .Select(m => Guid.Parse(m.ToString()))
+            .Where(g => g != Guid.Empty)
+            .ToList();
     }
 
     internal async Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId)
@@ -189,7 +209,13 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         var json = JsonSerializer.Serialize(new MessageEnvelope
         {
             Type = MessageType.Broadcast,
-            Data = JsonSerializer.SerializeToElement(data)
+            Data = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            })
+        },new JsonSerializerOptions()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
 
         await _subscriber.PublishAsync(new RedisChannel($"{_prefix}:broadcast", RedisChannel.PatternMode.Literal), json);
@@ -201,7 +227,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         // Check if connection is local
         if (_localConnections.TryGetValue(connectionId, out var state))
         {
-            var evt = new SseEvent(groupName, JsonSerializer.SerializeToElement(data));
+            var evt = new SseEvent(groupName, JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }));
             await state.Channel.Writer.WriteAsync(evt);
             return;
         }
@@ -220,7 +249,13 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
             Type = MessageType.Client,
             TargetId = connectionId,
             GroupName = groupName,
-            Data = JsonSerializer.SerializeToElement(data)
+            Data = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            })
+        }, new JsonSerializerOptions()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
 
         await _subscriber.PublishAsync(new RedisChannel($"{_prefix}:server:{serverId}", RedisChannel.PatternMode.Literal), json);
@@ -249,7 +284,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
             serverConnections[serverIdStr].Add(connectionId);
         }
 
-        var jsonData = JsonSerializer.SerializeToElement(data);
+        var jsonData = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
 
         // Send to each server
         foreach (var (serverId, connections) in serverConnections)
@@ -275,6 +313,9 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
                     GroupName = groupName,
                     TargetIds = connections,
                     Data = jsonData
+                }, new JsonSerializerOptions()
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
                 await _subscriber.PublishAsync(new RedisChannel($"{_prefix}:server:{serverId}", RedisChannel.PatternMode.Literal), json);
@@ -284,11 +325,16 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         _logger.LogDebug("Sent to group '{Group}' ({Count} members)", groupName, members.Length);
     }
 
+    private static readonly JsonSerializerOptions DeserializeOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private async Task OnServerMessage(RedisValue message)
     {
         try
         {
-            var envelope = JsonSerializer.Deserialize<MessageEnvelope>(message.ToString());
+            var envelope = JsonSerializer.Deserialize<MessageEnvelope>(message.ToString(), DeserializeOptions);
             if (envelope == null) return;
 
             var evt = new SseEvent(envelope.GroupName, envelope.Data);
@@ -326,7 +372,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     {
         try
         {
-            var envelope = JsonSerializer.Deserialize<MessageEnvelope>(message.ToString());
+            var envelope = JsonSerializer.Deserialize<MessageEnvelope>(message.ToString(), DeserializeOptions);
             if (envelope == null) return;
 
             var evt = new SseEvent(null, envelope.Data);

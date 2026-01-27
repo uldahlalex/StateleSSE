@@ -50,7 +50,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JoinedPayload"
+                  "$ref": "#/components/schemas/JoinGroupResponse"
                 }
               }
             }
@@ -127,7 +127,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JoinGroupResponse"
+                  "$ref": "#/components/schemas/JoinGroupResponse2"
                 }
               }
             }
@@ -359,7 +359,7 @@
           }
         }
       },
-      "JoinedPayload": {
+      "JoinGroupResponse": {
         "allOf": [
           {
             "$ref": "#/components/schemas/BaseResponseDto"
@@ -368,13 +368,11 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "connectionId": {
-                "type": "string",
-                "format": "guid"
-              },
-              "memberCount": {
-                "type": "integer",
-                "format": "int32"
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -434,7 +432,7 @@
           }
         ]
       },
-      "JoinGroupResponse": {
+      "JoinGroupResponse2": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
