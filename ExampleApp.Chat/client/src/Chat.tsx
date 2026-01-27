@@ -1,25 +1,17 @@
-import {useEffect, useRef, useState} from "react";
+import {useContext, useEffect, useRef, useState} from "react";
 import {BASE_URL} from "./utils/BASE_URL.ts";
-import {ChatClient, type ConnectionResponse} from "./generated-ts-client.ts";
+import {ChatClient, type ConnectionResponse, type SendGroupMessageRequestDto} from "./generated-ts-client.ts";
+import {GlobalContext} from "./GlobalContext.tsx";
 
 const chatClient = new ChatClient(BASE_URL)
 
 export default function Chat() {
 
-    const esRef = useRef<EventSource>(
-      undefined
-    )
-    const [connetionId, setConnectionId] = useState<string | undefined>(undefined)
+
 
 
     useEffect(() => {
-        const es = new EventSource(BASE_URL + "/connect");
-        esRef.current = es;
 
-        es.addEventListener("connected", (e) => {
-            const data = JSON.parse(e.data) as ConnectionResponse;
-            setConnectionId(data.connectionId);
-        });
 
 
     }, [])
@@ -27,12 +19,11 @@ export default function Chat() {
 
     return <>
 
-        {
-            connetionId  && <>
-                <Group groupId={"abc"} connectionId={connetionId!} />
-                <Group groupId={"xyz"} connectionId={connetionId!} />
+    <>
+                <Group groupId={"abc"}  />
+                <Group groupId={"xyz"}  />
             </>
-        }
+
 
 
     </>
@@ -40,28 +31,33 @@ export default function Chat() {
 
 interface GroupParams {
     groupId: string;
-    connectionId: string
 }
 
 export  function Group(params: GroupParams) {
 
+    const context = useContext(GlobalContext);
+
     useEffect(() => {
+        if(context.eventSource?.readyState != 1)
+            return;
         chatClient.joinGroup({
-            connectionId: params.connectionId,
+            connectionId: context.connectionId!,
             group: params.groupId
         })
-        addEventListener(params.groupId, (e) => {
+        context.eventSource!.addEventListener(params.groupId, (e) => {
             console.log(e)
+            
+            console.log(JSON.parse(e.data) as SendGroupMessageRequestDto)
         })
-    }, []);
+    }, [context]);
 
     return <>
 
         <button onClick={() => {
             chatClient.sendMessageToGroup({
                 groupId: params.groupId,
-                connectionId: params.connectionId,
-                message: "hello world from "+params.connectionId
+                connectionId: context.connectionId!,
+                message: "hello world from "+context.connectionId!
             })
         }}>Send to group {params.groupId}</button>
     </>
