@@ -50,7 +50,7 @@ export class ChatClient {
         return Promise.resolve<ConnectionResponse>(null as any);
     }
 
-    joinGroup(request: JoinGroupRequest): Promise<void> {
+    joinGroup(request: JoinGroupRequest): Promise<JoinedPayload> {
         let url_ = this.baseUrl + "/JoinGroup";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -61,6 +61,7 @@ export class ChatClient {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                "Accept": "application/json"
             }
         };
 
@@ -69,22 +70,24 @@ export class ChatClient {
         });
     }
 
-    protected processJoinGroup(response: Response): Promise<void> {
+    protected processJoinGroup(response: Response): Promise<JoinedPayload> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinedPayload;
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<JoinedPayload>(null as any);
     }
 
-    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<void> {
+    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<MessagePayload> {
         let url_ = this.baseUrl + "/SendMessageToGroup";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -95,6 +98,7 @@ export class ChatClient {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                "Accept": "application/json"
             }
         };
 
@@ -103,19 +107,21 @@ export class ChatClient {
         });
     }
 
-    protected processSendMessageToGroup(response: Response): Promise<void> {
+    protected processSendMessageToGroup(response: Response): Promise<MessagePayload> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MessagePayload;
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<MessagePayload>(null as any);
     }
 }
 
@@ -159,7 +165,7 @@ export class RealtimeClient {
         return Promise.resolve<void>(null as any);
     }
 
-    joinGroup(request: JoinGroupRequest): Promise<JoinGroupResponse> {
+    joinGroup(request: JoinGroupRequest2): Promise<JoinGroupResponse> {
         let url_ = this.baseUrl + "/api/realtime/groups/join";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -432,8 +438,17 @@ export class RealtimeClient {
     }
 }
 
-export interface ConnectionResponse {
+export interface BaseResponseDto {
+    eventType?: string;
+}
+
+export interface ConnectionResponse extends BaseResponseDto {
     connectionId?: string;
+}
+
+export interface JoinedPayload extends BaseResponseDto {
+    connectionId?: string;
+    memberCount?: number;
 }
 
 export interface JoinGroupRequest {
@@ -441,7 +456,12 @@ export interface JoinGroupRequest {
     group?: string;
 }
 
-export interface SendGroupMessageRequestDto {
+export interface MessagePayload extends BaseResponseDto {
+    connectionId?: string;
+    message?: string;
+}
+
+export interface SendGroupMessageRequestDto extends BaseResponseDto {
     message?: string;
     connectionId?: string;
     groupId?: string;
@@ -450,6 +470,11 @@ export interface SendGroupMessageRequestDto {
 export interface JoinGroupResponse {
     group?: string;
     memberCount?: number;
+}
+
+export interface JoinGroupRequest2 {
+    connectionId?: string;
+    group?: string;
 }
 
 export interface LeaveGroupResponse {

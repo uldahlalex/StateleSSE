@@ -46,7 +46,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinedPayload"
+                }
+              }
+            }
           }
         }
       }
@@ -71,7 +78,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePayload"
+                }
+              }
+            }
           }
         }
       }
@@ -100,7 +114,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JoinGroupRequest"
+                "$ref": "#/components/schemas/JoinGroupRequest2"
               }
             }
           },
@@ -319,14 +333,52 @@
   "components": {
     "schemas": {
       "ConnectionResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connectionId": {
+                "type": "string",
+                "format": "guid"
+              }
+            }
+          }
+        ]
+      },
+      "BaseResponseDto": {
         "type": "object",
+        "x-abstract": true,
         "additionalProperties": false,
         "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
+          "eventType": {
+            "type": "string"
           }
         }
+      },
+      "JoinedPayload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connectionId": {
+                "type": "string",
+                "format": "guid"
+              },
+              "memberCount": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          }
+        ]
       },
       "JoinGroupRequest": {
         "type": "object",
@@ -341,20 +393,46 @@
           }
         }
       },
-      "SendGroupMessageRequestDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "message": {
-            "type": "string"
+      "MessagePayload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
           },
-          "connectionId": {
-            "type": "string"
-          },
-          "groupId": {
-            "type": "string"
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connectionId": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
           }
-        }
+        ]
+      },
+      "SendGroupMessageRequestDto": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "connectionId": {
+                "type": "string"
+              },
+              "groupId": {
+                "type": "string"
+              }
+            }
+          }
+        ]
       },
       "JoinGroupResponse": {
         "type": "object",
@@ -366,6 +444,19 @@
           "memberCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "JoinGroupRequest2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "group": {
+            "type": "string"
           }
         }
       },
