@@ -1,10 +1,6 @@
 # StateleSSE
 
-## What is it?
-
-Type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core.
-
-Built for multi-client realtime web apps that scale. Features single-connection multi-event pattern to solve browser connection limits.
+Type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core with a SignalR-style backplane.
 
 ## Installation
 
@@ -12,139 +8,256 @@ Built for multi-client realtime web apps that scale. Features single-connection 
 dotnet add package StateleSSE.AspNetCore
 ```
 
-## Usage
+## Quick Start
 
-### Step 1: Add Backplane to DI
-
-Here demonstrated with a very basic Program.cs startup pipeline:
+### 1. Register the backplane
 
 ```csharp
-//using StackExchange.Redis; remove comment and have the StackExchange.Redis nuget package installed if you want to use redis for backplane instead of inmemory
-using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-/* this is required if you want to use redis for backplane - here im simply using a local redis db
-   builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    { var config = ConfigurationOptions.Parse( "localhost:6379" );
-        config.AbortOnConnectFail = false;
-        return ConnectionMultiplexer.Connect(config); });*/
+
+// Option A: In-memory (development / single server)
 builder.Services.AddInMemorySseBackplane();
-//builder.Services.AddRedisSseBackplane(); Use this one instead if you want to use redis for backplane - comment out the inmemorybackplane
-builder.Services.AddControllers(); //You can also use minimal API or other API type - the library has no MVC dependency
+
+// Option B: Redis (production / horizontal scaling)
+// builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+//     ConnectionMultiplexer.Connect("localhost:6379"));
+// builder.Services.AddRedisSseBackplane();
+
+builder.Services.AddControllers();
 var app = builder.Build();
 app.MapControllers();
 app.Run();
 ```
 
-### Step 2: Set up endpoints
-
-**Single-connection multi-event pattern (recommended):**
+### 2. Create the realtime controller
 
 ```csharp
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
 [ApiController]
-public class ChatController(ISseBackplane backplane) : ControllerBase
+[Route("api/realtime")]
+public class RealtimeController(ISseBackplane backplane) : ControllerBase
 {
-    [HttpGet("events")]
+    /// <summary>
+    /// Open SSE connection. Returns connectionId immediately.
+    /// </summary>
+    [HttpGet("connect")]
     [Produces("text/event-stream")]
-    [ProducesResponseType(typeof(ChatEventUnion), 200)]
-    public async Task StreamChatEvents(string roomId)
+    public async Task Connect()
     {
-        var channel = $"chat:{roomId}";
-        var eventTypes = new[]
+        await using var sse = await HttpContext.OpenSseStreamAsync();
+        await using var connection = backplane.CreateConnection();
+
+        // Send connectionId to client immediately
+        await sse.WriteAsync("connected", JsonSerializer.Serialize(new
         {
-            typeof(MessageReceivedEvent),
-            typeof(UserJoinedEvent),
-            typeof(UserLeftEvent)
-        };
-        await HttpContext.StreamSseAsync(backplane, channel, eventTypes);
+            connectionId = connection.ConnectionId
+        }));
+
+        // Stream events to client
+        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
+        {
+            if (evt.Group != null)
+                await sse.WriteAsync(evt.Group, evt.Data);
+            else
+                await sse.WriteAsync(evt.Data);
+        }
     }
 
-    [HttpPost("messages")]
-    public async Task SendMessage([FromBody] SendMessageRequest request)
+    /// <summary>
+    /// Join a group.
+    /// </summary>
+    [HttpPost("groups/join")]
+    public async Task<IActionResult> JoinGroup([FromBody] JoinGroupRequest request)
     {
-        var channel = $"chat:{request.RoomId}";
-        var evt = new MessageReceivedEvent(request.Username, request.Content, DateTime.UtcNow);
-        await backplane.PublishToGroup(channel, evt);
+        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
+        var members = await backplane.Groups.GetMembersAsync(request.Group);
+
+        // Notify group of new member
+        await backplane.Clients.GroupAsync(request.Group, new
+        {
+            type = "join",
+            connectionId = request.ConnectionId,
+            memberCount = members.Count
+        });
+
+        return Ok(new { memberCount = members.Count });
+    }
+
+    /// <summary>
+    /// Leave a group.
+    /// </summary>
+    [HttpPost("groups/leave")]
+    public async Task<IActionResult> LeaveGroup([FromBody] LeaveGroupRequest request)
+    {
+        await backplane.Groups.RemoveFromGroupAsync(request.ConnectionId, request.Group);
+        var members = await backplane.Groups.GetMembersAsync(request.Group);
+
+        await backplane.Clients.GroupAsync(request.Group, new
+        {
+            type = "leave",
+            connectionId = request.ConnectionId,
+            memberCount = members.Count
+        });
+
+        return Ok(new { memberCount = members.Count });
+    }
+
+    /// <summary>
+    /// Send message to a group.
+    /// </summary>
+    [HttpPost("groups/send")]
+    public async Task<IActionResult> SendToGroup([FromBody] SendToGroupRequest request)
+    {
+        await backplane.Clients.GroupAsync(request.Group, new
+        {
+            from = request.ConnectionId,
+            payload = request.Payload
+        });
+        return Ok();
+    }
+
+    /// <summary>
+    /// Send message to a specific client.
+    /// </summary>
+    [HttpPost("clients/send")]
+    public async Task<IActionResult> SendToClient([FromBody] SendToClientRequest request)
+    {
+        await backplane.Clients.ClientAsync(request.TargetConnectionId, new
+        {
+            from = request.FromConnectionId,
+            payload = request.Payload
+        });
+        return Ok();
+    }
+
+    /// <summary>
+    /// Broadcast to all connected clients.
+    /// </summary>
+    [HttpPost("broadcast")]
+    public async Task<IActionResult> Broadcast([FromBody] BroadcastRequest request)
+    {
+        await backplane.Clients.AllAsync(request.Payload);
+        return Ok();
     }
 }
 
-public record MessageReceivedEvent(string Username, string Content, DateTime Timestamp);
-public record UserJoinedEvent(string Username, DateTime Timestamp);
-public record UserLeftEvent(string Username, DateTime Timestamp);
-
-public class ChatEventUnion
-{
-    public MessageReceivedEvent? MessageReceived { get; set; }
-    public UserJoinedEvent? UserJoined { get; set; }
-    public UserLeftEvent? UserLeft { get; set; }
-}
-
-public record SendMessageRequest(string Username, string Content, string RoomId);
+public record JoinGroupRequest(Guid ConnectionId, string Group);
+public record LeaveGroupRequest(Guid ConnectionId, string Group);
+public record SendToGroupRequest(Guid ConnectionId, string Group, object Payload);
+public record SendToClientRequest(Guid FromConnectionId, Guid TargetConnectionId, object Payload);
+public record BroadcastRequest(object Payload);
 ```
 
-**Alternative: Single event type endpoint:**
+### 3. Connect from the browser
+
+```typescript
+const BASE_URL = "http://localhost:5000";
+let connectionId: string | null = null;
+
+// 1. Open SSE connection
+const es = new EventSource(`${BASE_URL}/api/realtime/connect`);
+
+// 2. Receive connectionId
+es.addEventListener("connected", (e) => {
+    const data = JSON.parse(e.data);
+    connectionId = data.connectionId;
+    console.log("Connected:", connectionId);
+});
+
+// 3. Join a group (after connected)
+async function joinGroup(group: string) {
+    await fetch(`${BASE_URL}/api/realtime/groups/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId, group })
+    });
+
+    // Listen for events on this group
+    es.addEventListener(group, (e) => {
+        console.log(`[${group}]`, JSON.parse(e.data));
+    });
+}
+
+// 4. Send to a group
+async function sendToGroup(group: string, message: string) {
+    await fetch(`${BASE_URL}/api/realtime/groups/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId, group, payload: { message } })
+    });
+}
+
+// 5. Send directly to another client
+async function sendToClient(targetConnectionId: string, message: string) {
+    await fetch(`${BASE_URL}/api/realtime/clients/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromConnectionId: connectionId, targetConnectionId, payload: { message } })
+    });
+}
+```
+
+## Backplane API
+
+### Clients (Publishing)
 
 ```csharp
-[HttpGet(nameof(StreamMessages))]
-[Produces("text/event-stream")]
-[ProducesResponseType(typeof(MessageReceivedEvent), 200)]
-public async Task StreamMessages(string roomId)
+// Broadcast to all
+await backplane.Clients.AllAsync(data);
+
+// Send to group
+await backplane.Clients.GroupAsync("room-1", data);
+
+// Send to multiple groups
+await backplane.Clients.GroupsAsync(["room-1", "room-2"], data);
+
+// Send to specific client
+await backplane.Clients.ClientAsync(connectionId, data);
+
+// Send to multiple clients
+await backplane.Clients.ClientsAsync([id1, id2], data);
+```
+
+### Groups (Membership)
+
+```csharp
+// Add/remove from group
+await backplane.Groups.AddToGroupAsync(connectionId, "room-1");
+await backplane.Groups.RemoveFromGroupAsync(connectionId, "room-1");
+
+// Query membership
+var members = await backplane.Groups.GetMembersAsync("room-1");
+var count = await backplane.Groups.GetMemberCountAsync("room-1");
+var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
+```
+
+## Scaling with Redis
+
+Switch to Redis for horizontal scaling:
+
+```csharp
+using StackExchange.Redis;
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    var channel = $"chat:{roomId}";
-    await HttpContext.StreamSseAsync<MessageReceivedEvent>(backplane, channel);
-}
-```
-
-### Step 3: Client usage
-
-**Browser (JavaScript/TypeScript):**
-```typescript
-const stream = new EventSource('/events?roomId=room1');
-
-stream.addEventListener('MessageReceivedEvent', (e) => {
-    const data = JSON.parse((e as MessageEvent).data);
-    console.log(`${data.Username}: ${data.Content}`);
+    var config = ConfigurationOptions.Parse("localhost:6379");
+    config.AbortOnConnectFail = false;
+    return ConnectionMultiplexer.Connect(config);
 });
 
-stream.addEventListener('UserJoinedEvent', (e) => {
-    const data = JSON.parse((e as MessageEvent).data);
-    console.log(`${data.Username} joined`);
-});
+builder.Services.AddRedisSseBackplane();
 ```
 
-**cURL (testing):**
-```bash
-# Terminal 1: Subscribe to the SSE stream
-curl -N http://localhost:5000/events?roomId=room1
+The Redis backplane handles cross-server routing, group membership, and connection cleanup automatically.
 
-# Terminal 2: Send a message (will appear in Terminal 1)
-curl -X POST http://localhost:5000/messages \
-    -H "Content-Type: application/json" \
-    -d '{"Username":"Alice","Content":"Hello!","RoomId":"room1"}'
-```
+## Example App
 
-## System vision
-
-I'd like to share my views on why I have designed the system this way:
-
-A lot of real-time frameworks have the following characteristics which I dislike:
-- Client-side management of connection (with things like WebSockets which can be open, closed, opening, etc...)
-- Weak and unopinionated "endpoint" / orchestration of communication. (like all network traffic all arriving to a single point in the client app, which now has to mediate traffic)
-- Bad support for web documentation standards / no living docs (no swagger/openapi, lack of source generators based around this standard. AsyncAPI is mostly geared towards "broker" oriented stuff )
-- Horizontal scaling and server side connection / user management can be very difficult (SignalR has a decent "Users/Connections/Groups" abstraction, which I'm inspired by)
-
-Most web devs have existing familiarity with request-response pattern in a simple client-server app with HTTP.
-The concept of this framework is: Custom HTTP endpoints that simply lets clients subscribe to a broadcast / stream and let them know which DTO they will receive upon that event.
-
-
-## CodeGen for Typescript & C# Client Code
-
-Can be found in StateleSSE.CodeGen at https://github.com/uldahlalex/StateleSSE.CodeGen
-
-Explained shortly: Use an OpenAPI generator like NSwag/Swashbuckle/etc to get a JSON spec. Use this JSON file to generate relevant client code for type-safe communication with your realtime API.
+See `ExampleApp.Chat` for a complete implementation with React client.
 
 ## License
 
