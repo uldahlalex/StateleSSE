@@ -65,6 +65,9 @@ export function Group(params: GroupParams) {
                     const msg = event as MessagePayload;
                     setMessages((prev) => [...prev, msg]);
                     break;
+                case "UserLeft":
+                    const l = event as any;
+                    setMembers(prev => prev.filter(p => p != l.connectionId));
             }
         };
 

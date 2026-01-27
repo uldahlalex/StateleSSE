@@ -186,16 +186,49 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
     internal async Task<int> GetGroupMemberCountAsync(string groupName)
     {
-        return (int)await _db.SetLengthAsync($"{_prefix}:group:{groupName}:members");
+        // Get validated members count (cleans up stale connections)
+        var members = await GetGroupMembersAsync(groupName, validateConnections: true);
+        return members.Count;
     }
 
-    internal async Task<IReadOnlyList<Guid>> GetGroupMembersAsync(string groupName)
+    internal async Task<IReadOnlyList<Guid>> GetGroupMembersAsync(string groupName, bool validateConnections = true)
     {
         var members = await _db.SetMembersAsync($"{_prefix}:group:{groupName}:members");
-        return members
+        var parsed = members
             .Select(m => Guid.Parse(m.ToString()))
             .Where(g => g != Guid.Empty)
             .ToList();
+
+        if (!validateConnections)
+            return parsed;
+
+        // Validate each connection still exists and clean up stale ones
+        var validMembers = new List<Guid>();
+        var staleMembers = new List<Guid>();
+
+        foreach (var connectionId in parsed)
+        {
+            var exists = await _db.KeyExistsAsync($"{_prefix}:conn:{connectionId}");
+            if (exists)
+                validMembers.Add(connectionId);
+            else
+                staleMembers.Add(connectionId);
+        }
+
+        // Clean up stale members in background
+        if (staleMembers.Count > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                foreach (var stale in staleMembers)
+                {
+                    await _db.SetRemoveAsync($"{_prefix}:group:{groupName}:members", stale.ToString());
+                    _logger.LogDebug("Removed stale connection {ConnectionId} from group '{Group}'", stale, groupName);
+                }
+            });
+        }
+
+        return validMembers;
     }
 
     internal async Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId)
@@ -268,13 +301,24 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
         // Group members by server for efficient routing
         var serverConnections = new Dictionary<string, List<Guid>>();
+        var staleConnections = new List<string>();
 
         foreach (var member in members)
         {
-            var connectionId = Guid.Parse(member.ToString());
+            var memberStr = member.ToString();
+            if (!Guid.TryParse(memberStr, out var connectionId) || connectionId == Guid.Empty)
+            {
+                staleConnections.Add(memberStr);
+                continue;
+            }
+
             var serverId = await _db.HashGetAsync($"{_prefix}:conn:{connectionId}", "server");
 
-            if (serverId.IsNullOrEmpty) continue;
+            if (serverId.IsNullOrEmpty)
+            {
+                staleConnections.Add(memberStr);
+                continue;
+            }
 
             var serverIdStr = serverId.ToString();
             if (!serverConnections.ContainsKey(serverIdStr))
@@ -282,6 +326,19 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
                 serverConnections[serverIdStr] = new List<Guid>();
             }
             serverConnections[serverIdStr].Add(connectionId);
+        }
+
+        // Clean up stale connections in background
+        if (staleConnections.Count > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                foreach (var stale in staleConnections)
+                {
+                    await _db.SetRemoveAsync($"{_prefix}:group:{groupName}:members", stale);
+                }
+                _logger.LogDebug("Cleaned up {Count} stale connections from group '{Group}'", staleConnections.Count, groupName);
+            });
         }
 
         var jsonData = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
