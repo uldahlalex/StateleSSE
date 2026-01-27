@@ -30,10 +30,11 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     [HttpPost(nameof(JoinGroup))]
     public async Task JoinGroup([FromBody] JoinGroupRequest request)
     {
-        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
-        var members = await backplane.Groups.GetMembersAsync(request.Group);
+        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group+"/joined");
+        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group+"/message");
+        var members = await backplane.Groups.GetMembersAsync(request.Group+"/joined");
 
-        await backplane.Clients.GroupAsync(request.Group, new JoinGroupResponse()
+        await backplane.Clients.GroupAsync(request.Group+"/joined", new JoinGroupResponse()
         {
             Group = request.Group,
             MemberCount = members.Count
@@ -43,7 +44,7 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
     [HttpPost(nameof(SendMessageToGroup))]
     public async Task SendMessageToGroup([FromBody]SendGroupMessageRequestDto dto)
     {
-        await backplane.Clients.GroupAsync(dto.GroupId, dto);
+        await backplane.Clients.GroupAsync(dto.GroupId+"/message", dto);
     }
     
     

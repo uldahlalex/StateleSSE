@@ -1,6 +1,11 @@
 import {useContext, useEffect, useRef, useState} from "react";
 import {BASE_URL} from "./utils/BASE_URL.ts";
-import {ChatClient, type ConnectionResponse, type SendGroupMessageRequestDto} from "./generated-ts-client.ts";
+import {
+    ChatClient,
+    type ConnectionResponse,
+    type JoinGroupResponse,
+    type SendGroupMessageRequestDto
+} from "./generated-ts-client.ts";
 import {GlobalContext} from "./GlobalContext.tsx";
 
 const chatClient = new ChatClient(BASE_URL)
@@ -44,9 +49,12 @@ export  function Group(params: GroupParams) {
             connectionId: context.connectionId!,
             group: params.groupId
         })
-        context.eventSource!.addEventListener(params.groupId, (e) => {
+        context.eventSource!.addEventListener(params.groupId+"/joined", (e) => {
+            console.log("group joined")
+        })
+        context.eventSource!.addEventListener(params.groupId+"/message", (e) => {
             console.log(e)
-            
+
             console.log(JSON.parse(e.data) as SendGroupMessageRequestDto)
         })
     }, [context]);
