@@ -1,9 +1,7 @@
-// RealtimeController.cs
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
-[Route("quickstart")]
 public class RealtimeController(ISseBackplane backplane) : ControllerBase
 {
     [HttpGet("connect")]
@@ -12,10 +10,11 @@ public class RealtimeController(ISseBackplane backplane) : ControllerBase
         await using var sse = await HttpContext.OpenSseStreamAsync();
         await using var connection = backplane.CreateConnection();
 
-        await sse.WriteAsync("connected", JsonSerializer.Serialize(new { connection.ConnectionId }, new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        }));
+        await sse.WriteAsync("connected", JsonSerializer.Serialize(new { connection.ConnectionId },
+            new JsonSerializerOptions()
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }));
 
         await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
             await sse.WriteAsync(evt.Group ?? "message", evt.Data);

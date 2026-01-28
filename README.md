@@ -10,75 +10,16 @@ dotnet add package StateleSSE.AspNetCore
 
 ## Quick Start
 
-### 1. Server
+See [`ExampleApp.Quickstart`](ExampleApp.Quickstart) for a minimal working example:
 
-```csharp
-// Program.cs
-using StateleSSE.AspNetCore.Extensions;
+- [Program.cs](ExampleApp.Quickstart/Program.cs) - Server setup
+- [RealtimeController.cs](ExampleApp.Quickstart/RealtimeController.cs) - SSE endpoints
+- [wwwroot/index.html](ExampleApp.Quickstart/wwwroot/index.html) - Browser client
 
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddInMemorySseBackplane();  // or AddRedisSseBackplane() for scaling
-builder.Services.AddControllers();
-
-var app = builder.Build();
-app.MapControllers();
-app.Run();
-```
-
-```csharp
-// RealtimeController.cs
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
-using StateleSSE.AspNetCore;
-
-public class RealtimeController(ISseBackplane backplane) : ControllerBase
-{
-    [HttpGet("connect")]
-    public async Task Connect()
-    {
-        await using var sse = await HttpContext.OpenSseStreamAsync();
-        await using var connection = backplane.CreateConnection();
-
-        await sse.WriteAsync("connected", JsonSerializer.Serialize(new { connection.ConnectionId }));
-
-        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
-            await sse.WriteAsync(evt.Group ?? "message", evt.Data);
-    }
-
-    [HttpPost("join")]
-    public async Task Join(string connectionId, string room)
-        => await backplane.Groups.AddToGroupAsync(connectionId, room);
-
-    [HttpPost("send")]
-    public async Task Send(string room, string message)
-        => await backplane.Clients.SendToGroupAsync(room, new { message });
-}
-```
-
-### 2. Client
-
-```html
-<div id="messages"></div>
-<input id="msg" placeholder="Message" />
-<button onclick="send()">Send</button>
-
-<script>
-const room = "chat";
-let connectionId;
-
-const es = new EventSource("/connect");
-es.addEventListener("connected", e => {
-    connectionId = JSON.parse(e.data).connectionId;
-    fetch(`/join?connectionId=${connectionId}&room=${room}`, { method: "POST" });
-});
-es.addEventListener(room, e => {
-    document.getElementById("messages").innerHTML += `<p>${JSON.parse(e.data).message}</p>`;
-});
-
-function send() {
-    fetch(`/send?room=${room}&message=${document.getElementById("msg").value}`, { method: "POST" });
-}
-</script>
+Run it:
+```bash
+cd ExampleApp.Quickstart
+dotnet run
 ```
 
 ## Backplane API
@@ -191,9 +132,10 @@ builder.Services.AddOpenApiDocument(config =>
 });
 ```
 
-## Example App
+## Examples
 
-See `ExampleApp.Chat` for a complete implementation with React client.
+- [`ExampleApp.Quickstart`](ExampleApp.Quickstart) - Minimal example (~30 lines)
+- [`ExampleApp.Chat`](ExampleApp.Chat) - Full chat app with React client
 
 ## License
 
