@@ -4,6 +4,8 @@ using NSwag.Generation.Processors;
 using NSwag.Generation.Processors.Contexts;
 using StateleSSE.AspNetCore;
 
+namespace server;
+
 public static class NSwagExtensions
 {
     public static void AddStringConstants<T>(this OpenApiDocumentGeneratorSettings settings)

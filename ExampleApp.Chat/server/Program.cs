@@ -1,5 +1,5 @@
 using System.Text.Json;
-using api.Etc;
+using server;
 using StackExchange.Redis;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
@@ -15,7 +15,6 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         return ConnectionMultiplexer.Connect(config);
     });
 
-//builder.Services.AddInMemorySseBackplane();
 builder.Services.AddRedisSseBackplane();
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -47,8 +46,10 @@ backplane.OnClientDisconnected += async (_, e) =>
 {                                                                                                                                                                                         
     foreach (var group in e.Groups)                                                                                                                                                       
     {                                                                                                                                                                                     
-        await backplane.Clients.SendToGroupAsync(group, new { eventType = "UserLeft", e.ConnectionId });                                                                                        
+        await backplane.Clients.SendToGroupAsync(group, new UserLeftResponseDto(e.ConnectionId));                                                                                        
     }                                                                                                                                                                                     
 };    
 
 app.Run();
+
+public record UserLeftResponseDto(string ConnectionId) : BaseResponseDto;

@@ -26,19 +26,14 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
                 await sse.WriteAsync(evt.Data);
         }
     }
-
-    /// <summary>
-    /// Join a group. Single subscription - all event types come through the same group.
-    /// </summary>
+    
     [HttpPost(nameof(JoinGroup))]
     [Produces<JoinGroupResponse>]
     public async Task JoinGroup([FromBody] JoinGroupRequest request)
     {
-        // Single group subscription (not group/joined + group/message)
         await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
         var members = await backplane.Groups.GetMembersAsync(request.Group);
 
-        // Event type is in the payload, not the group name
         await backplane.Clients.SendToGroupAsync(request.Group,  new JoinGroupResponse()
         {
             Members = members.ToList()
@@ -57,8 +52,6 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
         });
     }
 }
-
-
 
 
 public record ConnectionResponse(string ConnectionId) : BaseResponseDto;

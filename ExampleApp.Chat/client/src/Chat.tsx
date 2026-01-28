@@ -1,31 +1,23 @@
-import { useContext, useEffect, useState } from "react";
-import { BASE_URL } from "./utils/BASE_URL.ts";
+import {useContext, useEffect, useState} from "react";
+import {BASE_URL} from "./utils/BASE_URL.ts";
 import {
     type BaseResponseDto,
     ChatClient,
     type JoinGroupResponse,
-    type  StringConstants,
+    type MessageResponseDto,
+    StringConstants,
 } from "./generated-ts-client.ts";
-import { GlobalContext } from "./GlobalContext.tsx";
+import {GlobalContext} from "./GlobalContext.tsx";
 
 const chatClient = new ChatClient(BASE_URL);
 
-// Event types from server
-
 export default function Chat() {
 
-    const context = useContext(GlobalContext)
-
     return (
-<>
-
-
-                <Group groupId={"abc"} />
-                <Group groupId={"xyz"} />
-
-
-
-</>
+        <>
+            <Group groupId={"abc"}/>
+            <Group groupId={"xyz"}/>
+        </>
 
     );
 }
@@ -36,24 +28,20 @@ interface GroupParams {
 
 export function Group(params: GroupParams) {
     const context = useContext(GlobalContext);
-    const [messages, setMessages] = useState<MessagePayload[]>([]);
+    const [messages, setMessages] = useState<MessageResponseDto[]>([]);
     const [members, setMembers] = useState<string[]>([]);
 
     useEffect(() => {
-        if (!context.connectionId || !context.eventSource) return;
-
-        // Reset state on connectionId change
-        setMessages([]);
-        setMembers([]);
+        if (!context.connectionId || !context.eventSource)
+            return;
 
         chatClient.joinGroup({
             connectionId: context.connectionId,
             group: params.groupId,
-        }).then(r => {
+        });
+        context.eventSource.addEventListener(params.groupId, handler);
 
-        })
-
-        const handler = (e: MessageEvent) => {
+        function handler(e) {
             const event = JSON.parse(e.data) as BaseResponseDto;
             switch (event.eventType) {
                 case StringConstants.JoinGroupResponse:
@@ -61,26 +49,24 @@ export function Group(params: GroupParams) {
                     console.log(members)
                     setMembers(joined.members!);
                     break;
-                case "MessagePayload":
-                    const msg = event as MessagePayload;
+                case StringConstants.MessageResponseDto:
+                    const msg = event as MessageResponseDto;
                     setMessages((prev) => [...prev, msg]);
                     break;
-                case "UserLeft":
+                case StringConstants.UserLeftResponseDto:
                     const l = event as any;
                     setMembers(prev => prev.filter(p => p != l.connectionId));
             }
-        };
-
-        context.eventSource.addEventListener(params.groupId, handler);
+        }
 
         return () => context.eventSource?.removeEventListener(params.groupId, handler);
     }, [context.connectionId, context.eventSource, params.groupId]);
 
     return (
-        <div style={{ border: "1px solid #ccc", padding: 10, margin: 10 }}>
-           Connection ID: {
-                context.connectionId
-            }
+        <div style={{border: "1px solid #ccc", padding: 10, margin: 10}}>
+            Connection ID: {
+            context.connectionId
+        }
             <h3>Group: {params.groupId}</h3>
             <p>Members: {JSON.stringify(members)}m total: {members.length}</p>
 

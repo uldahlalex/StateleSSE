@@ -6,81 +6,6 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/quickstart/connect": {
-      "get": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_Connect",
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/quickstart/join": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_Join",
-        "parameters": [
-          {
-            "name": "connectionId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "room",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 2
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/quickstart/send": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_Send",
-        "parameters": [
-          {
-            "name": "room",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "message",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 2
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
     "/Connect": {
       "get": {
         "tags": [
@@ -270,6 +195,7 @@
       "StringConstants": {
         "type": "string",
         "enum": [
+          "UserLeftResponseDto",
           "ConnectionResponse",
           "SendGroupMessageRequestDto",
           "JoinGroupResponse",

@@ -1,10 +1,9 @@
 using NJsonSchema.CodeGeneration.TypeScript;
 using NSwag;
 using NSwag.CodeGeneration.TypeScript;
-
 using NSwag.Generation;
 
-namespace api.Etc;
+namespace server;
 
 public static class GenerateApiClientsExtensions
 {
