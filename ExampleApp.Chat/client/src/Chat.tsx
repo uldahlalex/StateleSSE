@@ -68,7 +68,7 @@ export function Group(params: GroupParams) {
             context.connectionId
         }
             <h3>Group: {params.groupId}</h3>
-            <p>Members: {JSON.stringify(members)}m total: {members.length}</p>
+            <p>Members: {JSON.stringify(members)} - members in total: {members.length}</p>
 
             <button
                 onClick={() => {

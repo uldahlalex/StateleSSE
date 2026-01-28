@@ -20,7 +20,14 @@ Run it:
 ```bash
 cd ExampleApp.Quickstart
 dotnet run
+#then navigate to http://localhost:5000 to use the client app
 ```
+
+## Example app with scalability
+
+Features Redis backplane, NSwag with codegen, horisontal scaling, increased typesafety + React client example
+
+- [ExampleApp.Chat](ExampleApp.Chat)
 
 ## Backplane API
 
@@ -128,15 +135,7 @@ Then in `Program.cs`:
 ```csharp
 builder.Services.AddOpenApiDocument(config =>
 {
-    config.AddStringConstants<MyConstants>();
+    config.AddStringConstants<MyConstants>(); //MyConstants is arbitrary class name - will simply include string constants defined here
 });
 ```
 
-## Examples
-
-- [`ExampleApp.Quickstart`](ExampleApp.Quickstart) - Minimal example (~30 lines)
-- [`ExampleApp.Chat`](ExampleApp.Chat) - Full chat app with React client
-
-## License
-
-MIT
