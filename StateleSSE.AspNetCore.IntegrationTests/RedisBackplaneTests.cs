@@ -55,7 +55,7 @@ public class RedisBackplaneTests : IAsyncLifetime
         var (reader, connectionId) = _backplane1.Connect();
         await _backplane1.Groups.AddToGroupAsync(connectionId, "test-group");
 
-        await _backplane1.Clients.GroupAsync("test-group", new TestMessage { Data = "test message" });
+        await _backplane1.Clients.SendToGroupAsync("test-group", new TestMessage { Data = "test message" });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var received = await reader.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
@@ -79,7 +79,7 @@ public class RedisBackplaneTests : IAsyncLifetime
 
         await Task.Delay(100);
 
-        await _backplane1.Clients.GroupAsync("chat-room", new TestMessage { Data = "cross-server message" });
+        await _backplane1.Clients.SendToGroupAsync("chat-room", new TestMessage { Data = "cross-server message" });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
@@ -106,7 +106,7 @@ public class RedisBackplaneTests : IAsyncLifetime
 
         await Task.Delay(100);
 
-        await _backplane1.Clients.GroupAsync("test-group", new TestMessage { Data = "should not receive" });
+        await _backplane1.Clients.SendToGroupAsync("test-group", new TestMessage { Data = "should not receive" });
 
         var cts = new CancellationTokenSource(500);
         var received = await reader.ReadAllAsync(cts.Token).ToListAsync();
@@ -128,8 +128,8 @@ public class RedisBackplaneTests : IAsyncLifetime
 
         await Task.Delay(100);
 
-        await _backplane1.Clients.GroupAsync("group1", new TestMessage { Data = "should not receive" });
-        await _backplane1.Clients.GroupAsync("group2", new TestMessage { Data = "should receive" });
+        await _backplane1.Clients.SendToGroupAsync("group1", new TestMessage { Data = "should not receive" });
+        await _backplane1.Clients.SendToGroupAsync("group2", new TestMessage { Data = "should receive" });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var received = await reader.ReadAllAsync(cts.Token).Take(1).ToListAsync();
@@ -151,8 +151,8 @@ public class RedisBackplaneTests : IAsyncLifetime
         await _backplane1.Groups.AddToGroupAsync(connectionId, "group1");
         await _backplane1.Groups.AddToGroupAsync(connectionId, "group2");
 
-        await _backplane1.Clients.GroupAsync("group1", new TestMessage { Data = "from group1" });
-        await _backplane1.Clients.GroupAsync("group2", new TestMessage { Data = "from group2" });
+        await _backplane1.Clients.SendToGroupAsync("group1", new TestMessage { Data = "from group1" });
+        await _backplane1.Clients.SendToGroupAsync("group2", new TestMessage { Data = "from group2" });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var received = await reader.ReadAllAsync(cts.Token).Take(2).ToListAsync();
@@ -174,7 +174,7 @@ public class RedisBackplaneTests : IAsyncLifetime
 
         await Task.Delay(100);
 
-        await _backplane1.Clients.AllAsync(new TestMessage { Data = "broadcast to all" });
+        await _backplane1.Clients.SendToAllAsync(new TestMessage { Data = "broadcast to all" });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
@@ -202,7 +202,7 @@ public class RedisBackplaneTests : IAsyncLifetime
         await Task.Delay(100);
 
         // Send from backplane2 to a client on backplane1
-        await _backplane2.Clients.ClientAsync(conn1, new TestMessage { Data = "only for conn1" });
+        await _backplane2.Clients.SendToClientAsync(conn1, new TestMessage { Data = "only for conn1" });
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 

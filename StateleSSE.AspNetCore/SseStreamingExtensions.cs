@@ -109,7 +109,7 @@ public sealed class BackplaneConnection : IAsyncDisposable
 {
     private readonly ISseBackplane _backplane;
 
-    internal BackplaneConnection(ISseBackplane backplane, ChannelReader<SseEvent> reader, Guid connectionId)
+    internal BackplaneConnection(ISseBackplane backplane, ChannelReader<SseEvent> reader, string connectionId)
     {
         _backplane = backplane;
         Reader = reader;
@@ -119,7 +119,7 @@ public sealed class BackplaneConnection : IAsyncDisposable
     /// <summary>
     /// The unique connection ID for this client.
     /// </summary>
-    public Guid ConnectionId { get; }
+    public string ConnectionId { get; }
 
     /// <summary>
     /// The channel reader for receiving events.

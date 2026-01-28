@@ -5,6 +5,7 @@
 
 # dotenv files
 .env
+ExampleApp.Kahoot
 
 # User-specific files
 *.rsuser

@@ -22,7 +22,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     private readonly TimeSpan _connectionTtl;
     private readonly TimeSpan _heartbeatInterval;
 
-    private readonly ConcurrentDictionary<Guid, ConnectionState> _localConnections = new();
+    private readonly ConcurrentDictionary<string, ConnectionState> _localConnections = new();
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _heartbeatTask;
 
@@ -83,10 +83,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
 
     /// <inheritdoc/>
-    public (ChannelReader<SseEvent> Reader, Guid ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
-        var connectionId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid().ToString();
         var state = new ConnectionState(channel);
 
         _localConnections.TryAdd(connectionId, state);
@@ -101,7 +101,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         _db.KeyExpire(connectionKey, _connectionTtl);
 
         // Add to server's connection set
-        _db.SetAdd($"{_prefix}:server:{_serverId}:connections", connectionId.ToString());
+        _db.SetAdd($"{_prefix}:server:{_serverId}:connections", connectionId);
 
         _logger.LogDebug("Client {ConnectionId} connected on server {ServerId}", connectionId, _serverId);
 
@@ -109,7 +109,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     }
 
     /// <inheritdoc/>
-    public async Task DisconnectAsync(Guid connectionId)
+    public async Task DisconnectAsync(string connectionId)
     {
         // Remove from local state
         if (!_localConnections.TryRemove(connectionId, out var state))
@@ -135,7 +135,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         });
 
         // Remove from server's connection set
-        await _db.SetRemoveAsync($"{_prefix}:server:{_serverId}:connections", connectionId.ToString());
+        await _db.SetRemoveAsync($"{_prefix}:server:{_serverId}:connections", connectionId);
 
         state.Channel.Writer.Complete();
         _logger.LogDebug("Client {ConnectionId} disconnected", connectionId);
@@ -148,16 +148,16 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         });
     }
 
-    internal async Task AddToGroupAsync(Guid connectionId, string groupName)
+    internal async Task AddToGroupAsync(string connectionId, string groupName)
     {
-        if (connectionId == Guid.Empty)
+        if (string.IsNullOrEmpty(connectionId))
         {
-            _logger.LogWarning("Attempted to add empty GUID to group '{Group}'", groupName);
+            _logger.LogWarning("Attempted to add null/empty connectionId to group '{Group}'", groupName);
             return;
         }
 
         // Add connection to group members
-        await _db.SetAddAsync($"{_prefix}:group:{groupName}:members", connectionId.ToString());
+        await _db.SetAddAsync($"{_prefix}:group:{groupName}:members", connectionId);
 
         // Track which groups this connection belongs to
         await _db.SetAddAsync($"{_prefix}:conn:{connectionId}:groups", groupName);
@@ -171,9 +171,9 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         _logger.LogDebug("Client {ConnectionId} added to group '{Group}'", connectionId, groupName);
     }
 
-    internal async Task RemoveFromGroupAsync(Guid connectionId, string groupName)
+    internal async Task RemoveFromGroupAsync(string connectionId, string groupName)
     {
-        await _db.SetRemoveAsync($"{_prefix}:group:{groupName}:members", connectionId.ToString());
+        await _db.SetRemoveAsync($"{_prefix}:group:{groupName}:members", connectionId);
         await _db.SetRemoveAsync($"{_prefix}:conn:{connectionId}:groups", groupName);
 
         if (_localConnections.TryGetValue(connectionId, out var state))
@@ -191,20 +191,20 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         return members.Count;
     }
 
-    internal async Task<IReadOnlyList<Guid>> GetGroupMembersAsync(string groupName, bool validateConnections = true)
+    internal async Task<IReadOnlyList<string>> GetGroupMembersAsync(string groupName, bool validateConnections = true)
     {
         var members = await _db.SetMembersAsync($"{_prefix}:group:{groupName}:members");
         var parsed = members
-            .Select(m => Guid.Parse(m.ToString()))
-            .Where(g => g != Guid.Empty)
+            .Select(m => m.ToString())
+            .Where(m => !string.IsNullOrEmpty(m))
             .ToList();
 
         if (!validateConnections)
             return parsed;
 
         // Validate each connection still exists and clean up stale ones
-        var validMembers = new List<Guid>();
-        var staleMembers = new List<Guid>();
+        var validMembers = new List<string>();
+        var staleMembers = new List<string>();
 
         foreach (var connectionId in parsed)
         {
@@ -222,7 +222,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
             {
                 foreach (var stale in staleMembers)
                 {
-                    await _db.SetRemoveAsync($"{_prefix}:group:{groupName}:members", stale.ToString());
+                    await _db.SetRemoveAsync($"{_prefix}:group:{groupName}:members", stale);
                     _logger.LogDebug("Removed stale connection {ConnectionId} from group '{Group}'", stale, groupName);
                 }
             });
@@ -231,7 +231,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         return validMembers;
     }
 
-    internal async Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId)
+    internal async Task<IReadOnlyList<string>> GetClientGroupsAsync(string connectionId)
     {
         var groups = await _db.SetMembersAsync($"{_prefix}:conn:{connectionId}:groups");
         return groups.Select(g => g.ToString()).ToList();
@@ -255,7 +255,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         _logger.LogDebug("Broadcast message sent");
     }
 
-    internal async Task SendToClientAsync(Guid connectionId, object data, string? groupName = null)
+    internal async Task SendToClientAsync(string connectionId, object data, string? groupName = null)
     {
         // Check if connection is local
         if (_localConnections.TryGetValue(connectionId, out var state))
@@ -300,15 +300,15 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         var members = await _db.SetMembersAsync($"{_prefix}:group:{groupName}:members");
 
         // Group members by server for efficient routing
-        var serverConnections = new Dictionary<string, List<Guid>>();
+        var serverConnections = new Dictionary<string, List<string>>();
         var staleConnections = new List<string>();
 
         foreach (var member in members)
         {
-            var memberStr = member.ToString();
-            if (!Guid.TryParse(memberStr, out var connectionId) || connectionId == Guid.Empty)
+            var connectionId = member.ToString();
+            if (string.IsNullOrEmpty(connectionId))
             {
-                staleConnections.Add(memberStr);
+                staleConnections.Add(connectionId);
                 continue;
             }
 
@@ -316,14 +316,14 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
             if (serverId.IsNullOrEmpty)
             {
-                staleConnections.Add(memberStr);
+                staleConnections.Add(connectionId);
                 continue;
             }
 
             var serverIdStr = serverId.ToString();
             if (!serverConnections.ContainsKey(serverIdStr))
             {
-                serverConnections[serverIdStr] = new List<Guid>();
+                serverConnections[serverIdStr] = new List<string>();
             }
             serverConnections[serverIdStr].Add(connectionId);
         }
@@ -399,7 +399,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
             switch (envelope.Type)
             {
                 case MessageType.Client:
-                    if (envelope.TargetId.HasValue && _localConnections.TryGetValue(envelope.TargetId.Value, out var state))
+                    if (envelope.TargetId != null && _localConnections.TryGetValue(envelope.TargetId, out var state))
                     {
                         await state.Channel.Writer.WriteAsync(evt);
                     }
@@ -503,29 +503,29 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     private sealed class MessageEnvelope
     {
         public MessageType Type { get; init; }
-        public Guid? TargetId { get; init; }
-        public List<Guid>? TargetIds { get; init; }
+        public string? TargetId { get; init; }
+        public List<string>? TargetIds { get; init; }
         public string? GroupName { get; init; }
         public JsonElement Data { get; init; }
     }
 
     private sealed class RedisClients(RedisBackplane backplane) : IBackplaneClients
     {
-        public Task AllAsync(object data) => backplane.SendToAllAsync(data);
+        public Task SendToAllAsync(object data) => backplane.SendToAllAsync(data);
 
-        public Task ClientAsync(Guid connectionId, object data) =>
+        public Task SendToClientAsync(string connectionId, object data) =>
             backplane.SendToClientAsync(connectionId, data);
 
-        public async Task ClientsAsync(IEnumerable<Guid> connectionIds, object data)
+        public async Task SendToClientsAsync(IEnumerable<string> connectionIds, object data)
         {
             var tasks = connectionIds.Select(id => backplane.SendToClientAsync(id, data));
             await Task.WhenAll(tasks);
         }
 
-        public Task GroupAsync(string groupName, object data) =>
+        public Task SendToGroupAsync(string groupName, object data) =>
             backplane.SendToGroupAsync(groupName, data);
 
-        public async Task GroupsAsync(IEnumerable<string> groupNames, object data)
+        public async Task SendToGroupsAsync(IEnumerable<string> groupNames, object data)
         {
             var tasks = groupNames.Select(g => backplane.SendToGroupAsync(g, data));
             await Task.WhenAll(tasks);
@@ -534,19 +534,19 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
     private sealed class RedisGroups(RedisBackplane backplane) : IBackplaneGroups
     {
-        public Task AddToGroupAsync(Guid connectionId, string groupName) =>
+        public Task AddToGroupAsync(string connectionId, string groupName) =>
             backplane.AddToGroupAsync(connectionId, groupName);
 
-        public Task RemoveFromGroupAsync(Guid connectionId, string groupName) =>
+        public Task RemoveFromGroupAsync(string connectionId, string groupName) =>
             backplane.RemoveFromGroupAsync(connectionId, groupName);
 
         public Task<int> GetMemberCountAsync(string groupName) =>
             backplane.GetGroupMemberCountAsync(groupName);
 
-        public Task<IReadOnlyList<Guid>> GetMembersAsync(string groupName) =>
+        public Task<IReadOnlyList<string>> GetMembersAsync(string groupName) =>
             backplane.GetGroupMembersAsync(groupName);
 
-        public Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId) =>
+        public Task<IReadOnlyList<string>> GetClientGroupsAsync(string connectionId) =>
             backplane.GetClientGroupsAsync(connectionId);
     }
 }

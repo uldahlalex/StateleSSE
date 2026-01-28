@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
+namespace server.Controllers;
+
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     [HttpGet(nameof(Connect))]
@@ -15,8 +17,6 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         }));
-
-        await backplane.Clients.ClientAsync(connection.ConnectionId, new ConnectionResponse(connection.ConnectionId));
         
         await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
         {
@@ -39,20 +39,18 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
         var members = await backplane.Groups.GetMembersAsync(request.Group);
 
         // Event type is in the payload, not the group name
-        await backplane.Clients.GroupAsync(request.Group,  new JoinGroupResponse()
-            {
-              
-                Members = members.Select(m => m.ToString()).ToList()
-            });
+        await backplane.Clients.SendToGroupAsync(request.Group,  new JoinGroupResponse()
+        {
+            Members = members.ToList()
+        });
 
     }
 
     [HttpPost(nameof(SendMessageToGroup))]
-    [Produces<MessagePayload>]
+    [Produces<MessageResponseDto>]
     public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
     {
-        // Event type is in the payload
-        await backplane.Clients.GroupAsync(dto.GroupId, new MessagePayload
+        await backplane.Clients.SendToGroupAsync(dto.GroupId, new MessageResponseDto
         {
             ConnectionId = dto.ConnectionId,
             Message = dto.Message
@@ -61,21 +59,12 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
 }
 
 
-public abstract record BaseResponseDto
-{
-    public BaseResponseDto()
-    {
-        EventType = GetType().Name;
-       
-    }
-
-    public string EventType { get; set; }
-}
-
-public record ConnectionResponse(Guid ConnectionId) : BaseResponseDto;
 
 
-public record JoinGroupRequest(Guid ConnectionId, string Group);
+public record ConnectionResponse(string ConnectionId) : BaseResponseDto;
+
+
+public record JoinGroupRequest(string ConnectionId, string Group);
 
 public record SendGroupMessageRequestDto : BaseResponseDto
 {
@@ -91,7 +80,7 @@ public record JoinGroupResponse : BaseResponseDto
 
 
 
-public record MessagePayload : BaseResponseDto
+public record MessageResponseDto : BaseResponseDto
 {
     public string ConnectionId { get; set; } = "";
     public string Message { get; set; } = "";

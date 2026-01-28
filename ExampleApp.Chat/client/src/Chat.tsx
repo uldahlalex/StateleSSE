@@ -4,7 +4,7 @@ import {
     type BaseResponseDto,
     ChatClient,
     type JoinGroupResponse,
-    type MessagePayload
+    type  StringConstants,
 } from "./generated-ts-client.ts";
 import { GlobalContext } from "./GlobalContext.tsx";
 
@@ -56,7 +56,7 @@ export function Group(params: GroupParams) {
         const handler = (e: MessageEvent) => {
             const event = JSON.parse(e.data) as BaseResponseDto;
             switch (event.eventType) {
-                case "JoinGroupResponse":
+                case StringConstants.JoinGroupResponse:
                     const joined = event as JoinGroupResponse;
                     console.log(members)
                     setMembers(joined.members!);

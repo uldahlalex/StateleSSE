@@ -11,8 +11,8 @@ namespace StateleSSE.AspNetCore.Infrastructure;
 public class InMemoryBackplane : ISseBackplane, IDisposable
 {
     private readonly ILogger<InMemoryBackplane> _logger;
-    private readonly ConcurrentDictionary<Guid, ConnectionState> _connections = new();
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, byte>> _groups = new();
+    private readonly ConcurrentDictionary<string, ConnectionState> _connections = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _groups = new();
 
     private readonly InMemoryClients _clients;
     private readonly InMemoryGroups _groupsApi;
@@ -44,10 +44,10 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
 
     /// <inheritdoc/>
-    public (ChannelReader<SseEvent> Reader, Guid ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
-        var connectionId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid().ToString();
         var state = new ConnectionState(channel);
 
         _connections.TryAdd(connectionId, state);
@@ -58,7 +58,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
     }
 
     /// <inheritdoc/>
-    public Task DisconnectAsync(Guid connectionId)
+    public Task DisconnectAsync(string connectionId)
     {
         if (!_connections.TryRemove(connectionId, out var state))
         {
@@ -103,7 +103,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         _groups.Clear();
     }
 
-    internal async Task SendToClientAsync(Guid connectionId, object data, string? groupName = null)
+    internal async Task SendToClientAsync(string connectionId, object data, string? groupName = null)
     {
         if (_connections.TryGetValue(connectionId, out var state))
         {
@@ -152,7 +152,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         _logger.LogDebug("Sent to group '{Group}' ({Count} members)", groupName, members.Count);
     }
 
-    internal Task AddToGroupAsync(Guid connectionId, string groupName)
+    internal Task AddToGroupAsync(string connectionId, string groupName)
     {
         if (!_connections.TryGetValue(connectionId, out var state))
         {
@@ -162,14 +162,14 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
 
         state.Groups.TryAdd(groupName, 0);
 
-        var members = _groups.GetOrAdd(groupName, _ => new ConcurrentDictionary<Guid, byte>());
+        var members = _groups.GetOrAdd(groupName, _ => new ConcurrentDictionary<string, byte>());
         members.TryAdd(connectionId, 0);
 
         _logger.LogDebug("Client {ConnectionId} added to group '{Group}'", connectionId, groupName);
         return Task.CompletedTask;
     }
 
-    internal Task RemoveFromGroupAsync(Guid connectionId, string groupName)
+    internal Task RemoveFromGroupAsync(string connectionId, string groupName)
     {
         if (_connections.TryGetValue(connectionId, out var state))
         {
@@ -195,15 +195,15 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
         return Task.FromResult(count);
     }
 
-    internal Task<IReadOnlyList<Guid>> GetGroupMembersAsync(string groupName)
+    internal Task<IReadOnlyList<string>> GetGroupMembersAsync(string groupName)
     {
-        IReadOnlyList<Guid> result = _groups.TryGetValue(groupName, out var members)
+        IReadOnlyList<string> result = _groups.TryGetValue(groupName, out var members)
             ? members.Keys.ToList()
-            : Array.Empty<Guid>();
+            : Array.Empty<string>();
         return Task.FromResult(result);
     }
 
-    internal Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId)
+    internal Task<IReadOnlyList<string>> GetClientGroupsAsync(string connectionId)
     {
         IReadOnlyList<string> result = _connections.TryGetValue(connectionId, out var state)
             ? state.Groups.Keys.ToList()
@@ -219,21 +219,21 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
 
     private sealed class InMemoryClients(InMemoryBackplane backplane) : IBackplaneClients
     {
-        public Task AllAsync(object data) => backplane.SendToAllAsync(data);
+        public Task SendToAllAsync(object data) => backplane.SendToAllAsync(data);
 
-        public Task ClientAsync(Guid connectionId, object data) =>
+        public Task SendToClientAsync(string connectionId, object data) =>
             backplane.SendToClientAsync(connectionId, data);
 
-        public async Task ClientsAsync(IEnumerable<Guid> connectionIds, object data)
+        public async Task SendToClientsAsync(IEnumerable<string> connectionIds, object data)
         {
             var tasks = connectionIds.Select(id => backplane.SendToClientAsync(id, data));
             await Task.WhenAll(tasks);
         }
 
-        public Task GroupAsync(string groupName, object data) =>
+        public Task SendToGroupAsync(string groupName, object data) =>
             backplane.SendToGroupAsync(groupName, data);
 
-        public async Task GroupsAsync(IEnumerable<string> groupNames, object data)
+        public async Task SendToGroupsAsync(IEnumerable<string> groupNames, object data)
         {
             var tasks = groupNames.Select(g => backplane.SendToGroupAsync(g, data));
             await Task.WhenAll(tasks);
@@ -242,19 +242,19 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
 
     private sealed class InMemoryGroups(InMemoryBackplane backplane) : IBackplaneGroups
     {
-        public Task AddToGroupAsync(Guid connectionId, string groupName) =>
+        public Task AddToGroupAsync(string connectionId, string groupName) =>
             backplane.AddToGroupAsync(connectionId, groupName);
 
-        public Task RemoveFromGroupAsync(Guid connectionId, string groupName) =>
+        public Task RemoveFromGroupAsync(string connectionId, string groupName) =>
             backplane.RemoveFromGroupAsync(connectionId, groupName);
 
         public Task<int> GetMemberCountAsync(string groupName) =>
             backplane.GetGroupMemberCountAsync(groupName);
 
-        public Task<IReadOnlyList<Guid>> GetMembersAsync(string groupName) =>
+        public Task<IReadOnlyList<string>> GetMembersAsync(string groupName) =>
             backplane.GetGroupMembersAsync(groupName);
 
-        public Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId) =>
+        public Task<IReadOnlyList<string>> GetClientGroupsAsync(string connectionId) =>
             backplane.GetClientGroupsAsync(connectionId);
     }
 }

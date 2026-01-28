@@ -16,7 +16,7 @@ public class ClientDisconnectedEventArgs : EventArgs
     /// <summary>
     /// The connection ID of the disconnected client.
     /// </summary>
-    public Guid ConnectionId { get; init; }
+    public required string ConnectionId { get; init; }
 
     /// <summary>
     /// The groups the client was a member of at disconnection time.
@@ -43,12 +43,12 @@ public interface ISseBackplane
     /// <summary>
     /// Opens a new client connection. Returns a channel reader for receiving events and a unique connection ID.
     /// </summary>
-    (ChannelReader<SseEvent> Reader, Guid ConnectionId) Connect();
+    (ChannelReader<SseEvent> Reader, string ConnectionId) Connect();
 
     /// <summary>
     /// Close a client connection and remove from all groups.
     /// </summary>
-    Task DisconnectAsync(Guid connectionId);
+    Task DisconnectAsync(string connectionId);
 
     /// <summary>
     /// Raised when a client disconnects. Use this to broadcast "user left" events.
@@ -64,27 +64,27 @@ public interface IBackplaneClients
     /// <summary>
     /// Send to all connected clients across all server instances.
     /// </summary>
-    Task AllAsync(object data);
+    Task SendToAllAsync(object data);
 
     /// <summary>
     /// Send to a specific client by connection ID.
     /// </summary>
-    Task ClientAsync(Guid connectionId, object data);
+    Task SendToClientAsync(string connectionId, object data);
 
     /// <summary>
     /// Send to multiple specific clients by connection ID.
     /// </summary>
-    Task ClientsAsync(IEnumerable<Guid> connectionIds, object data);
+    Task SendToClientsAsync(IEnumerable<string> connectionIds, object data);
 
     /// <summary>
     /// Send to all clients in a group.
     /// </summary>
-    Task GroupAsync(string groupName, object data);
+    Task SendToGroupAsync(string groupName, object data);
 
     /// <summary>
     /// Send to all clients in multiple groups.
     /// </summary>
-    Task GroupsAsync(IEnumerable<string> groupNames, object data);
+    Task SendToGroupsAsync(IEnumerable<string> groupNames, object data);
 }
 
 /// <summary>
@@ -95,12 +95,12 @@ public interface IBackplaneGroups
     /// <summary>
     /// Add a client to a group.
     /// </summary>
-    Task AddToGroupAsync(Guid connectionId, string groupName);
+    Task AddToGroupAsync(string connectionId, string groupName);
 
     /// <summary>
     /// Remove a client from a group.
     /// </summary>
-    Task RemoveFromGroupAsync(Guid connectionId, string groupName);
+    Task RemoveFromGroupAsync(string connectionId, string groupName);
 
     /// <summary>
     /// Get the number of clients in a group (across all server instances).
@@ -110,10 +110,10 @@ public interface IBackplaneGroups
     /// <summary>
     /// Get all client connection IDs in a group (across all server instances).
     /// </summary>
-    Task<IReadOnlyList<Guid>> GetMembersAsync(string groupName);
+    Task<IReadOnlyList<string>> GetMembersAsync(string groupName);
 
     /// <summary>
     /// Get all groups a client belongs to.
     /// </summary>
-    Task<IReadOnlyList<string>> GetClientGroupsAsync(Guid connectionId);
+    Task<IReadOnlyList<string>> GetClientGroupsAsync(string connectionId);
 }

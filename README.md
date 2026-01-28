@@ -10,196 +10,75 @@ dotnet add package StateleSSE.AspNetCore
 
 ## Quick Start
 
-### 1. Register the backplane
+### 1. Server
 
 ```csharp
+// Program.cs
 using StateleSSE.AspNetCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Option A: In-memory (development / single server)
-builder.Services.AddInMemorySseBackplane();
-
-// Option B: Redis (production / horizontal scaling)
-// builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-//     ConnectionMultiplexer.Connect("localhost:6379"));
-// builder.Services.AddRedisSseBackplane();
-
+builder.Services.AddInMemorySseBackplane();  // or AddRedisSseBackplane() for scaling
 builder.Services.AddControllers();
+
 var app = builder.Build();
 app.MapControllers();
 app.Run();
 ```
 
-### 2. Create the realtime controller
-
 ```csharp
+// RealtimeController.cs
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using StateleSSE.AspNetCore;  // Required for OpenSseStreamAsync, CreateConnection extensions
+using StateleSSE.AspNetCore;
 
-[ApiController]
-[Route("api/realtime")]
 public class RealtimeController(ISseBackplane backplane) : ControllerBase
 {
-    /// <summary>
-    /// Open SSE connection. Returns connectionId immediately.
-    /// </summary>
     [HttpGet("connect")]
-    [Produces("text/event-stream")]
     public async Task Connect()
     {
         await using var sse = await HttpContext.OpenSseStreamAsync();
         await using var connection = backplane.CreateConnection();
 
-        // Send connectionId to client immediately
-        await sse.WriteAsync("connected", JsonSerializer.Serialize(new
-        {
-            connectionId = connection.ConnectionId
-        }));
+        await sse.WriteAsync("connected", JsonSerializer.Serialize(new { connection.ConnectionId }));
 
-        // Stream events to client
         await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
-        {
-            if (evt.Group != null)
-                await sse.WriteAsync(evt.Group, evt.Data);
-            else
-                await sse.WriteAsync(evt.Data);
-        }
+            await sse.WriteAsync(evt.Group ?? "message", evt.Data);
     }
 
-    /// <summary>
-    /// Join a group.
-    /// </summary>
-    [HttpPost("groups/join")]
-    public async Task<IActionResult> JoinGroup([FromBody] JoinGroupRequest request)
-    {
-        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
-        var members = await backplane.Groups.GetMembersAsync(request.Group);
+    [HttpPost("join")]
+    public async Task Join(string connectionId, string room)
+        => await backplane.Groups.AddToGroupAsync(connectionId, room);
 
-        // Notify group of new member
-        await backplane.Clients.GroupAsync(request.Group, new
-        {
-            type = "join",
-            connectionId = request.ConnectionId,
-            memberCount = members.Count
-        });
-
-        return Ok(new { memberCount = members.Count });
-    }
-
-    /// <summary>
-    /// Leave a group.
-    /// </summary>
-    [HttpPost("groups/leave")]
-    public async Task<IActionResult> LeaveGroup([FromBody] LeaveGroupRequest request)
-    {
-        await backplane.Groups.RemoveFromGroupAsync(request.ConnectionId, request.Group);
-        var members = await backplane.Groups.GetMembersAsync(request.Group);
-
-        await backplane.Clients.GroupAsync(request.Group, new
-        {
-            type = "leave",
-            connectionId = request.ConnectionId,
-            memberCount = members.Count
-        });
-
-        return Ok(new { memberCount = members.Count });
-    }
-
-    /// <summary>
-    /// Send message to a group.
-    /// </summary>
-    [HttpPost("groups/send")]
-    public async Task<IActionResult> SendToGroup([FromBody] SendToGroupRequest request)
-    {
-        await backplane.Clients.GroupAsync(request.Group, new
-        {
-            from = request.ConnectionId,
-            payload = request.Payload
-        });
-        return Ok();
-    }
-
-    /// <summary>
-    /// Send message to a specific client.
-    /// </summary>
-    [HttpPost("clients/send")]
-    public async Task<IActionResult> SendToClient([FromBody] SendToClientRequest request)
-    {
-        await backplane.Clients.ClientAsync(request.TargetConnectionId, new
-        {
-            from = request.FromConnectionId,
-            payload = request.Payload
-        });
-        return Ok();
-    }
-
-    /// <summary>
-    /// Broadcast to all connected clients.
-    /// </summary>
-    [HttpPost("broadcast")]
-    public async Task<IActionResult> Broadcast([FromBody] BroadcastRequest request)
-    {
-        await backplane.Clients.AllAsync(request.Payload);
-        return Ok();
-    }
+    [HttpPost("send")]
+    public async Task Send(string room, string message)
+        => await backplane.Clients.SendToGroupAsync(room, new { message });
 }
-
-public record JoinGroupRequest(Guid ConnectionId, string Group);
-public record LeaveGroupRequest(Guid ConnectionId, string Group);
-public record SendToGroupRequest(Guid ConnectionId, string Group, object Payload);
-public record SendToClientRequest(Guid FromConnectionId, Guid TargetConnectionId, object Payload);
-public record BroadcastRequest(object Payload);
 ```
 
-### 3. Connect from the browser
+### 2. Client
 
-```typescript
-const BASE_URL = "http://localhost:5000";
-let connectionId: string | null = null;
+```html
+<div id="messages"></div>
+<input id="msg" placeholder="Message" />
+<button onclick="send()">Send</button>
 
-// 1. Open SSE connection
-const es = new EventSource(`${BASE_URL}/api/realtime/connect`);
+<script>
+const room = "chat";
+let connectionId;
 
-// 2. Receive connectionId
-es.addEventListener("connected", (e) => {
-    const data = JSON.parse(e.data);
-    connectionId = data.connectionId;
-    console.log("Connected:", connectionId);
+const es = new EventSource("/connect");
+es.addEventListener("connected", e => {
+    connectionId = JSON.parse(e.data).connectionId;
+    fetch(`/join?connectionId=${connectionId}&room=${room}`, { method: "POST" });
+});
+es.addEventListener(room, e => {
+    document.getElementById("messages").innerHTML += `<p>${JSON.parse(e.data).message}</p>`;
 });
 
-// 3. Join a group (after connected)
-async function joinGroup(group: string) {
-    await fetch(`${BASE_URL}/api/realtime/groups/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connectionId, group })
-    });
-
-    // Listen for events on this group
-    es.addEventListener(group, (e) => {
-        console.log(`[${group}]`, JSON.parse(e.data));
-    });
+function send() {
+    fetch(`/send?room=${room}&message=${document.getElementById("msg").value}`, { method: "POST" });
 }
-
-// 4. Send to a group
-async function sendToGroup(group: string, message: string) {
-    await fetch(`${BASE_URL}/api/realtime/groups/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connectionId, group, payload: { message } })
-    });
-}
-
-// 5. Send directly to another client
-async function sendToClient(targetConnectionId: string, message: string) {
-    await fetch(`${BASE_URL}/api/realtime/clients/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromConnectionId: connectionId, targetConnectionId, payload: { message } })
-    });
-}
+</script>
 ```
 
 ## Backplane API
@@ -208,19 +87,19 @@ async function sendToClient(targetConnectionId: string, message: string) {
 
 ```csharp
 // Broadcast to all
-await backplane.Clients.AllAsync(data);
+await backplane.Clients.SendToAllAsync(data);
 
 // Send to group
-await backplane.Clients.GroupAsync("room-1", data);
+await backplane.Clients.SendToGroupAsync("room-1", data);
 
 // Send to multiple groups
-await backplane.Clients.GroupsAsync(["room-1", "room-2"], data);
+await backplane.Clients.SendToGroupsAsync(["room-1", "room-2"], data);
 
 // Send to specific client
-await backplane.Clients.ClientAsync(connectionId, data);
+await backplane.Clients.SendToClientAsync(connectionId, data);
 
 // Send to multiple clients
-await backplane.Clients.ClientsAsync([id1, id2], data);
+await backplane.Clients.SendToClientsAsync([id1, id2], data);
 ```
 
 ### Groups (Membership)
@@ -254,6 +133,63 @@ builder.Services.AddRedisSseBackplane();
 ```
 
 The Redis backplane handles cross-server routing, group membership, and connection cleanup automatically.
+
+## OpenAPI String Constants
+
+`StringConstantsDiscovery` helps expose event type names in your OpenAPI spec for client code generation. It extracts:
+- All `BaseResponseDto` subclass names (event types)
+- String constants from a class you specify
+
+```csharp
+using StateleSSE.AspNetCore;
+
+// Get event type names
+var eventTypes = StringConstantsDiscovery.GetEventTypeNames();
+
+// Get constants from a specific class
+var constants = StringConstantsDiscovery.GetStringConstants<MyConstants>();
+
+// Get both combined
+var all = StringConstantsDiscovery.GetAll<MyConstants>();
+```
+
+For NSwag integration, create a thin wrapper:
+
+```csharp
+using NJsonSchema;
+using NSwag.Generation;
+using NSwag.Generation.Processors;
+using NSwag.Generation.Processors.Contexts;
+using StateleSSE.AspNetCore;
+
+public static class NSwagExtensions
+{
+    public static void AddStringConstants<T>(this OpenApiDocumentGeneratorSettings settings)
+    {
+        settings.DocumentProcessors.Add(new StringConstantsProcessor<T>());
+    }
+
+    private sealed class StringConstantsProcessor<T> : IDocumentProcessor
+    {
+        public void Process(DocumentProcessorContext context)
+        {
+            var schema = new JsonSchema { Type = JsonObjectType.String };
+            foreach (var c in StringConstantsDiscovery.GetAll<T>())
+                schema.Enumeration.Add(c);
+            context.Document.Definitions["StringConstants"] = schema;
+        }
+    }
+}
+```
+
+Then in `Program.cs`:
+
+```csharp
+builder.Services.AddOpenApiDocument(config =>
+{
+    config.AddStringConstants<MyConstants>();
+});
+```
 
 ## Example App
 

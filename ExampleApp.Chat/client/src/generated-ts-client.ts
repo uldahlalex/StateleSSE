@@ -7,6 +7,123 @@
 /* eslint-disable */
 // ReSharper disable InconsistentNaming
 
+export class RealtimeClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    connect(): Promise<void> {
+        let url_ = this.baseUrl + "/quickstart/connect";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processConnect(_response);
+        });
+    }
+
+    protected processConnect(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    join(connectionId: string | undefined, room: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/quickstart/join?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        if (room === null)
+            throw new globalThis.Error("The parameter 'room' cannot be null.");
+        else if (room !== undefined)
+            url_ += "room=" + encodeURIComponent("" + room) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processJoin(_response);
+        });
+    }
+
+    protected processJoin(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    send(room: string | undefined, message: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/quickstart/send?";
+        if (room === null)
+            throw new globalThis.Error("The parameter 'room' cannot be null.");
+        else if (room !== undefined)
+            url_ += "room=" + encodeURIComponent("" + room) + "&";
+        if (message === null)
+            throw new globalThis.Error("The parameter 'message' cannot be null.");
+        else if (message !== undefined)
+            url_ += "message=" + encodeURIComponent("" + message) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSend(_response);
+        });
+    }
+
+    protected processSend(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+}
+
 export class ChatClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
@@ -87,7 +204,7 @@ export class ChatClient {
         return Promise.resolve<JoinGroupResponse>(null as any);
     }
 
-    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<MessagePayload> {
+    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<MessageResponseDto> {
         let url_ = this.baseUrl + "/SendMessageToGroup";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -107,13 +224,13 @@ export class ChatClient {
         });
     }
 
-    protected processSendMessageToGroup(response: Response): Promise<MessagePayload> {
+    protected processSendMessageToGroup(response: Response): Promise<MessageResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MessagePayload;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MessageResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -121,323 +238,11 @@ export class ChatClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<MessagePayload>(null as any);
+        return Promise.resolve<MessageResponseDto>(null as any);
     }
 }
 
-export class RealtimeClient {
-    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
-    private baseUrl: string;
-    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
-
-    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
-        this.http = http ? http : window as any;
-        this.baseUrl = baseUrl ?? "";
-    }
-
-    connect(): Promise<void> {
-        let url_ = this.baseUrl + "/api/realtime/connect";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processConnect(_response);
-        });
-    }
-
-    protected processConnect(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    joinGroup(request: JoinGroupRequest2): Promise<JoinGroupResponse2> {
-        let url_ = this.baseUrl + "/api/realtime/groups/join";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processJoinGroup(_response);
-        });
-    }
-
-    protected processJoinGroup(response: Response): Promise<JoinGroupResponse2> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinGroupResponse2;
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<JoinGroupResponse2>(null as any);
-    }
-
-    leaveGroup(request: LeaveGroupRequest): Promise<LeaveGroupResponse> {
-        let url_ = this.baseUrl + "/api/realtime/groups/leave";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processLeaveGroup(_response);
-        });
-    }
-
-    protected processLeaveGroup(response: Response): Promise<LeaveGroupResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as LeaveGroupResponse;
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<LeaveGroupResponse>(null as any);
-    }
-
-    getGroupMembers(group: string): Promise<GroupMembersResponse> {
-        let url_ = this.baseUrl + "/api/realtime/groups/{group}/members";
-        if (group === undefined || group === null)
-            throw new globalThis.Error("The parameter 'group' must be defined.");
-        url_ = url_.replace("{group}", encodeURIComponent("" + group));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetGroupMembers(_response);
-        });
-    }
-
-    protected processGetGroupMembers(response: Response): Promise<GroupMembersResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as GroupMembersResponse;
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<GroupMembersResponse>(null as any);
-    }
-
-    sendToGroup(request: SendToGroupRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/realtime/groups/send";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSendToGroup(_response);
-        });
-    }
-
-    protected processSendToGroup(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
-    }
-
-    sendToClient(request: SendToClientRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/realtime/clients/send";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSendToClient(_response);
-        });
-    }
-
-    protected processSendToClient(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
-    }
-
-    broadcast(request: BroadcastRequest): Promise<FileResponse> {
-        let url_ = this.baseUrl + "/api/realtime/broadcast";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/octet-stream"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processBroadcast(_response);
-        });
-    }
-
-    protected processBroadcast(response: Response): Promise<FileResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<FileResponse>(null as any);
-    }
-
-    getConnectionGroups(connectionId: string): Promise<ConnectionGroupsResponse> {
-        let url_ = this.baseUrl + "/api/realtime/connections/{connectionId}/groups";
-        if (connectionId === undefined || connectionId === null)
-            throw new globalThis.Error("The parameter 'connectionId' must be defined.");
-        url_ = url_.replace("{connectionId}", encodeURIComponent("" + connectionId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetConnectionGroups(_response);
-        });
-    }
-
-    protected processGetConnectionGroups(response: Response): Promise<ConnectionGroupsResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ConnectionGroupsResponse;
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<ConnectionGroupsResponse>(null as any);
-    }
-}
-
+/** Models used for server sent events to clients should preferably use this model. It automatically attaches "EventType" as a property with type name as value. */
 export interface BaseResponseDto {
     eventType?: string;
 }
@@ -455,7 +260,7 @@ export interface JoinGroupRequest {
     group?: string;
 }
 
-export interface MessagePayload extends BaseResponseDto {
+export interface MessageResponseDto extends BaseResponseDto {
     connectionId?: string;
     message?: string;
 }
@@ -466,58 +271,11 @@ export interface SendGroupMessageRequestDto extends BaseResponseDto {
     groupId?: string;
 }
 
-export interface JoinGroupResponse2 {
-    group?: string;
-    memberCount?: number;
-}
-
-export interface JoinGroupRequest2 {
-    connectionId?: string;
-    group?: string;
-}
-
-export interface LeaveGroupResponse {
-    group?: string;
-    memberCount?: number;
-}
-
-export interface LeaveGroupRequest {
-    connectionId?: string;
-    group?: string;
-}
-
-export interface GroupMembersResponse {
-    group?: string;
-    members?: string[];
-    memberCount?: number;
-}
-
-export interface SendToGroupRequest {
-    connectionId?: string;
-    group?: string;
-    payload?: any;
-}
-
-export interface SendToClientRequest {
-    fromConnectionId?: string;
-    targetConnectionId?: string;
-    payload?: any;
-}
-
-export interface BroadcastRequest {
-    payload?: any;
-}
-
-export interface ConnectionGroupsResponse {
-    connectionId?: string;
-    groups?: string[];
-}
-
-export interface FileResponse {
-    data: Blob;
-    status: number;
-    fileName?: string;
-    headers?: { [name: string]: any };
+export enum StringConstants {
+    ConnectionResponse = "ConnectionResponse",
+    SendGroupMessageRequestDto = "SendGroupMessageRequestDto",
+    JoinGroupResponse = "JoinGroupResponse",
+    MessageResponseDto = "MessageResponseDto",
 }
 
 export class ApiException extends Error {

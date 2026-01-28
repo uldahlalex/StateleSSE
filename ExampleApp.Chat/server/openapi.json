@@ -6,6 +6,81 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/quickstart/connect": {
+      "get": {
+        "tags": [
+          "Realtime"
+        ],
+        "operationId": "Realtime_Connect",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/quickstart/join": {
+      "post": {
+        "tags": [
+          "Realtime"
+        ],
+        "operationId": "Realtime_Join",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "room",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/quickstart/send": {
+      "post": {
+        "tags": [
+          "Realtime"
+        ],
+        "operationId": "Realtime_Send",
+        "parameters": [
+          {
+            "name": "room",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/Connect": {
       "get": {
         "tags": [
@@ -82,246 +157,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessagePayload"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/connect": {
-      "get": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_Connect",
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/api/realtime/groups/join": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_JoinGroup",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/JoinGroupRequest2"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JoinGroupResponse2"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/groups/leave": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_LeaveGroup",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LeaveGroupRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LeaveGroupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/groups/{group}/members": {
-      "get": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_GetGroupMembers",
-        "parameters": [
-          {
-            "name": "group",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GroupMembersResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/groups/send": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_SendToGroup",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendToGroupRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/clients/send": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_SendToClient",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendToClientRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/broadcast": {
-      "post": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_Broadcast",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BroadcastRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/realtime/connections/{connectionId}/groups": {
-      "get": {
-        "tags": [
-          "Realtime"
-        ],
-        "operationId": "Realtime_GetConnectionGroups",
-        "parameters": [
-          {
-            "name": "connectionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConnectionGroupsResponse"
+                  "$ref": "#/components/schemas/MessageResponseDto"
                 }
               }
             }
@@ -342,8 +178,7 @@
             "additionalProperties": false,
             "properties": {
               "connectionId": {
-                "type": "string",
-                "format": "guid"
+                "type": "string"
               }
             }
           }
@@ -351,6 +186,7 @@
       },
       "BaseResponseDto": {
         "type": "object",
+        "description": "Models used for server sent events to clients should preferably use this model.\nIt automatically attaches \"EventType\" as a property with type name as value.",
         "x-abstract": true,
         "additionalProperties": false,
         "properties": {
@@ -383,15 +219,14 @@
         "additionalProperties": false,
         "properties": {
           "connectionId": {
-            "type": "string",
-            "format": "guid"
+            "type": "string"
           },
           "group": {
             "type": "string"
           }
         }
       },
-      "MessagePayload": {
+      "MessageResponseDto": {
         "allOf": [
           {
             "$ref": "#/components/schemas/BaseResponseDto"
@@ -432,129 +267,14 @@
           }
         ]
       },
-      "JoinGroupResponse2": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "group": {
-            "type": "string"
-          },
-          "memberCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "JoinGroupRequest2": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "group": {
-            "type": "string"
-          }
-        }
-      },
-      "LeaveGroupResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "group": {
-            "type": "string"
-          },
-          "memberCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "LeaveGroupRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "group": {
-            "type": "string"
-          }
-        }
-      },
-      "GroupMembersResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "group": {
-            "type": "string"
-          },
-          "members": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          "memberCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "SendToGroupRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "group": {
-            "type": "string"
-          },
-          "payload": {}
-        }
-      },
-      "SendToClientRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "fromConnectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "targetConnectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "payload": {}
-        }
-      },
-      "BroadcastRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "payload": {}
-        }
-      },
-      "ConnectionGroupsResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "groups": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
+      "StringConstants": {
+        "type": "string",
+        "enum": [
+          "ConnectionResponse",
+          "SendGroupMessageRequestDto",
+          "JoinGroupResponse",
+          "MessageResponseDto"
+        ]
       }
     }
   }

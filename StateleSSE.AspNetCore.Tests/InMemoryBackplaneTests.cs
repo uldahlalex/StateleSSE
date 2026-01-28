@@ -13,7 +13,7 @@ public class InMemoryBackplaneTests
         var (reader, connectionId) = backplane.Connect();
         await backplane.Groups.AddToGroupAsync(connectionId, "test-group");
 
-        await backplane.Clients.GroupAsync("test-group", new { Data = "test message" });
+        await backplane.Clients.SendToGroupAsync("test-group", new { Data = "test message" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).FirstOrDefaultAsync();
@@ -33,7 +33,7 @@ public class InMemoryBackplaneTests
         await backplane.Groups.AddToGroupAsync(conn1, "test-group");
         await backplane.Groups.AddToGroupAsync(conn2, "test-group");
 
-        await backplane.Clients.GroupAsync("test-group", new { Data = "broadcast" });
+        await backplane.Clients.SendToGroupAsync("test-group", new { Data = "broadcast" });
 
         var cts = new CancellationTokenSource(100);
 
@@ -51,7 +51,7 @@ public class InMemoryBackplaneTests
     {
         var backplane = new InMemoryBackplane(NullLogger<InMemoryBackplane>.Instance);
 
-        var act = async () => await backplane.Clients.GroupAsync("empty-group", new { Data = "test" });
+        var act = async () => await backplane.Clients.SendToGroupAsync("empty-group", new { Data = "test" });
 
         await act.Should().NotThrowAsync();
 
@@ -67,7 +67,7 @@ public class InMemoryBackplaneTests
 
         await backplane.DisconnectAsync(connectionId);
 
-        await backplane.Clients.GroupAsync("test-group", new { Data = "should not receive" });
+        await backplane.Clients.SendToGroupAsync("test-group", new { Data = "should not receive" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).ToListAsync();
@@ -87,8 +87,8 @@ public class InMemoryBackplaneTests
 
         await backplane.Groups.RemoveFromGroupAsync(connectionId, "group1");
 
-        await backplane.Clients.GroupAsync("group1", new { Data = "should not receive" });
-        await backplane.Clients.GroupAsync("group2", new { Data = "should receive" });
+        await backplane.Clients.SendToGroupAsync("group1", new { Data = "should not receive" });
+        await backplane.Clients.SendToGroupAsync("group2", new { Data = "should receive" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).Take(1).ToListAsync();
@@ -108,8 +108,7 @@ public class InMemoryBackplaneTests
         var (_, conn2) = backplane.Connect();
 
         conn1.Should().NotBe(conn2);
-        conn1.Should().NotBe(Guid.Empty);
-        conn2.Should().NotBe(Guid.Empty);
+
 
         backplane.Dispose();
     }
@@ -172,8 +171,8 @@ public class InMemoryBackplaneTests
         await backplane.Groups.AddToGroupAsync(connectionId, "group1");
         await backplane.Groups.AddToGroupAsync(connectionId, "group2");
 
-        await backplane.Clients.GroupAsync("group1", new { Data = "from group1" });
-        await backplane.Clients.GroupAsync("group2", new { Data = "from group2" });
+        await backplane.Clients.SendToGroupAsync("group1", new { Data = "from group1" });
+        await backplane.Clients.SendToGroupAsync("group2", new { Data = "from group2" });
 
         var cts = new CancellationTokenSource(100);
         var received = await reader.ReadAllAsync(cts.Token).Take(2).ToListAsync();
@@ -191,7 +190,7 @@ public class InMemoryBackplaneTests
         var (reader1, _) = backplane.Connect();
         var (reader2, _) = backplane.Connect();
 
-        await backplane.Clients.AllAsync(new { Data = "broadcast to all" });
+        await backplane.Clients.SendToAllAsync(new { Data = "broadcast to all" });
 
         var cts = new CancellationTokenSource(100);
 
@@ -213,7 +212,7 @@ public class InMemoryBackplaneTests
         var (reader1, conn1) = backplane.Connect();
         var (reader2, _) = backplane.Connect();
 
-        await backplane.Clients.ClientAsync(conn1, new { Data = "only for conn1" });
+        await backplane.Clients.SendToClientAsync(conn1, new { Data = "only for conn1" });
 
         var cts = new CancellationTokenSource(100);
 
