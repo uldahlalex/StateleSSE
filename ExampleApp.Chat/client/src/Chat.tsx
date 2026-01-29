@@ -1,24 +1,16 @@
-import {useContext, useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 import {BASE_URL} from "./utils/BASE_URL.ts";
-import {
-    type BaseResponseDto,
-    ChatClient,
-    type JoinGroupResponse,
-    type MessageResponseDto,
-    StringConstants,
-} from "./generated-ts-client.ts";
-import {GlobalContext} from "./GlobalContext.tsx";
+import {ChatClient, type MessageResponseDto} from "./generated-ts-client.ts";
+import {useStream} from "./useStream.tsx";
 
 const chatClient = new ChatClient(BASE_URL);
 
 export default function Chat() {
-
     return (
         <>
             <Group groupId={"abc"}/>
             <Group groupId={"xyz"}/>
         </>
-
     );
 }
 
@@ -26,60 +18,57 @@ interface GroupParams {
     groupId: string;
 }
 
-export function Group(params: GroupParams) {
-    const context = useContext(GlobalContext);
+export function Group({groupId}: GroupParams) {
+    const stream = useStream();
     const [messages, setMessages] = useState<MessageResponseDto[]>([]);
     const [members, setMembers] = useState<string[]>([]);
 
+    // Join group when connected
     useEffect(() => {
-        if (!context.connectionId || !context.eventSource)
-            return;
+        if (!stream.connectionId) return;
+        chatClient.joinGroup({connectionId: stream.connectionId, group: groupId});
+    }, [stream.connectionId, groupId]);
 
-        chatClient.joinGroup({
-            connectionId: context.connectionId,
-            group: params.groupId,
+    // Subscribe to group events
+    useEffect(() => {
+        // dto is automatically typed as JoinGroupResponse - no manual annotation needed!
+        const unsub1 = stream.on(groupId, "JoinGroupResponse", (dto) => {
+            setMembers(dto.members ?? []);
         });
-        context.eventSource.addEventListener(params.groupId, handler);
 
-        function handler(e) {
-            const event = JSON.parse(e.data) as BaseResponseDto;
-            switch (event.eventType) {
-                case StringConstants.JoinGroupResponse:
-                    const joined = event as JoinGroupResponse;
-                    console.log(members)
-                    setMembers(joined.members!);
-                    break;
-                case StringConstants.MessageResponseDto:
-                    const msg = event as MessageResponseDto;
-                    setMessages((prev) => [...prev, msg]);
-                    break;
-                case StringConstants.UserLeftResponseDto:
-                    const l = event as any;
-                    setMembers(prev => prev.filter(p => p != l.connectionId));
-            }
-        }
+        // dto is automatically typed as MessageResponseDto
+        const unsub2 = stream.on(groupId, "MessageResponseDto", (dto) => {
+            setMessages(prev => [...prev, dto]);
+        });
 
-        return () => context.eventSource?.removeEventListener(params.groupId, handler);
-    }, [context.connectionId, context.eventSource, params.groupId]);
+        // dto is automatically typed as { connectionId: string; eventType: string }
+        const unsub3 = stream.on(groupId, "UserLeftResponseDto", (dto) => {
+            setMembers(prev => prev.filter(m => m !== dto.connectionId));
+        });
+
+        return () => {
+            unsub1();
+            unsub2();
+            unsub3();
+        };
+    }, [groupId]);
 
     return (
         <div style={{border: "1px solid #ccc", padding: 10, margin: 10}}>
-            Connection ID: {
-            context.connectionId
-        }
-            <h3>Group: {params.groupId}</h3>
+            Connection ID: {stream.connectionId}
+            <h3>Group: {groupId}</h3>
             <p>Members: {JSON.stringify(members)} - members in total: {members.length}</p>
 
             <button
                 onClick={() => {
                     chatClient.sendMessageToGroup({
-                        groupId: params.groupId,
-                        connectionId: context.connectionId!,
-                        message: "hello from " + context.connectionId,
+                        groupId,
+                        connectionId: stream.connectionId!,
+                        message: "hello from " + stream.connectionId,
                     });
                 }}
             >
-                Send to group {params.groupId}
+                Send to group {groupId}
             </button>
 
             <ul>

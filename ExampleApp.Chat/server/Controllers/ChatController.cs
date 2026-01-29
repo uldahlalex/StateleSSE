@@ -6,6 +6,13 @@ namespace server.Controllers;
 
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
+    
+    /*
+     id: 1
+       event: ConnectionResponse
+       data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","eventType":"ConnectionResponse"}
+       
+     */
     [HttpGet(nameof(Connect))]
     [Produces<ConnectionResponse>]
     public async Task Connect()
@@ -27,6 +34,12 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
         }
     }
     
+    /*
+     id: 2
+       event: string
+       data: {"members":["8cc4cabc-e550-4e20-9732-5da6282f573b"],"eventType":"JoinGroupResponse"}
+       
+     */
     [HttpPost(nameof(JoinGroup))]
     [Produces<JoinGroupResponse>]
     public async Task JoinGroup([FromBody] JoinGroupRequest request)
@@ -41,6 +54,12 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
 
     }
 
+    /*
+     id: 3
+       event: string
+       data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","message":"string","eventType":"MessageResponseDto"}
+       
+     */
     [HttpPost(nameof(SendMessageToGroup))]
     [Produces<MessageResponseDto>]
     public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
