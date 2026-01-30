@@ -10,6 +10,7 @@
         <Project Path="ExampleApp.Kahoot/server/tests/tests.csproj" />
     </Folder>-->
     <Folder Name="/ExampleApp.Chat/">
+        <Project Path="ExampleApp.Chat/loadbalancer/loadbalancer.csproj" />
         <Project Path="ExampleApp.Chat/server/server.csproj" />
     </Folder>
 
