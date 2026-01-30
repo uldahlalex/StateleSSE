@@ -5,7 +5,7 @@ import {BASE_URL} from "./utils/BASE_URL.ts";
 
 createRoot(document.getElementById('root')!).render(
     <StreamProvider config={{
-        url: `${BASE_URL}/Connect`,
+        urlForStreamEndpoint: `${BASE_URL}/Connect`,
         connectEvent: "ConnectionResponse",
     }}>
         <Chat/>

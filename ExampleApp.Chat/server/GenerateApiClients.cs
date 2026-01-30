@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using NJsonSchema.CodeGeneration.TypeScript;
 using NSwag;
 using NSwag.CodeGeneration.TypeScript;

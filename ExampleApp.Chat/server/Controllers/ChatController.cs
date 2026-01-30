@@ -4,6 +4,7 @@ using StateleSSE.AspNetCore;
 
 namespace server.Controllers;
 
+
 public class ChatController(ISseBackplane backplane) : ControllerBase
 {
     

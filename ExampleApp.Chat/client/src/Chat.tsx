@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import {BASE_URL} from "./utils/BASE_URL.ts";
-import {ChatClient, type MessageResponseDto} from "./generated-ts-client.ts";
+import {ChatClient, type JoinGroupResponse, type MessageResponseDto, StringConstants} from "./generated-ts-client.ts";
 import {useStream} from "./useStream.tsx";
 
 const chatClient = new ChatClient(BASE_URL);
@@ -31,18 +31,16 @@ export function Group({groupId}: GroupParams) {
 
     // Subscribe to group events
     useEffect(() => {
-        // dto is automatically typed as JoinGroupResponse - no manual annotation needed!
-        const unsub1 = stream.on(groupId, "JoinGroupResponse", (dto) => {
+        const unsub1 = stream.on<JoinGroupResponse>(groupId, StringConstants.JoinGroupResponse, (dto) => {
             setMembers(dto.members ?? []);
         });
 
-        // dto is automatically typed as MessageResponseDto
-        const unsub2 = stream.on(groupId, "MessageResponseDto", (dto) => {
+        const unsub2 = stream.on<MessageResponseDto>(groupId, StringConstants.MessageResponseDto, (dto) => {
             setMessages(prev => [...prev, dto]);
         });
 
         // dto is automatically typed as { connectionId: string; eventType: string }
-        const unsub3 = stream.on(groupId, "UserLeftResponseDto", (dto) => {
+        const unsub3 = stream.on<any>(groupId, StringConstants.UserLeftResponseDto, (dto) => {
             setMembers(prev => prev.filter(m => m !== dto.connectionId));
         });
 
