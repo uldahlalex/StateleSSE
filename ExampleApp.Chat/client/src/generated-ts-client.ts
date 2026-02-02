@@ -17,6 +17,43 @@ export class ChatClient {
         this.baseUrl = baseUrl ?? "";
     }
 
+    login(request: LoginRequest): Promise<LoginResponse> {
+        let url_ = this.baseUrl + "/Login";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processLogin(_response);
+        });
+    }
+
+    protected processLogin(response: Response): Promise<LoginResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as LoginResponse;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<LoginResponse>(null as any);
+    }
+
     connect(): Promise<ConnectionResponse> {
         let url_ = this.baseUrl + "/Connect";
         url_ = url_.replace(/[?&]$/, "");
@@ -123,6 +160,85 @@ export class ChatClient {
         }
         return Promise.resolve<MessageResponseDto>(null as any);
     }
+
+    createRoom(name: string | undefined): Promise<Room> {
+        let url_ = this.baseUrl + "/CreateRoom?";
+        if (name === null)
+            throw new globalThis.Error("The parameter 'name' cannot be null.");
+        else if (name !== undefined)
+            url_ += "name=" + encodeURIComponent("" + name) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreateRoom(_response);
+        });
+    }
+
+    protected processCreateRoom(response: Response): Promise<Room> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Room;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Room>(null as any);
+    }
+
+    getRooms(): Promise<Room[]> {
+        let url_ = this.baseUrl + "/GetRooms";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetRooms(_response);
+        });
+    }
+
+    protected processGetRooms(response: Response): Promise<Room[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Room[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Room[]>(null as any);
+    }
+}
+
+export interface LoginResponse {
+    token?: string;
+}
+
+export interface LoginRequest {
+    username?: string;
+    password?: string;
 }
 
 /** Models used for server sent events to clients should preferably use this model. It automatically attaches "EventType" as a property with type name as value. */
@@ -144,20 +260,49 @@ export interface JoinGroupRequest {
 }
 
 export interface MessageResponseDto extends BaseResponseDto {
-    connectionId?: string;
     message?: string;
+    user?: string | undefined;
 }
 
-export interface SendGroupMessageRequestDto extends BaseResponseDto {
+export interface SendGroupMessageRequestDto {
     message?: string;
-    connectionId?: string;
     groupId?: string;
+}
+
+export interface Room {
+    id?: string;
+    name?: string;
+    createdBy?: string;
+    messages?: Message[];
+    userRooms?: UserRoom[];
+}
+
+export interface Message {
+    id?: string;
+    content?: string;
+    userId?: string;
+    user?: User;
+    roomId?: string;
+    room?: Room;
+}
+
+export interface User {
+    id?: string;
+    nickname?: string;
+    messages?: Message[];
+    userRooms?: UserRoom[];
+}
+
+export interface UserRoom {
+    userId?: string;
+    user?: User;
+    roomId?: string;
+    room?: Room;
 }
 
 export enum StringConstants {
     UserLeftResponseDto = "UserLeftResponseDto",
     ConnectionResponse = "ConnectionResponse",
-    SendGroupMessageRequestDto = "SendGroupMessageRequestDto",
     JoinGroupResponse = "JoinGroupResponse",
     MessageResponseDto = "MessageResponseDto",
 }

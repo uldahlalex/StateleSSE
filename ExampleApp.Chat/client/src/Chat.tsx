@@ -1,81 +1,43 @@
+import {Group} from "./Group.tsx";
+import Login from "./Login.tsx";
 import {useEffect, useState} from "react";
-import {BASE_URL} from "./utils/BASE_URL.ts";
-import {ChatClient, type JoinGroupResponse, type MessageResponseDto, StringConstants} from "./generated-ts-client.ts";
-import {useStream} from "./useStream.tsx";
-
-const chatClient = new ChatClient(BASE_URL);
+import type {Room} from "./generated-ts-client.ts";
+import {chatClient} from "./ChatClient.tsx";
 
 export default function Chat() {
+
+    const [rooms, setRooms] = useState<Room[]>([])
+
+    useEffect(() => {
+        chatClient.getRooms().then(r => {
+            setRooms(r)
+        })
+    }, []);
+    const [createRoomForm, setCreateRoomFormm] = useState<string>("your awesome room name")
+
+
     return (
         <>
-            <Group groupId={"abc"}/>
-            <Group groupId={"xyz"}/>
+            <Login/>
+            <hr/>
+            <h1>create new room</h1>
+            <input onChange={e => setCreateRoomFormm(e.target.value)} value={createRoomForm}/>
+
+            <button onClick={() => {
+                chatClient.createRoom(createRoomForm).then(r => {
+                    setRooms(prev => [...prev, r])
+                })
+            }}>Create room
+            </button>
+            <hr/>
+            {
+                rooms.map(r => {
+                    return <div key={r.id}>
+                        <Group room={r}/>
+                    </div>
+                })
+            }
         </>
     );
 }
 
-interface GroupParams {
-    groupId: string;
-}
-
-export function Group({groupId}: GroupParams) {
-    const stream = useStream();
-    const [messages, setMessages] = useState<MessageResponseDto[]>([]);
-    const [members, setMembers] = useState<string[]>([]);
-
-    // Join group when connected
-    useEffect(() => {
-        if (!stream.connectionId) return;
-        chatClient.joinGroup({connectionId: stream.connectionId, group: groupId});
-    }, [stream.connectionId, groupId]);
-
-    // Subscribe to group events
-    useEffect(() => {
-        const unsub1 = stream.on<JoinGroupResponse>(groupId, StringConstants.JoinGroupResponse, (dto) => {
-            setMembers(dto.members ?? []);
-        });
-
-        const unsub2 = stream.on<MessageResponseDto>(groupId, StringConstants.MessageResponseDto, (dto) => {
-            setMessages(prev => [...prev, dto]);
-        });
-
-        // dto is automatically typed as { connectionId: string; eventType: string }
-        const unsub3 = stream.on<any>(groupId, StringConstants.UserLeftResponseDto, (dto) => {
-            setMembers(prev => prev.filter(m => m !== dto.connectionId));
-        });
-
-        return () => {
-            unsub1();
-            unsub2();
-            unsub3();
-        };
-    }, [groupId]);
-
-    return (
-        <div style={{border: "1px solid #ccc", padding: 10, margin: 10}}>
-            Connection ID: {stream.connectionId}
-            <h3>Group: {groupId}</h3>
-            <p>Members: {JSON.stringify(members)} - members in total: {members.length}</p>
-
-            <button
-                onClick={() => {
-                    chatClient.sendMessageToGroup({
-                        groupId,
-                        connectionId: stream.connectionId!,
-                        message: "hello from " + stream.connectionId,
-                    });
-                }}
-            >
-                Send to group {groupId}
-            </button>
-
-            <ul>
-                {messages.map((m, i) => (
-                    <li key={i}>
-                        <strong>{m.connectionId}:</strong> {m.message}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-}

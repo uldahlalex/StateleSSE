@@ -6,6 +6,38 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/Login": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Login",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/Connect": {
       "get": {
         "tags": [
@@ -87,12 +119,96 @@
               }
             }
           }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/CreateRoom": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_CreateRoom",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/GetRooms": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_GetRooms",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Room"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
   },
   "components": {
     "schemas": {
+      "LoginResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
       "ConnectionResponse": {
         "allOf": [
           {
@@ -160,47 +276,138 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "connectionId": {
-                "type": "string"
-              },
               "message": {
                 "type": "string"
+              },
+              "user": {
+                "type": "string",
+                "nullable": true
               }
             }
           }
         ]
       },
       "SendGroupMessageRequestDto": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/BaseResponseDto"
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
           },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "message": {
-                "type": "string"
-              },
-              "connectionId": {
-                "type": "string"
-              },
-              "groupId": {
-                "type": "string"
-              }
+          "groupId": {
+            "type": "string"
+          }
+        }
+      },
+      "Room": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "userRooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRoom"
             }
           }
-        ]
+        }
+      },
+      "Message": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "roomId": {
+            "type": "string"
+          },
+          "room": {
+            "$ref": "#/components/schemas/Room"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "userRooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRoom"
+            }
+          }
+        }
+      },
+      "UserRoom": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "roomId": {
+            "type": "string"
+          },
+          "room": {
+            "$ref": "#/components/schemas/Room"
+          }
+        }
       },
       "StringConstants": {
         "type": "string",
         "enum": [
           "UserLeftResponseDto",
           "ConnectionResponse",
-          "SendGroupMessageRequestDto",
           "JoinGroupResponse",
           "MessageResponseDto"
         ]
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Enter your JWT token",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   }

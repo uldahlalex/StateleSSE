@@ -1,13 +1,25 @@
+using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 
 namespace server.Controllers;
 
 
-public class ChatController(ISseBackplane backplane) : ControllerBase
+public class ChatController(ISseBackplane backplane,
+    MyDbContext ctx) : ControllerBase
 {
-    
+    [HttpPost(nameof(Login))]
+    public LoginResponse Login([FromBody] LoginRequest request)
+    {
+        if (request.Username == "test" && request.Password == "test")
+            return (new LoginResponse(JwtService.GenerateToken(request.Username)));
+        throw new ValidationException("Not valid credentials");
+    }
+
     /*
      id: 1
        event: ConnectionResponse
@@ -61,16 +73,48 @@ public class ChatController(ISseBackplane backplane) : ControllerBase
        data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","message":"string","eventType":"MessageResponseDto"}
        
      */
+    [Authorize]
     [HttpPost(nameof(SendMessageToGroup))]
     [Produces<MessageResponseDto>]
     public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var message = new Message()
+        {
+            UserId = userId,
+            Content = dto.Message,
+            RoomId = dto.GroupId,
+            Id = Guid.NewGuid().ToString(),
+        };
+        ctx.Messages.Add(message);
+        await ctx.SaveChangesAsync();
         await backplane.Clients.SendToGroupAsync(dto.GroupId, new MessageResponseDto
         {
-            ConnectionId = dto.ConnectionId,
+            User = userId,
             Message = dto.Message
         });
     }
+
+    [Authorize]
+    [HttpPost(nameof(CreateRoom))]
+    public async Task<Room> CreateRoom(string name)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);    
+        var room = new Room()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = name,
+            CreatedBy = userId
+        };
+        ctx.Rooms.Add(room);
+        await ctx.SaveChangesAsync();
+        return room;
+    }
+
+
+    [HttpGet(nameof(GetRooms))]
+    public async Task<List<Room>> GetRooms()
+        => ctx.Rooms.ToList();
 }
 
 
@@ -79,10 +123,9 @@ public record ConnectionResponse(string ConnectionId) : BaseResponseDto;
 
 public record JoinGroupRequest(string ConnectionId, string Group);
 
-public record SendGroupMessageRequestDto : BaseResponseDto
+public record SendGroupMessageRequestDto
 {
     public string Message { get; set; } = "";
-    public string ConnectionId { get; set; } = "";
     public string GroupId { get; set; } = "";
 }
 
@@ -95,6 +138,9 @@ public record JoinGroupResponse : BaseResponseDto
 
 public record MessageResponseDto : BaseResponseDto
 {
-    public string ConnectionId { get; set; } = "";
     public string Message { get; set; } = "";
+    public string? User { get; set; } = "";
 }
+
+public record LoginRequest(string Username, string Password);
+public record LoginResponse(string Token);
