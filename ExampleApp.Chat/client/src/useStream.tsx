@@ -280,12 +280,20 @@ export function StreamProvider({ config, children }: StreamProviderProps) {
 /**
  * Access the stream for listening to messages from groups.
  * Must be used within a StreamProvider like this:
+ * @example
+ * import {createRoot} from 'react-dom/client'
+ * import './index.css'
+ * import App from './App.tsx'
+ * import {StreamProvider} from "./useStream.tsx";
+ *
+ * createRoot(document.getElementById('root')!).render(
  *     <StreamProvider config={{
- *         urlForStreamEndpoint: `${BASE_URL}/Connect`,
- *         connectEvent: "ConnectionResponse", //Example from the "Response" section of the Event Source in networks tab: "event: ConnectionResponse data: {"connectionId":"568c5e1a-89e4-4231-8a46-260649608d5e","eventType":"ConnectionResponse"}"
+ *         connectEvent: 'connected',
+ *         urlForStreamEndpoint: 'http://localhost:5000/connect'
  *     }}>
- *         <Chat/> //this is the component using the useStream()
- *     </StreamProvider>
+ *         <App/>
+ *     </StreamProvider>,
+ * )
  *
  * Group membership is managed server-side via the StateleSSE backplane.
  * This hook only determines how to react when messages arrive.
