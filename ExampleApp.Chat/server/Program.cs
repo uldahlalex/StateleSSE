@@ -8,6 +8,7 @@ using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
 using StackExchange.Redis;
+using Microsoft.AspNetCore.Diagnostics;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
 
@@ -40,23 +41,6 @@ builder.Services.AddDbContext<MyDbContext>((conf) =>
 });
 builder.Services.AddOpenApiDocument(config =>
 {
-    config.PostProcess = document =>                                                                        
-    {                                                                                                       
-        foreach (var operation in document.Operations)                                                      
-        {                                                                                                   
-            operation.Operation.Responses["500"] = new NSwag.OpenApiResponse                                
-            {                                                                                               
-                Description = "Server Error",                                                               
-                Content                                                                                      =
-                {
-                    ["application/problem+json"] = new NSwag.OpenApiMediaType                               
-                    {                                                                                       
-                        Schema = NJsonSchema.JsonSchema.FromType<Microsoft.AspNetCore.Mvc.ProblemDetails>() 
-                    }    
-                }
-            };                                                                                              
-        }                                                                                                   
-    };              
     config.AddSecurity("Bearer", new OpenApiSecurityScheme
     {
         Type = OpenApiSecuritySchemeType.Http,
@@ -68,7 +52,17 @@ builder.Services.AddOpenApiDocument(config =>
     config.AddStringConstants<MyConstants>();
     
 });
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        var exception = context.HttpContext.Features.Get<IExceptionHandlerFeature>()?.Error;
+        if (exception != null)
+        {
+            context.ProblemDetails.Detail = exception.Message;
+        }
+    };
+});
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -80,6 +74,7 @@ builder.Services.AddControllers()
 builder.Services.AddCors();
 
 var app = builder.Build();
+app.UseExceptionHandler();
 app.UseOpenApi();
 app.UseSwaggerUi();
 app.UseAuthentication();
