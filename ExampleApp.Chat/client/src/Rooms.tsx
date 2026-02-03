@@ -1,19 +1,20 @@
-import {Group} from "./Group.tsx";
 import Login from "./Login.tsx";
 import {useEffect, useState} from "react";
 import type {Room} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.tsx";
+import {Outlet, useNavigate} from "react-router";
 
-export default function Chat() {
+export default function Rooms() {
 
     const [rooms, setRooms] = useState<Room[]>([])
+    const [createRoomForm, setCreateRoomFormm] = useState<string>("your awesome room name")
+    const navigate = useNavigate();
 
     useEffect(() => {
         chatClient.getRooms().then(r => {
             setRooms(r)
         })
     }, []);
-    const [createRoomForm, setCreateRoomFormm] = useState<string>("your awesome room name")
 
 
     return (
@@ -33,10 +34,12 @@ export default function Chat() {
             {
                 rooms.map(r => {
                     return <div key={r.id}>
-                        <Group room={r}/>
+                        <button onClick={() => navigate('/room/'+r.id)}>Go to room</button>
                     </div>
                 })
             }
+            <hr />
+            <Outlet />
         </>
     );
 }

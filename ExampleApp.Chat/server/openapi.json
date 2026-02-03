@@ -38,6 +38,38 @@
         }
       }
     },
+    "/Register": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Register",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/Connect": {
       "get": {
         "tags": [
@@ -77,6 +109,16 @@
           "x-position": 1
         },
         "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinGroupBroadcast"
+                }
+              }
+            }
+          },
           "200": {
             "description": "",
             "content": {
@@ -236,6 +278,37 @@
           }
         }
       },
+      "JoinGroupBroadcast": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connectedUsers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConnectionIdAndUserName"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ConnectionIdAndUserName": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          }
+        }
+      },
       "JoinGroupResponse": {
         "allOf": [
           {
@@ -245,62 +318,12 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "members": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "message": {
-                "type": "string"
+              "room": {
+                "$ref": "#/components/schemas/Room"
               }
             }
           }
         ]
-      },
-      "JoinGroupRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string"
-          },
-          "group": {
-            "type": "string"
-          }
-        }
-      },
-      "MessageResponseDto": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/BaseResponseDto"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "message": {
-                "type": "string"
-              },
-              "user": {
-                "type": "string",
-                "nullable": true
-              }
-            }
-          }
-        ]
-      },
-      "SendGroupMessageRequestDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "message": {
-            "type": "string"
-          },
-          "groupId": {
-            "type": "string"
-          }
-        }
       },
       "Room": {
         "type": "object",
@@ -367,6 +390,12 @@
           "nickname": {
             "type": "string"
           },
+          "salt": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
           "messages": {
             "type": "array",
             "items": {
@@ -399,14 +428,58 @@
           }
         }
       },
+      "JoinGroupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          }
+        }
+      },
+      "MessageResponseDto": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "user": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "SendGroupMessageRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": "string"
+          }
+        }
+      },
       "StringConstants": {
         "type": "string",
         "enum": [
           "UserLeftResponseDto",
-          "JoinInvokerResponseDto",
-          "ConnectionResponse",
           "JoinGroupResponse",
-          "MessageResponseDto"
+          "ConnectionResponse",
+          "MessageResponseDto",
+          "JoinGroupBroadcast"
         ]
       }
     },

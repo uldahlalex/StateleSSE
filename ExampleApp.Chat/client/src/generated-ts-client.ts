@@ -54,6 +54,43 @@ export class ChatClient {
         return Promise.resolve<LoginResponse>(null as any);
     }
 
+    register(request: LoginRequest): Promise<LoginResponse> {
+        let url_ = this.baseUrl + "/Register";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRegister(_response);
+        });
+    }
+
+    protected processRegister(response: Response): Promise<LoginResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as LoginResponse;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<LoginResponse>(null as any);
+    }
+
     connect(): Promise<ConnectionResponse> {
         let url_ = this.baseUrl + "/Connect";
         url_ = url_.replace(/[?&]$/, "");
@@ -115,6 +152,12 @@ export class ChatClient {
             let result200: any = null;
             result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinGroupResponse;
             return result200;
+            });
+        } else if (status === 202) {
+            return response.text().then((_responseText) => {
+            let result202: any = null;
+            result202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinGroupBroadcast;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result202);
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
@@ -250,24 +293,17 @@ export interface ConnectionResponse extends BaseResponseDto {
     connectionId?: string;
 }
 
-export interface JoinGroupResponse extends BaseResponseDto {
-    members?: string[];
-    message?: string;
+export interface JoinGroupBroadcast extends BaseResponseDto {
+    connectedUsers?: ConnectionIdAndUserName[];
 }
 
-export interface JoinGroupRequest {
+export interface ConnectionIdAndUserName {
     connectionId?: string;
-    group?: string;
+    userName?: string;
 }
 
-export interface MessageResponseDto extends BaseResponseDto {
-    message?: string;
-    user?: string | undefined;
-}
-
-export interface SendGroupMessageRequestDto {
-    message?: string;
-    groupId?: string;
+export interface JoinGroupResponse extends BaseResponseDto {
+    room?: Room;
 }
 
 export interface Room {
@@ -291,6 +327,8 @@ export interface Message {
 export interface User {
     id?: string;
     nickname?: string;
+    salt?: string;
+    hash?: string;
     messages?: Message[];
     userRooms?: UserRoom[];
 }
@@ -302,12 +340,27 @@ export interface UserRoom {
     room?: Room;
 }
 
+export interface JoinGroupRequest {
+    connectionId?: string;
+    group?: string;
+}
+
+export interface MessageResponseDto extends BaseResponseDto {
+    message?: string;
+    user?: string | undefined;
+}
+
+export interface SendGroupMessageRequestDto {
+    message?: string;
+    groupId?: string;
+}
+
 export enum StringConstants {
     UserLeftResponseDto = "UserLeftResponseDto",
-    JoinInvokerResponseDto = "JoinInvokerResponseDto",
-    ConnectionResponse = "ConnectionResponse",
     JoinGroupResponse = "JoinGroupResponse",
+    ConnectionResponse = "ConnectionResponse",
     MessageResponseDto = "MessageResponseDto",
+    JoinGroupBroadcast = "JoinGroupBroadcast",
 }
 
 export class ApiException extends Error {

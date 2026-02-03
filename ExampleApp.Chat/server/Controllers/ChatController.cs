@@ -16,9 +16,33 @@ public class ChatController(ISseBackplane backplane,
     [HttpPost(nameof(Login))]
     public LoginResponse Login([FromBody] LoginRequest request)
     {
-        if (request.Username == "test" && request.Password == "test")
-            return (new LoginResponse(JwtService.GenerateToken(request.Username)));
+        var user = ctx.Users.FirstOrDefault(u => u.Nickname == request.Username) ??
+                   throw new ValidationException("User does not exist");
+        if(user.Hash == Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(request.Password + user.Salt))))
+            return (new LoginResponse(JwtService.GenerateToken(user.Id, user.Nickname)));
         throw new ValidationException("Not valid credentials");
+    }
+    [HttpPost(nameof(Register))]
+    public LoginResponse Register([FromBody] LoginRequest request)
+    {
+        if (ctx.Users.Any(u => u.Nickname == request.Username))
+            throw new ValidationException("Name is already taken");
+        
+        var salt = Guid.NewGuid().ToString();
+        //im just using an arbitrary hashing algorithm
+        var hash = Convert.ToBase64String(                                                                                                                                    
+            System.Security.Cryptography.SHA256.HashData(                                                                                                                     
+                System.Text.Encoding.UTF8.GetBytes(request.Password + salt)));   
+        var u = new User()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Nickname = request.Username,
+            Hash = hash,
+            Salt = salt,
+        };
+        ctx.Users.Add(u);
+        ctx.SaveChanges();
+        return (new LoginResponse(JwtService.GenerateToken(u.Id, u.Nickname)));
     }
 
     /*
@@ -48,41 +72,33 @@ public class ChatController(ISseBackplane backplane,
         }
     }
     
-    /*
-     id: 2
-       event: string
-       data: {"members":["8cc4cabc-e550-4e20-9732-5da6282f573b"],"eventType":"JoinGroupResponse"}
-       
-     */
-    [HttpPost(nameof(JoinGroup))]
-    [Produces<JoinGroupResponse>]
-    public async Task<JoinInvokerResponseDto> JoinGroup([FromBody] JoinGroupRequest request)
-    {
-        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
-        var members = await backplane.Groups.GetMembersAsync(request.Group);
 
-        await backplane.Clients.SendToGroupAsync(request.Group,  new JoinGroupResponse()
+    [HttpPost(nameof(JoinGroup))]
+    [ProducesResponseType(typeof(JoinGroupBroadcast), 202)]
+    [Produces(typeof(JoinGroupResponse))]
+    public async Task<JoinGroupResponse> JoinGroup([FromBody] JoinGroupRequest request)
+    {
+        var room = ctx.Rooms.FirstOrDefault(r => r.Id == request.Group) ??
+                   throw new ValidationException("Room does not exist");
+        var name = User.FindFirstValue(ClaimTypes.Name);
+        await backplane.Groups.AddToGroupAsync("nickname/" + request.ConnectionId, name ?? "Anonymous");
+        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
+        
+        var members = await backplane.Groups.GetClientGroupsAsync(request.Group);
+        var list = new List<ConnectionIdAndUserName>();
+        foreach (var m in members)
         {
-            message = "someone entered the chat",
-            Members = members.ToList()
-        });
-        var messages = ctx.Messages
-            .OrderBy(m => m.CreatedAt)
-            .Where(m => m.RoomId == request.Group)
-            .Take(5).ToList();
+            var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
+            list.Add(new ConnectionIdAndUserName(m, nickname.FirstOrDefault() ?? "Anonymous"));
+        }
+        await backplane.Clients.SendToGroupAsync(request.Group, new JoinGroupBroadcast(list));
         
-        
-        return new JoinInvokerResponseDto(messages);
+        return new JoinGroupResponse(room);
 
 
     }
 
-    /*
-     id: 3
-       event: string
-       data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","message":"string","eventType":"MessageResponseDto"}
-       
-     */
+
     [Authorize]
     [HttpPost(nameof(SendMessageToGroup))]
     [Produces<MessageResponseDto>]
@@ -127,14 +143,7 @@ public class ChatController(ISseBackplane backplane,
         => ctx.Rooms.ToList();
 }
 
-public record JoinInvokerResponseDto(List<Message> messages) : BaseResponseDto
-{
-    public override string ToString()
-    {
-        return $"{{ messages = {messages} }}";
-    }
-}
-
+public record JoinGroupResponse(Room room) : BaseResponseDto;
 public record ConnectionResponse(string ConnectionId) : BaseResponseDto;
 
 
@@ -144,12 +153,6 @@ public record SendGroupMessageRequestDto
 {
     public string Message { get; set; } = "";
     public string GroupId { get; set; } = "";
-}
-
-public record JoinGroupResponse : BaseResponseDto
-{
-    public List<string> Members { get; set; }
-    public string message { get; set; }
 }
 
 
@@ -164,3 +167,6 @@ public record LoginRequest(string Username, string Password);
 public record LoginResponse(string Token);
 
 
+public record JoinGroupBroadcast(List<ConnectionIdAndUserName> ConnectedUsers) : BaseResponseDto;
+
+public record ConnectionIdAndUserName(string ConnectionId, string UserName);

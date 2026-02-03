@@ -39,6 +39,7 @@ builder.Services.AddOpenApiDocument(config =>
     });
     config.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("Bearer"));
     config.AddStringConstants<MyConstants>();
+    
 });
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -80,11 +81,18 @@ using (var scope = app.Services.CreateScope())
  var exists = ctx.Users.Any(u => u.Id == "test");
  if (!exists)
  {
+     
+     var salt = "word";
+     var password = "pass";
      ctx.Users.Add(new User()
      {
-         Id = "test",
-         Nickname = "test"
-
+         Id = Guid.NewGuid().ToString(),
+         Nickname = "test",
+         //password is "pass", salt is "word"
+         Hash = Convert.ToBase64String(
+             System.Security.Cryptography.SHA256.HashData(
+                 System.Text.Encoding.UTF8.GetBytes(password + salt))),
+         Salt = salt,
      });
      ctx.SaveChanges();
  }

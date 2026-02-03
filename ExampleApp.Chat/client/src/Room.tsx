@@ -1,54 +1,55 @@
 import {useStream} from "./useStream.tsx";
 import {useEffect, useState} from "react";
 import {
-    type JoinGroupResponse,
-    type MessageResponseDto,
+    type MessageResponseDto, type Room,
     type SendGroupMessageRequestDto,
-    StringConstants
+    type JoinGroupBroadcast,
+    StringConstants, type ConnectionIdAndUserName
 } from "./generated-ts-client.ts";
-import type {GroupParams} from "./GroupParams.tsx";
 import {chatClient} from "./ChatClient.tsx";
+import {useParams} from "react-router";
+export type RoomParams = {
+    roomId: string;
+}
 
-export function Group(params: GroupParams) {
+export function Room() {
+    const stream = useStream();
+    const params = useParams<RoomParams>();
     const [messages, setMessages] = useState<MessageResponseDto[]>([]);
-    const [members, setMembers] = useState<string[]>([]);
+    const [members, setMembers] = useState<ConnectionIdAndUserName[]>([]);
+    const [room, setRoom] = useState<Room | undefined>(undefined)
     const [message, setMessage] = useState<SendGroupMessageRequestDto>({
-        groupId: params.room.id,
+        groupId: params.roomId,
         message: ""
     })
-    const stream = useStream();
     useEffect(() => {
-        const unsub1 = stream.on<JoinGroupResponse>(params.room.id!, StringConstants.JoinGroupResponse, (dto) => {
-            setMembers(dto.members ?? []);
+        const unsub1 = stream.on<JoinGroupBroadcast>(params.roomId!, StringConstants.JoinGroupBroadcast, (dto) => {
+            setMembers(dto.connectedUsers!);
         });
-
-        const unsub2 = stream.on<MessageResponseDto>(params.room.id!, StringConstants.MessageResponseDto, (dto) => {
+        const unsub2 = stream.on<MessageResponseDto>(params.roomId!, StringConstants.MessageResponseDto, (dto) => {
             setMessages(prev => [...prev, dto]);
         });
-
-        // dto is automatically typed as { connectionId: string; eventType: string }
-        const unsub3 = stream.on<any>(params.room.id!, StringConstants.UserLeftResponseDto, (dto) => {
-            setMembers(prev => prev.filter(m => m !== dto.connectionId));
-        });
-
         return () => {
             unsub1();
             unsub2();
-            unsub3();
         };
-    }, [params.room.id!]);
-    // Join group when connected
+    }, [params.roomId!]);
     useEffect(() => {
-        if (!stream.connectionId) return;
-        chatClient.joinGroup({connectionId: stream.connectionId, group: params.room.id});
-    }, [stream.connectionId, params.room.id]);
+        if (!stream.connectionId)
+            return;
+        chatClient.joinGroup({connectionId: stream.connectionId, group: params.roomId})
+            .then(r => {
+            setRoom(r.room)
+        })
+    }, [stream.connectionId, params.roomId]);
 
+    if(!room)
+        return <>Loading room...</>
 
 
     return (
         <div style={{border: "1px solid #ccc", padding: 10, margin: 10}}>
-            Connection ID: {stream.connectionId}
-            <h3>Group: {params.room.name!}</h3>
+            <h3>Group: {room.name!}</h3>
             <p>Members: {JSON.stringify(members)} - members in total: {members.length}</p>
 
             <input onChange={e => {
@@ -63,7 +64,7 @@ export function Group(params: GroupParams) {
                     })
                 }}
             >
-                Send to group {params.room.name}
+                Send to group {room.name}
             </button>
 
             <ul>
