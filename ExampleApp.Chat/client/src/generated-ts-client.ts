@@ -159,12 +159,55 @@ export class ChatClient {
             result202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinGroupBroadcast;
             return throwException("A server side error occurred.", status, _responseText, _headers, result202);
             });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as UserLeftResponseDto;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
         return Promise.resolve<JoinGroupResponse>(null as any);
+    }
+
+    poke(connectionIdToPoke: string | undefined): Promise<PokeResponseDto> {
+        let url_ = this.baseUrl + "/Poke?";
+        if (connectionIdToPoke === null)
+            throw new globalThis.Error("The parameter 'connectionIdToPoke' cannot be null.");
+        else if (connectionIdToPoke !== undefined)
+            url_ += "connectionIdToPoke=" + encodeURIComponent("" + connectionIdToPoke) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processPoke(_response);
+        });
+    }
+
+    protected processPoke(response: Response): Promise<PokeResponseDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PokeResponseDto;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PokeResponseDto>(null as any);
     }
 
     sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<MessageResponseDto> {
@@ -340,9 +383,17 @@ export interface UserRoom {
     room?: Room;
 }
 
+export interface UserLeftResponseDto extends BaseResponseDto {
+    connectionId?: string;
+}
+
 export interface JoinGroupRequest {
     connectionId?: string;
     group?: string;
+}
+
+export interface PokeResponseDto extends BaseResponseDto {
+    pokedBy?: string;
 }
 
 export interface MessageResponseDto extends BaseResponseDto {
@@ -357,6 +408,7 @@ export interface SendGroupMessageRequestDto {
 
 export enum StringConstants {
     UserLeftResponseDto = "UserLeftResponseDto",
+    PokeResponseDto = "PokeResponseDto",
     JoinGroupResponse = "JoinGroupResponse",
     ConnectionResponse = "ConnectionResponse",
     MessageResponseDto = "MessageResponseDto",

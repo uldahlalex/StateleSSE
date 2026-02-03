@@ -75,16 +75,16 @@ public class ChatController(ISseBackplane backplane,
 
     [HttpPost(nameof(JoinGroup))]
     [ProducesResponseType(typeof(JoinGroupBroadcast), 202)]
-    [Produces(typeof(JoinGroupResponse))]
+    [ProducesResponseType(typeof(JoinGroupResponse), 200)]
+    [ProducesResponseType(typeof(UserLeftResponseDto), 400)]
     public async Task<JoinGroupResponse> JoinGroup([FromBody] JoinGroupRequest request)
     {
         var room = ctx.Rooms.FirstOrDefault(r => r.Id == request.Group) ??
                    throw new ValidationException("Room does not exist");
-        var name = User.FindFirstValue(ClaimTypes.Name);
-        await backplane.Groups.AddToGroupAsync("nickname/" + request.ConnectionId, name ?? "Anonymous");
+        var name = User.FindFirstValue(ClaimTypes.Name) ?? "Anonymous";
+        await backplane.Groups.AddToGroupAsync("nickname/"+request.ConnectionId, name);
         await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
-        
-        var members = await backplane.Groups.GetClientGroupsAsync(request.Group);
+        var members = await backplane.Groups.GetMembersAsync(request.Group);
         var list = new List<ConnectionIdAndUserName>();
         foreach (var m in members)
         {
@@ -98,6 +98,15 @@ public class ChatController(ISseBackplane backplane,
 
     }
 
+    [Authorize]
+    [HttpPost(nameof(Poke))]
+    [ProducesResponseType(typeof(PokeResponseDto), 200)]
+    public async Task Poke(PokeRequestDto dto)
+    {
+         var userName = User.FindFirstValue(ClaimTypes.Name);
+
+        await backplane.Clients.SendToClientAsync(dto.connectionIdToPoke, new PokeResponseDto(userName));
+    }
 
     [Authorize]
     [HttpPost(nameof(SendMessageToGroup))]
@@ -105,18 +114,20 @@ public class ChatController(ISseBackplane backplane,
     public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userName = User.FindFirstValue(ClaimTypes.Name);
         var message = new Message()
         {
             UserId = userId,
             Content = dto.Message,
             RoomId = dto.GroupId,
             Id = Guid.NewGuid().ToString(),
+            CreatedAt = DateTimeOffset.UtcNow,
         };
         ctx.Messages.Add(message);
         await ctx.SaveChangesAsync();
         await backplane.Clients.SendToGroupAsync(dto.GroupId, new MessageResponseDto
         {
-            User = userId,
+            User = userName,
             Message = dto.Message
         });
     }
@@ -142,6 +153,9 @@ public class ChatController(ISseBackplane backplane,
     public async Task<List<Room>> GetRooms()
         => ctx.Rooms.ToList();
 }
+
+public record PokeResponseDto(string pokedBy) : BaseResponseDto;
+public record PokeRequestDto(string connectionIdToPoke);
 
 public record JoinGroupResponse(Room room) : BaseResponseDto;
 public record ConnectionResponse(string ConnectionId) : BaseResponseDto;

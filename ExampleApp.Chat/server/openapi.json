@@ -128,8 +128,53 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLeftResponseDto"
+                }
+              }
+            }
           }
         }
+      }
+    },
+    "/Poke": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Poke",
+        "parameters": [
+          {
+            "name": "connectionIdToPoke",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PokeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/SendMessageToGroup": {
@@ -428,6 +473,22 @@
           }
         }
       },
+      "UserLeftResponseDto": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connectionId": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
       "JoinGroupRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -439,6 +500,22 @@
             "type": "string"
           }
         }
+      },
+      "PokeResponseDto": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponseDto"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pokedBy": {
+                "type": "string"
+              }
+            }
+          }
+        ]
       },
       "MessageResponseDto": {
         "allOf": [
@@ -476,6 +553,7 @@
         "type": "string",
         "enum": [
           "UserLeftResponseDto",
+          "PokeResponseDto",
           "JoinGroupResponse",
           "ConnectionResponse",
           "MessageResponseDto",
