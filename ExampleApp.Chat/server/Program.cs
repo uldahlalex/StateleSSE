@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -6,30 +7,56 @@ using Microsoft.IdentityModel.Tokens;
 using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
+using StackExchange.Redis;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
+var db = builder.Configuration.GetSection("DbConnectionString").Value;
+var redis = builder.Configuration.GetSection("Redis").Value;
+var secret = builder.Configuration.GetSection("Secret").Value;
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = false,
         ValidateAudience = false,
-        IssuerSigningKey = JwtService.Key
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret))
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-
-builder.Services.AddRedisSseBackplane(configure: conf =>
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    conf.RedisConnectionString = "localhost:6379";
+    var config = ConfigurationOptions.Parse( redis    );
+    config.AbortOnConnectFail = false;
+    return ConnectionMultiplexer.Connect(config);
 });
+
+builder.Services.AddRedisSseBackplane();
 builder.Services.AddDbContext<MyDbContext>((conf) =>
 {
-    conf.UseNpgsql("Host=localhost;Database=exampleapp_chat;Username=postgres;Password=postgres");
+    conf.UseNpgsql(db);
 });
 builder.Services.AddOpenApiDocument(config =>
 {
+    config.PostProcess = document =>                                                                        
+    {                                                                                                       
+        foreach (var operation in document.Operations)                                                      
+        {                                                                                                   
+            operation.Operation.Responses["500"] = new NSwag.OpenApiResponse                                
+            {                                                                                               
+                Description = "Server Error",                                                               
+                Content                                                                                      =
+                {
+                    ["application/problem+json"] = new NSwag.OpenApiMediaType                               
+                    {                                                                                       
+                        Schema = NJsonSchema.JsonSchema.FromType<Microsoft.AspNetCore.Mvc.ProblemDetails>() 
+                    }    
+                }
+            };                                                                                              
+        }                                                                                                   
+    };              
     config.AddSecurity("Bearer", new OpenApiSecurityScheme
     {
         Type = OpenApiSecuritySchemeType.Http,
@@ -41,6 +68,8 @@ builder.Services.AddOpenApiDocument(config =>
     config.AddStringConstants<MyConstants>();
     
 });
+builder.Services.AddProblemDetails();
+builder.Services.AddSingleton<JwtService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -51,7 +80,6 @@ builder.Services.AddControllers()
 builder.Services.AddCors();
 
 var app = builder.Build();
-
 app.UseOpenApi();
 app.UseSwaggerUi();
 app.UseAuthentication();
@@ -76,7 +104,8 @@ backplane.OnClientDisconnected += async (_, e) =>
 using (var scope = app.Services.CreateScope())
 {
  var ctx =   scope.ServiceProvider.GetRequiredService<MyDbContext>();
- ctx.Database.EnsureDeleted();
+ Console.WriteLine(ctx.Database.GenerateCreateScript());
+
  ctx.Database.EnsureCreated();
  var exists = ctx.Users.Any(u => u.Id == "test");
  if (!exists)

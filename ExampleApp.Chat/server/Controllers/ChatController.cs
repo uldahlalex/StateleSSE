@@ -11,6 +11,7 @@ namespace server.Controllers;
 
 
 public class ChatController(ISseBackplane backplane,
+    JwtService jwtService,
     MyDbContext ctx) : ControllerBase
 {
     [HttpPost(nameof(Login))]
@@ -19,7 +20,7 @@ public class ChatController(ISseBackplane backplane,
         var user = ctx.Users.FirstOrDefault(u => u.Nickname == request.Username) ??
                    throw new ValidationException("User does not exist");
         if(user.Hash == Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(request.Password + user.Salt))))
-            return (new LoginResponse(JwtService.GenerateToken(user.Id, user.Nickname)));
+            return (new LoginResponse(jwtService.GenerateToken(user.Id, user.Nickname)));
         throw new ValidationException("Not valid credentials");
     }
     [HttpPost(nameof(Register))]
@@ -42,7 +43,7 @@ public class ChatController(ISseBackplane backplane,
         };
         ctx.Users.Add(u);
         ctx.SaveChanges();
-        return (new LoginResponse(JwtService.GenerateToken(u.Id, u.Nickname)));
+        return (new LoginResponse(jwtService.GenerateToken(u.Id, u.Nickname)));
     }
 
     /*

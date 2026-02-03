@@ -5,14 +5,16 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace server;
 
-public static class JwtService
+public class JwtService(IServiceProvider provider, IConfiguration configuration)
 {
-    public static readonly SymmetricSecurityKey Key =
-        new("YourSuperSecretKeyAtLeast32Bytes!"u8.ToArray());
 
-    public static string GenerateToken(string userId, string userName) =>
-        new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+    public string GenerateToken(string userId, string userName)
+    {
+        var secret = configuration.GetSection("Secret").Value ??
+                     throw new InvalidOperationException("JWT Secret not configured");
+        return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
             claims: [new Claim(ClaimTypes.NameIdentifier, userId), new Claim(ClaimTypes.Name, userName)],
             expires: DateTime.UtcNow.AddHours(24),
-            signingCredentials: new SigningCredentials(Key, SecurityAlgorithms.HmacSha256)));
+            signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)), SecurityAlgorithms.HmacSha256)));
+    }
 }

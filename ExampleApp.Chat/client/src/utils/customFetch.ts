@@ -1,32 +1,27 @@
 
 
-/**
- * This fetch http client attaches JWT from localstorage
- * and toasts if http requests fail.
- * Note: circular reference resolution is handled at the API client level,
- * not here, because JSON.stringify() cannot preserve circular references.
- */
+
 export const customFetch = {
-    fetch(url: RequestInfo, init?: RequestInit): Promise<Response> {
+    async fetch(url: RequestInfo, init?: RequestInit): Promise<Response> {
         const token = localStorage.getItem('jwt');
         const headers = new Headers(init?.headers);
 
         if (token) {
-            headers.set('Authorization', "Bearer "+token);
+            headers.set('Authorization', "Bearer " + token);
         }
 
+        const response = await fetch(url, { ...init, headers });
 
-        return fetch(url, {
-            ...init,
-            headers
-        }).then(async (response) => {
-            // Handle errors by reading from one clone
-            if (!response.ok) {
-                const errorClone = response.clone();
-                console.log(errorClone)
-            }
+        if (!response.ok) {
+            const clone = response.clone();
+            try {
+                const problem = await clone.json();
+                if (problem.detail) {
+                    alert(problem.detail);
+                }
+            } catch {}
+        }
 
-            return response;
-        });
+        return response;
     }
 };
