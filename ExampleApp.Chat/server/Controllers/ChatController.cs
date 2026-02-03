@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using StateleSSE.AspNetCore;
 
 namespace server.Controllers;
@@ -55,15 +56,24 @@ public class ChatController(ISseBackplane backplane,
      */
     [HttpPost(nameof(JoinGroup))]
     [Produces<JoinGroupResponse>]
-    public async Task JoinGroup([FromBody] JoinGroupRequest request)
+    public async Task<JoinInvokerResponseDto> JoinGroup([FromBody] JoinGroupRequest request)
     {
         await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
         var members = await backplane.Groups.GetMembersAsync(request.Group);
 
         await backplane.Clients.SendToGroupAsync(request.Group,  new JoinGroupResponse()
         {
+            message = "someone entered the chat",
             Members = members.ToList()
         });
+        var messages = ctx.Messages
+            .OrderBy(m => m.CreatedAt)
+            .Where(m => m.RoomId == request.Group)
+            .Take(5).ToList();
+        
+        
+        return new JoinInvokerResponseDto(messages);
+
 
     }
 
@@ -117,6 +127,13 @@ public class ChatController(ISseBackplane backplane,
         => ctx.Rooms.ToList();
 }
 
+public record JoinInvokerResponseDto(List<Message> messages) : BaseResponseDto
+{
+    public override string ToString()
+    {
+        return $"{{ messages = {messages} }}";
+    }
+}
 
 public record ConnectionResponse(string ConnectionId) : BaseResponseDto;
 
@@ -132,6 +149,7 @@ public record SendGroupMessageRequestDto
 public record JoinGroupResponse : BaseResponseDto
 {
     public List<string> Members { get; set; }
+    public string message { get; set; }
 }
 
 
@@ -144,3 +162,5 @@ public record MessageResponseDto : BaseResponseDto
 
 public record LoginRequest(string Username, string Password);
 public record LoginResponse(string Token);
+
+

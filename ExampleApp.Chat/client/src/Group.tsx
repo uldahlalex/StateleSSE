@@ -10,21 +10,13 @@ import type {GroupParams} from "./GroupParams.tsx";
 import {chatClient} from "./ChatClient.tsx";
 
 export function Group(params: GroupParams) {
-    const stream = useStream();
     const [messages, setMessages] = useState<MessageResponseDto[]>([]);
     const [members, setMembers] = useState<string[]>([]);
     const [message, setMessage] = useState<SendGroupMessageRequestDto>({
         groupId: params.room.id,
         message: ""
     })
-
-    // Join group when connected
-    useEffect(() => {
-        if (!stream.connectionId) return;
-        chatClient.joinGroup({connectionId: stream.connectionId, group: params.room.id});
-    }, [stream.connectionId, params.room.id]);
-
-    // Subscribe to group events
+    const stream = useStream();
     useEffect(() => {
         const unsub1 = stream.on<JoinGroupResponse>(params.room.id!, StringConstants.JoinGroupResponse, (dto) => {
             setMembers(dto.members ?? []);
@@ -45,6 +37,13 @@ export function Group(params: GroupParams) {
             unsub3();
         };
     }, [params.room.id!]);
+    // Join group when connected
+    useEffect(() => {
+        if (!stream.connectionId) return;
+        chatClient.joinGroup({connectionId: stream.connectionId, group: params.room.id});
+    }, [stream.connectionId, params.room.id]);
+
+
 
     return (
         <div style={{border: "1px solid #ccc", padding: 10, margin: 10}}>

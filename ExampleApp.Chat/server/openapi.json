@@ -250,6 +250,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "message": {
+                "type": "string"
               }
             }
           }
@@ -347,6 +350,10 @@
           },
           "room": {
             "$ref": "#/components/schemas/Room"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -396,6 +403,7 @@
         "type": "string",
         "enum": [
           "UserLeftResponseDto",
+          "JoinInvokerResponseDto",
           "ConnectionResponse",
           "JoinGroupResponse",
           "MessageResponseDto"

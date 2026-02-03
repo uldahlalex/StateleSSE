@@ -252,6 +252,7 @@ export interface ConnectionResponse extends BaseResponseDto {
 
 export interface JoinGroupResponse extends BaseResponseDto {
     members?: string[];
+    message?: string;
 }
 
 export interface JoinGroupRequest {
@@ -284,6 +285,7 @@ export interface Message {
     user?: User;
     roomId?: string;
     room?: Room;
+    createdAt?: string;
 }
 
 export interface User {
@@ -302,6 +304,7 @@ export interface UserRoom {
 
 export enum StringConstants {
     UserLeftResponseDto = "UserLeftResponseDto",
+    JoinInvokerResponseDto = "JoinInvokerResponseDto",
     ConnectionResponse = "ConnectionResponse",
     JoinGroupResponse = "JoinGroupResponse",
     MessageResponseDto = "MessageResponseDto",

@@ -3,8 +3,9 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NSwag;
+using NSwag.Generation.Processors.Security;
 using server;
-using StackExchange.Redis;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
 
@@ -18,30 +19,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    {
-        var config = ConfigurationOptions.Parse(
-            "localhost:6379"
-            );
-        config.AbortOnConnectFail = false;
-        return ConnectionMultiplexer.Connect(config);
-    });
 
-builder.Services.AddRedisSseBackplane();
+builder.Services.AddRedisSseBackplane(configure: conf =>
+{
+    conf.RedisConnectionString = "localhost:6379";
+});
 builder.Services.AddDbContext<MyDbContext>((conf) =>
 {
     conf.UseNpgsql("Host=localhost;Database=exampleapp_chat;Username=postgres;Password=postgres");
 });
 builder.Services.AddOpenApiDocument(config =>
 {
-    config.AddSecurity("Bearer", new NSwag.OpenApiSecurityScheme
+    config.AddSecurity("Bearer", new OpenApiSecurityScheme
     {
-        Type = NSwag.OpenApiSecuritySchemeType.Http,
+        Type = OpenApiSecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
         Description = "Enter your JWT token"
     });
-    config.OperationProcessors.Add(new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("Bearer"));
+    config.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("Bearer"));
     config.AddStringConstants<MyConstants>();
 });
 builder.Services.AddControllers()
@@ -79,6 +75,7 @@ backplane.OnClientDisconnected += async (_, e) =>
 using (var scope = app.Services.CreateScope())
 {
  var ctx =   scope.ServiceProvider.GetRequiredService<MyDbContext>();
+ ctx.Database.EnsureDeleted();
  ctx.Database.EnsureCreated();
  var exists = ctx.Users.Any(u => u.Id == "test");
  if (!exists)

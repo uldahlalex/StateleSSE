@@ -37,6 +37,7 @@ public class Message
 
     public string RoomId { get; set; }
     public Room Room { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 [PrimaryKey(nameof(Id))]
