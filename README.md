@@ -195,27 +195,29 @@ Features Redis backplane, NSwag with codegen, horisontal scaling, increased type
 - [ExampleApp.Chat](ExampleApp.Chat)
 
 
-
 ## OpenAPI String Constants
 
 `StringConstantsDiscovery` helps expose event type names in your OpenAPI spec for client code generation. It extracts:
 - All `BaseResponseDto` subclass names (event types)
 - String constants from a class you specify
 
-```csharp
-using StateleSSE.AspNetCore;
+This way you don't have to use error prone hardcoded string in your client app. This allows for:
 
-// Get event type names
-var eventTypes = StringConstantsDiscovery.GetEventTypeNames();
+```tsx
+const stream = useStream();
+useEffect(() => {
+    stream.on<JoinGroupResponse>(params.room.id!,
+        StringConstants.JoinGroupResponse, //this comes from OpenAPI-based scaffolded TS code. Also see the ExampleApp.Chat/ which uses NSwag to do this
+        (dto) => {
+        setMembers(dto.members ?? []);
+    });
+}, [])
 
-// Get constants from a specific class
-var constants = StringConstantsDiscovery.GetStringConstants<MyConstants>();
-
-// Get both combined
-var all = StringConstantsDiscovery.GetAll<MyConstants>();
 ```
 
-For NSwag integration, create a thin wrapper:
+
+
+For NSwag integration, create a thin wrapper: (assuming you have already added required NSwag Nugets)
 
 ```csharp
 using NJsonSchema;
