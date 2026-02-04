@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using api.Etc;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NSwag;
@@ -52,17 +54,7 @@ builder.Services.AddOpenApiDocument(config =>
     config.AddStringConstants<MyConstants>();
     
 });
-builder.Services.AddProblemDetails(options =>
-{
-    options.CustomizeProblemDetails = context =>
-    {
-        var exception = context.HttpContext.Features.Get<IExceptionHandlerFeature>()?.Error;
-        if (exception != null)
-        {
-            context.ProblemDetails.Detail = exception.Message;
-        }
-    };
-});
+
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -72,19 +64,21 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 builder.Services.AddCors();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, AuthorizationExceptionHandler>();
 
 var app = builder.Build();
-app.UseExceptionHandler();
+app.UseExceptionHandler(config => { });
+app.UseCors(c =>
+    c.AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowAnyOrigin()
+    .SetIsOriginAllowed(_ => true));
 app.UseOpenApi();
 app.UseSwaggerUi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.UseCors(c => 
-    c.AllowAnyHeader()
-    .AllowAnyMethod()
-    .AllowAnyOrigin()
-    .SetIsOriginAllowed(_ => true));
 
 
 app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();

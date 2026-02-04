@@ -11,7 +11,7 @@
     <Authors>Alex Uldahl Pedersen</Authors>
     <Description>Standardized client/group management for server sent events with horizontal scaling+more. Install StateleSSE.CodeGen for TypeScript or C# client code generation.</Description>
     <PackageTags>sse;server-sent-events;aspnetcore;extensions;stateless;real-time;redis;backplane;horizontal-scaling</PackageTags>
-    <RepositoryUrl>https://github.com/StateleSSE/StateleSSE.AspNetCore</RepositoryUrl>
+    <RepositoryUrl>https://github.com/uldahlalex/StateleSSE.AspNetCore</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>StateleSSE.AspNetCore</RootNamespace>

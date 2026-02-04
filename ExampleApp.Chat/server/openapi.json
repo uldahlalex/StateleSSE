@@ -34,58 +34,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -118,58 +66,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -187,58 +83,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConnectionResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
                 }
               }
             }
@@ -294,58 +138,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -373,58 +165,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PokeResponseDto"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
                 }
               }
             }
@@ -465,58 +205,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
           }
         },
         "security": [
@@ -552,58 +240,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
           }
         },
         "security": [
@@ -628,58 +264,6 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/Room"
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "title": "ProblemDetails",
-                  "type": "object",
-                  "additionalProperties": {
-                    "oneOf": [
-                      {},
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "properties": {
-                    "type": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "title": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "status": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "format": "int32"
-                    },
-                    "detail": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    },
-                    "instance": {
-                      "type": [
-                        "null",
-                        "string"
-                      ]
-                    }
                   }
                 }
               }

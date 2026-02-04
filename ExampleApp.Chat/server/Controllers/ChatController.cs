@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using StateleSSE.AspNetCore;
 
 namespace server.Controllers;
@@ -19,8 +19,8 @@ public class ChatController(ISseBackplane backplane,
     {
         var user = ctx.Users.FirstOrDefault(u => u.Nickname == request.Username) ??
                    throw new ValidationException("User does not exist");
-        if(user.Hash == Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(request.Password + user.Salt))))
-            return (new LoginResponse(jwtService.GenerateToken(user.Id, user.Nickname)));
+        if(user.Hash == Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(request.Password + user.Salt))))
+            return (new LoginResponse(jwtService.GenerateToken(user.Id)));
         throw new ValidationException("Not valid credentials");
     }
     [HttpPost(nameof(Register))]
@@ -32,8 +32,8 @@ public class ChatController(ISseBackplane backplane,
         var salt = Guid.NewGuid().ToString();
         //im just using an arbitrary hashing algorithm
         var hash = Convert.ToBase64String(                                                                                                                                    
-            System.Security.Cryptography.SHA256.HashData(                                                                                                                     
-                System.Text.Encoding.UTF8.GetBytes(request.Password + salt)));   
+            SHA256.HashData(                                                                                                                     
+                Encoding.UTF8.GetBytes(request.Password + salt)));   
         var u = new User()
         {
             Id = Guid.NewGuid().ToString(),
@@ -43,7 +43,7 @@ public class ChatController(ISseBackplane backplane,
         };
         ctx.Users.Add(u);
         ctx.SaveChanges();
-        return (new LoginResponse(jwtService.GenerateToken(u.Id, u.Nickname)));
+        return (new LoginResponse(jwtService.GenerateToken(u.Id)));
     }
 
     /*
@@ -80,9 +80,11 @@ public class ChatController(ISseBackplane backplane,
     [ProducesResponseType(typeof(UserLeftResponseDto), 400)]
     public async Task<JoinGroupResponse> JoinGroup([FromBody] JoinGroupRequest request)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
         var room = ctx.Rooms.FirstOrDefault(r => r.Id == request.Group) ??
                    throw new ValidationException("Room does not exist");
-        var name = User.FindFirstValue(ClaimTypes.Name) ?? "Anonymous";
+        var name = u?.Nickname ?? "Anonymous";
         await backplane.Groups.AddToGroupAsync("nickname/"+request.ConnectionId, name);
         await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
         var members = await backplane.Groups.GetMembersAsync(request.Group);
@@ -104,9 +106,11 @@ public class ChatController(ISseBackplane backplane,
     [ProducesResponseType(typeof(PokeResponseDto), 200)]
     public async Task Poke(PokeRequestDto dto)
     {
-         var userName = User.FindFirstValue(ClaimTypes.Name);
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
+        var name = u?.Nickname ?? "Anonymous";
 
-        await backplane.Clients.SendToClientAsync(dto.connectionIdToPoke, new PokeResponseDto(userName));
+        await backplane.Clients.SendToClientAsync(dto.connectionIdToPoke, new PokeResponseDto(name));
     }
 
     [Authorize]
@@ -115,7 +119,8 @@ public class ChatController(ISseBackplane backplane,
     public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var userName = User.FindFirstValue(ClaimTypes.Name);
+        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
+        var name = u?.Nickname ?? "Anonymous";
         var message = new Message()
         {
             UserId = userId,
@@ -128,7 +133,7 @@ public class ChatController(ISseBackplane backplane,
         await ctx.SaveChangesAsync();
         await backplane.Clients.SendToGroupAsync(dto.GroupId, new MessageResponseDto
         {
-            User = userName,
+            User = name,
             Message = dto.Message
         });
     }
