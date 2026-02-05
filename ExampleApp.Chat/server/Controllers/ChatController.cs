@@ -5,13 +5,16 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.EfRealtime;
 
 namespace server.Controllers;
 
 
 public class ChatController(ISseBackplane backplane,
     JwtService jwtService,
+    IRealtimeManager realtimeManager,
     MyDbContext ctx) : ControllerBase
 {
     [HttpPost(nameof(Login))]
@@ -46,10 +49,30 @@ public class ChatController(ISseBackplane backplane,
         return (new LoginResponse(jwtService.GenerateToken(u.Id)));
     }
 
-    [HttpGet(nameof(Listen))]
-    public async Task Listen()
+    [HttpPost("listen/room-messages/{roomId}")]
+    public async Task<IActionResult> ListenToRoomMessages(string connectionId, string roomId)
     {
-        
+        var group = $"room-messages:{roomId}";
+
+        // Add client to the backplane group
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        // Register the realtime subscription for this group
+        realtimeManager.Subscribe<MyDbContext>(group,
+            criteria: changes => changes.OfType<Message>()
+                .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId),
+            query: async ctx => await ctx.Messages
+                .Where(m => m.RoomId == roomId)
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(10)
+                .Select(s => new
+                {
+                    Message = s.Content
+                })
+                .ToListAsync()
+        );
+
+        return Ok();
     }
 
     /*

@@ -70,6 +70,46 @@
         }
       }
     },
+    "/listen/room-messages/{roomId}": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_ListenToRoomMessages",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/Connect": {
       "get": {
         "tags": [
