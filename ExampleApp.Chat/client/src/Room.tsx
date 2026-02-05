@@ -29,7 +29,10 @@ export function Room() {
         stream.on<PokeResponseDto>("message", StringConstants.PokeResponseDto, (dto) => {
             alert("you have been poked by: "+dto.pokedBy)
         })
-        const unsub1 = stream.on<JoinGroupBroadcast>(params.roomId!, StringConstants.JoinGroupBroadcast, (dto) => {
+        const unsub1 = stream.on<JoinGroupBroadcast>(
+            params.roomId!,
+            "JoinGroupBroadcast",
+            (dto) => {
             setMembers(dto.connectedUsers!);
         });
         const unsub2 = stream.on<MessageResponseDto>(params.roomId!, StringConstants.MessageResponseDto, (dto) => {

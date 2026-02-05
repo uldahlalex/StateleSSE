@@ -35,11 +35,13 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     config.AbortOnConnectFail = false;
     return ConnectionMultiplexer.Connect(config);
 });
-
 builder.Services.AddRedisSseBackplane();
-builder.Services.AddDbContext<MyDbContext>((conf) =>
+builder.Services.AddEfRealtime();
+builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
     conf.UseNpgsql(db);
+    conf.AddEfRealtimeInterceptor(sp); // hooks into SaveChanges
+
 });
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -52,7 +54,7 @@ builder.Services.AddOpenApiDocument(config =>
     });
     config.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("Bearer"));
     config.AddStringConstants<MyConstants>();
-    
+
 });
 
 builder.Services.AddSingleton<JwtService>();

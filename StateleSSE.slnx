@@ -3,12 +3,6 @@
     <Project Path="StateleSSE.AspNetCore.IntegrationTests/StateleSSE.AspNetCore.IntegrationTests.csproj" />
     <Project Path="StateleSSE.AspNetCore.Tests/StateleSSE.AspNetCore.Tests.csproj" />
     <Project Path="StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
-<!--    <Folder Name="/ExampleApp.Kahoot/">
-        <Project Path="ExampleApp.Kahoot/server/api/api.csproj" />
-        <Project Path="ExampleApp.Kahoot/server/dataaccess/dataaccess.csproj" />
-        <Project Path="ExampleApp.Kahoot/server/mqtt/mqtt.csproj" />
-        <Project Path="ExampleApp.Kahoot/server/tests/tests.csproj" />
-    </Folder>-->
     <Folder Name="/ExampleApp.Chat/">
         <Project Path="ExampleApp.Chat/loadbalancer/loadbalancer.csproj" />
         <Project Path="ExampleApp.Chat/server/server.csproj" />

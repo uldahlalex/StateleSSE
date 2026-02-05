@@ -1,5 +1,10 @@
 using StateleSSE.AspNetCore;
 
+
+/// <summary>
+/// this is just used for the readme docs
+/// </summary>
+/// <param name="backplane"></param>
 public class Example(ISseBackplane backplane)
 {
     public async Task Send(string connectionId, object data, string id1 = "abc", string id2 = "xyz")

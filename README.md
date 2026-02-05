@@ -195,6 +195,94 @@ Features Redis backplane, NSwag with codegen, horisontal scaling, increased type
 - [ExampleApp.Chat](ExampleApp.Chat)
 
 
+## EF Core Realtime (EfRealtime)
+
+Automatic realtime updates for web clients driven by EF Core's `SaveChanges`. When data is saved, registered queries are executed and results are broadcast to subscribers via the SSE backplane.
+
+### How it works
+
+1. A controller endpoint **subscribes** clients to a realtime feature by defining a **criteria** (what kind of change triggers it) and a **query** (what data to send).
+2. Clients join a backplane group for that feature.
+3. When `SaveChanges`/`SaveChangesAsync` is called on the DbContext, the interceptor:
+   - Snapshots the change tracker **before** save (so Added/Modified/Deleted states are visible)
+   - After save succeeds, executes the query against the committed database state
+   - Broadcasts the result to the backplane group
+
+### Setup
+
+```csharp
+builder.Services.AddInMemorySseBackplane(); // or AddRedisSseBackplane()
+builder.Services.AddEfRealtime();
+
+builder.Services.AddDbContext<MyDbContext>((sp, options) =>
+{
+    options.UseNpgsql(connectionString);
+    options.AddEfRealtimeInterceptor(sp); // hooks into SaveChanges
+});
+```
+
+### Subscribing clients to realtime features
+
+In a controller, use `IRealtimeManager` to register a subscription. The criteria inspects a `ChangeSnapshot` captured before save, and the query runs after save:
+
+```csharp
+public class ChatController(ISseBackplane backplane, IRealtimeManager realtime) : ControllerBase
+{
+    [HttpPost("listen/room-messages/{roomId}")]
+    public async Task<IActionResult> ListenToRoomMessages(string connectionId, int roomId)
+    {
+        var group = $"room-messages:{roomId}";
+
+        // Add client to the backplane group
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        // Register the realtime subscription for this group
+        realtime.Subscribe<MyDbContext>(group,
+            criteria: changes => changes.OfType<Message>()
+                .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId),
+            query: async ctx => await ctx.Messages
+                .Where(m => m.RoomId == roomId)
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(10)
+                .ToListAsync()
+        );
+
+        return Ok();
+    }
+}
+```
+
+Now whenever *any* code calls `SaveChangesAsync()` on `MyDbContext` and a `Message` with matching `RoomId` was added, the query executes and all clients in the `"room-messages:{roomId}"` group receive the result.
+
+### ChangeSnapshot API
+
+The `criteria` function receives a `ChangeSnapshot` with these helpers:
+
+```csharp
+// Typed access to changed entities
+changes.OfType<Message>()          // IEnumerable<ChangeEntry<Message>>
+
+// Quick checks
+changes.HasChanges<Message>()      // any Added, Modified, or Deleted
+changes.HasAdded<Message>()        // any Added
+changes.HasModified<Message>()     // any Modified
+changes.HasDeleted<Message>()      // any Deleted
+
+// Each ChangeEntry<T> has:
+//   .Entity  (T)           - the entity instance
+//   .State   (EntityState)  - Added, Modified, or Deleted
+```
+
+### Unsubscribing
+
+```csharp
+realtime.Unsubscribe("room-messages:5");
+```
+
+Calling `Subscribe` with the same group name replaces the previous subscription (no duplicates).
+
+---
+
 ## OpenAPI String Constants
 
 `StringConstantsDiscovery` helps expose event type names in your OpenAPI spec for client code generation. It extracts:

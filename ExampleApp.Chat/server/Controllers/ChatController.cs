@@ -20,7 +20,7 @@ public class ChatController(ISseBackplane backplane,
         var user = ctx.Users.FirstOrDefault(u => u.Nickname == request.Username) ??
                    throw new ValidationException("User does not exist");
         if(user.Hash == Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(request.Password + user.Salt))))
-            return (new LoginResponse(jwtService.GenerateToken(user.Id)));
+            return new LoginResponse(jwtService.GenerateToken(user.Id));
         throw new ValidationException("Not valid credentials");
     }
     [HttpPost(nameof(Register))]
@@ -44,6 +44,12 @@ public class ChatController(ISseBackplane backplane,
         ctx.Users.Add(u);
         ctx.SaveChanges();
         return (new LoginResponse(jwtService.GenerateToken(u.Id)));
+    }
+
+    [HttpGet(nameof(Listen))]
+    public async Task Listen()
+    {
+        
     }
 
     /*
@@ -73,11 +79,12 @@ public class ChatController(ISseBackplane backplane,
         }
     }
     
-
+    
     [HttpPost(nameof(JoinGroup))]
     [ProducesResponseType(typeof(JoinGroupBroadcast), 202)]
     [ProducesResponseType(typeof(JoinGroupResponse), 200)]
     [ProducesResponseType(typeof(UserLeftResponseDto), 400)]
+
     public async Task<JoinGroupResponse> JoinGroup([FromBody] JoinGroupRequest request)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
