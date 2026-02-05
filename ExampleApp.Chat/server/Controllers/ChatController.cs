@@ -50,29 +50,22 @@ public class ChatController(ISseBackplane backplane,
     }
 
     [HttpPost("listen/room-messages/{roomId}")]
-    public async Task<IActionResult> ListenToRoomMessages(string connectionId, string roomId)
+    public async Task<RealtimeListenResponse> ListenToRoomMessages(string connectionId, string roomId)
     {
         var group = $"room-messages:{roomId}";
-
-        // Add client to the backplane group
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        // Register the realtime subscription for this group
         realtimeManager.Subscribe<MyDbContext>(group,
-            criteria: changes => changes.OfType<Message>()
-                .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId),
-            query: async ctx => await ctx.Messages
+            criteria: changes => changes.HasAdded<Message>(),
+            query: async c => await c.Messages
                 .Where(m => m.RoomId == roomId)
                 .OrderByDescending(m => m.CreatedAt)
                 .Take(10)
-                .Select(s => new
-                {
-                    Message = s.Content
-                })
+                .Select(m => new { m.Content, User = m.User.Nickname })
                 .ToListAsync()
         );
 
-        return Ok();
+        return new RealtimeListenResponse(group);
     }
 
     /*
@@ -145,12 +138,9 @@ public class ChatController(ISseBackplane backplane,
 
     [Authorize]
     [HttpPost(nameof(SendMessageToGroup))]
-    [Produces<MessageResponseDto>]
     public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
-        var name = u?.Nickname ?? "Anonymous";
         var message = new Message()
         {
             UserId = userId,
@@ -161,11 +151,6 @@ public class ChatController(ISseBackplane backplane,
         };
         ctx.Messages.Add(message);
         await ctx.SaveChangesAsync();
-        await backplane.Clients.SendToGroupAsync(dto.GroupId, new MessageResponseDto
-        {
-            User = name,
-            Message = dto.Message
-        });
     }
 
     [Authorize]

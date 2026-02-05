@@ -99,10 +99,9 @@
           "200": {
             "description": "",
             "content": {
-              "application/octet-stream": {
+              "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "binary"
+                  "$ref": "#/components/schemas/RealtimeListenResponse"
                 }
               }
             }
@@ -237,14 +236,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponseDto"
-                }
-              }
-            }
+            "description": ""
           }
         },
         "security": [
@@ -332,6 +324,16 @@
             "type": "string"
           },
           "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RealtimeListenResponse": {
+        "type": "object",
+        "description": "Returned by subscribe endpoints so the client knows which SSE group to listen on.",
+        "additionalProperties": false,
+        "properties": {
+          "group": {
             "type": "string"
           }
         }
@@ -552,26 +554,6 @@
             "properties": {
               "pokedBy": {
                 "type": "string"
-              }
-            }
-          }
-        ]
-      },
-      "MessageResponseDto": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/BaseResponseDto"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "message": {
-                "type": "string"
-              },
-              "user": {
-                "type": "string",
-                "nullable": true
               }
             }
           }

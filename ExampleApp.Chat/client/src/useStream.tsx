@@ -58,6 +58,11 @@ export interface Stream {
         eventType: string,
         handler: (dto: T) => void
     ): Unsubscribe;
+    /** Listen for all messages on a group (no eventType filtering). Used by EfRealtime subscriptions. */
+    on<T>(
+        group: string,
+        handler: (dto: T) => void
+    ): Unsubscribe;
 }
 
 // ============================================================================
@@ -83,7 +88,7 @@ function assertNonEmpty(value: string, name: string): void {
 
 type Listener = {
     group: string;
-    eventType: string;
+    eventType: string | null;
     handler: (dto: unknown) => void;
 };
 
@@ -135,17 +140,20 @@ class StreamCore {
         this.pendingGroups.clear();
     }
 
+    on<T>(group: string, eventType: string, handler: (dto: T) => void): Unsubscribe;
+    on<T>(group: string, handler: (dto: T) => void): Unsubscribe;
     on<T>(
         group: string,
-        eventType: string,
-        handler: (dto: T) => void
+        eventTypeOrHandler: string | ((dto: T) => void),
+        maybeHandler?: (dto: T) => void
     ): Unsubscribe {
         assertNonEmpty(group, "group");
-        assertNonEmpty(eventType, "eventType");
 
-        if (typeof handler !== "function") {
-            throw new StreamError("handler must be a function");
-        }
+        const eventType = typeof eventTypeOrHandler === "string" ? eventTypeOrHandler : null;
+        const handler = typeof eventTypeOrHandler === "function" ? eventTypeOrHandler : maybeHandler!;
+
+        if (eventType !== null) assertNonEmpty(eventType, "eventType");
+        if (typeof handler !== "function") throw new StreamError("handler must be a function");
 
         if (this.isDisconnected) {
             throw new StreamError(
@@ -184,27 +192,23 @@ class StreamCore {
         if (this.groupHandlers.has(group) || !this.eventSource) return;
 
         const handler = (e: MessageEvent) => {
-            let data: BaseResponseDto;
+            let data: unknown;
             try {
-                data = JSON.parse(e.data) as BaseResponseDto;
+                data = JSON.parse(e.data);
             } catch {
                 console.error(`[stream] Failed to parse message on group "${group}":`, e.data);
                 return;
             }
 
-            const eventType = data.eventType;
-            if (!eventType) {
-                console.warn(`[stream] Received message without eventType on group "${group}":`, data);
-                return;
-            }
+            const eventType = (data as BaseResponseDto)?.eventType;
 
             for (const listener of this.listeners.values()) {
-                if (listener.group === group && listener.eventType === eventType) {
-                    try {
-                        listener.handler(data);
-                    } catch (err) {
-                        console.error(`[stream] Handler error for ${group}/${eventType}:`, err);
-                    }
+                if (listener.group !== group) continue;
+                if (listener.eventType && listener.eventType !== eventType) continue;
+                try {
+                    listener.handler(data);
+                } catch (err) {
+                    console.error(`[stream] Handler error for ${group}:`, err);
                 }
             }
         };
@@ -263,7 +267,8 @@ export function StreamProvider({ config, children }: StreamProviderProps) {
     const stream: Stream = {
         connectionId,
         isConnected: connectionId !== null,
-        on: (group, eventType, handler) => coreRef.current!.on(group, eventType, handler),
+        on: (group: string, ...args: [string, (dto: unknown) => void] | [(dto: unknown) => void]) =>
+            (coreRef.current!.on as Function)(group, ...args),
     };
 
     return (
@@ -320,4 +325,50 @@ export function useStream(): Stream {
         );
     }
     return stream;
+}
+
+// ============================================================================
+// EfRealtime hook
+// ============================================================================
+
+/**
+ * Subscribe to a realtime feature and listen for broadcasts.
+ * Combines the API call (which registers the server-side subscription) with
+ * the SSE listener (which receives broadcasts when SaveChanges triggers).
+ *
+ * @param subscribe - Async function that calls the subscribe endpoint. Receives the connectionId
+ *                    and must return an object with a `group` field (RealtimeListenResponse).
+ * @param onData - Callback invoked whenever the server broadcasts new data for this subscription.
+ * @param deps - Additional dependency array for re-subscribing (e.g., [roomId]).
+ *
+ * @example
+ * useRealtimeListen<Message[]>(
+ *     (connId) => chatClient.listenToRoomMessages(roomId, connId),
+ *     (messages) => setMessages(messages),
+ *     [roomId]
+ * );
+ */
+export function useRealtimeListen<T>(
+    subscribe: (connectionId: string) => Promise<{ group: string }>,
+    onData: (data: T) => void,
+    deps: unknown[] = []
+) {
+    const stream = useStream();
+
+    useEffect(() => {
+        if (!stream.connectionId) return;
+
+        let unsub: Unsubscribe | undefined;
+        let cancelled = false;
+
+        subscribe(stream.connectionId).then(({ group }) => {
+            if (cancelled) return;
+            unsub = stream.on<T>(group, onData);
+        });
+
+        return () => {
+            cancelled = true;
+            unsub?.();
+        };
+    }, [stream.connectionId, ...deps]);
 }

@@ -1,7 +1,7 @@
-import {useStream} from "./useStream.tsx";
+import {useRealtimeListen, useStream} from "./useStream.tsx";
 import {useEffect, useState} from "react";
 import {
-    type MessageResponseDto, type Room,
+    type Room,
     type SendGroupMessageRequestDto,
     type JoinGroupBroadcast,
     type PokeResponseDto,
@@ -18,13 +18,19 @@ export function Room() {
     const stream = useStream();
     const navigate = useNavigate()
     const params = useParams<RoomParams>();
-    const [messages, setMessages] = useState<MessageResponseDto[]>([]);
+    const [messages, setMessages] = useState<{ content?: string; user?: string }[]>([]);
     const [members, setMembers] = useState<ConnectionIdAndUserName[]>([]);
     const [room, setRoom] = useState<Room | undefined>(undefined)
     const [message, setMessage] = useState<SendGroupMessageRequestDto>({
         groupId: params.roomId,
         message: ""
     })
+    useRealtimeListen<{ content?: string; user?: string }[]>(
+        (connId) => chatClient.listenToRoomMessages(connId, params.roomId!),
+        (msgs) => setMessages(msgs),
+        [params.roomId]
+    );
+
     useEffect(() => {
         stream.on<PokeResponseDto>("message", StringConstants.PokeResponseDto, (dto) => {
             alert("you have been poked by: "+dto.pokedBy)
@@ -35,10 +41,7 @@ export function Room() {
             (dto) => {
             setMembers(dto.connectedUsers!);
         });
-        const unsub2 = stream.on<MessageResponseDto>(params.roomId!, StringConstants.MessageResponseDto, (dto) => {
-            setMessages(prev => [...prev, dto]);
-        });
-        const unsub3 = stream.on<UserLeftResponseDto>(params.roomId!, StringConstants.UserLeftResponseDto, (dto) => {
+        const unsub2 = stream.on<UserLeftResponseDto>(params.roomId!, StringConstants.UserLeftResponseDto, (dto) => {
             setMembers(prev => [...prev.filter(u => u.connectionId == dto.connectionId)]);
         });
         return () => {
@@ -77,7 +80,7 @@ export function Room() {
                         messages.map((m, i) => (
                             <div className="message" key={i}>
                                 <div className="message-author">{m.user || 'Anonymous'}</div>
-                                <div className="message-content">{m.message}</div>
+                                <div className="message-content">{m.content}</div>
                             </div>
                         ))
                     )}

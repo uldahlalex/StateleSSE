@@ -91,7 +91,7 @@ export class ChatClient {
         return Promise.resolve<LoginResponse>(null as any);
     }
 
-    listenToRoomMessages(connectionId: string | undefined, roomId: string): Promise<FileResponse> {
+    listenToRoomMessages(connectionId: string | undefined, roomId: string): Promise<RealtimeListenResponse> {
         let url_ = this.baseUrl + "/listen/room-messages/{roomId}?";
         if (roomId === undefined || roomId === null)
             throw new globalThis.Error("The parameter 'roomId' must be defined.");
@@ -105,7 +105,7 @@ export class ChatClient {
         let options_: RequestInit = {
             method: "POST",
             headers: {
-                "Accept": "application/octet-stream"
+                "Accept": "application/json"
             }
         };
 
@@ -114,26 +114,21 @@ export class ChatClient {
         });
     }
 
-    protected processListenToRoomMessages(response: Response): Promise<FileResponse> {
+    protected processListenToRoomMessages(response: Response): Promise<RealtimeListenResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200 || status === 206) {
-            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
-            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
-            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
-            if (fileName) {
-                fileName = decodeURIComponent(fileName);
-            } else {
-                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
-                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
-            }
-            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponse;
+            return result200;
+            });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<FileResponse>(null as any);
+        return Promise.resolve<RealtimeListenResponse>(null as any);
     }
 
     connect(): Promise<ConnectionResponse> {
@@ -255,7 +250,7 @@ export class ChatClient {
         return Promise.resolve<PokeResponseDto>(null as any);
     }
 
-    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<MessageResponseDto> {
+    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<void> {
         let url_ = this.baseUrl + "/SendMessageToGroup";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -266,7 +261,6 @@ export class ChatClient {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json"
             }
         };
 
@@ -275,21 +269,19 @@ export class ChatClient {
         });
     }
 
-    protected processSendMessageToGroup(response: Response): Promise<MessageResponseDto> {
+    protected processSendMessageToGroup(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MessageResponseDto;
-            return result200;
+            return;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<MessageResponseDto>(null as any);
+        return Promise.resolve<void>(null as any);
     }
 
     createRoom(name: string | undefined): Promise<Room> {
@@ -372,6 +364,11 @@ export interface LoginRequest {
     password?: string;
 }
 
+/** Returned by subscribe endpoints so the client knows which SSE group to listen on. */
+export interface RealtimeListenResponse {
+    group?: string;
+}
+
 /** Models used for server sent events to clients should preferably use this model. It automatically attaches "EventType" as a property with type name as value. */
 export interface BaseResponseDto {
     eventType?: string;
@@ -441,11 +438,6 @@ export interface PokeResponseDto extends BaseResponseDto {
     pokedBy?: string;
 }
 
-export interface MessageResponseDto extends BaseResponseDto {
-    message?: string;
-    user?: string | undefined;
-}
-
 export interface SendGroupMessageRequestDto {
     message?: string;
     groupId?: string;
@@ -458,13 +450,6 @@ export enum StringConstants {
     ConnectionResponse = "ConnectionResponse",
     MessageResponseDto = "MessageResponseDto",
     JoinGroupBroadcast = "JoinGroupBroadcast",
-}
-
-export interface FileResponse {
-    data: Blob;
-    status: number;
-    fileName?: string;
-    headers?: { [name: string]: any };
 }
 
 export class ApiException extends Error {
