@@ -160,7 +160,7 @@ public class ChatController(ISseBackplane backplane,
 
     [Authorize]
     [HttpPost(nameof(CreateRoom))]
-    public async Task<Room> CreateRoom(string name)
+    public async Task CreateRoom(string name)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);    
         var room = new Room()
@@ -171,8 +171,30 @@ public class ChatController(ISseBackplane backplane,
         };
         ctx.Rooms.Add(room);
         await ctx.SaveChangesAsync();
-        return room;
     }
+    
+    [Authorize]
+    [HttpPost(nameof(DeleteRoom))]
+    public async Task DeleteRoom(string id)
+    {
+        var room = await ctx.Rooms.FindAsync(id);
+        if (room is null)
+            return;
+        ctx.Rooms.Remove(room);
+         ctx.SaveChanges();
+    }
+
+    [Authorize]                                                                                                  
+    [HttpPost(nameof(UpdateRoom))]
+    public async Task UpdateRoom([FromBody]Room newRoom)                                                        
+    {                                                                                  
+        var room = await ctx.Rooms.FindAsync(newRoom.Id);                                                                
+        if (room is null)                                                                                        
+            return;
+        ctx.Entry(room).CurrentValues.SetValues(newRoom);
+        await ctx.SaveChangesAsync();
+    }
+
 
 
     [HttpGet(nameof(GetRooms))]
@@ -182,10 +204,10 @@ public class ChatController(ISseBackplane backplane,
         var group = "rooms";
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        realtimeManager.Subscribe<MyDbContext>(group,
+        realtimeManager.Subscribe<MyDbContext>("rooms",
             criteria: changes =>
             {
-                return changes.HasAdded<Room>();
+                return changes.OfType<Room>().Any();
             },
             query:async (context) => await context.Rooms.ToListAsync()); 
         return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList()); 

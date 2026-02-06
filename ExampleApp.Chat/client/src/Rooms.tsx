@@ -5,6 +5,19 @@ import {chatClient} from "./ChatClient.ts";
 import {Outlet, useNavigate} from "react-router";
 import {useRealtimeListen} from "./useStream.tsx";
 
+function ChangeRoomName(props: { room: Room }) {
+
+    const [roomForm, setRoomForm] = useState<Room>(props.room)
+    return <>
+        <input placeholder="new name" onChange={e => setRoomForm({...roomForm, name: e.target.value})}/>
+        <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => chatClient.updateRoom(roomForm)}
+        >Change name</button>
+    </>
+
+}
+
 export function Rooms() {
 
     const [rooms, setRooms] = useState<Room[]>([])
@@ -74,6 +87,14 @@ export function Rooms() {
                                 >
                                     Join Room
                                 </button>
+                                <button
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={()=> chatClient.deleteRoom(r.id)}
+                                >
+                                    Delete room
+                                </button>
+                             <ChangeRoomName room={r} />
+
                             </div>
                         ))
                     )}

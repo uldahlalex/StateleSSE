@@ -198,7 +198,7 @@ export class ChatClient {
         return Promise.resolve<void>(null as any);
     }
 
-    createRoom(name: string | undefined): Promise<Room> {
+    createRoom(name: string | undefined): Promise<void> {
         let url_ = this.baseUrl + "/CreateRoom?";
         if (name === null)
             throw new globalThis.Error("The parameter 'name' cannot be null.");
@@ -209,7 +209,6 @@ export class ChatClient {
         let options_: RequestInit = {
             method: "POST",
             headers: {
-                "Accept": "application/json"
             }
         };
 
@@ -218,21 +217,87 @@ export class ChatClient {
         });
     }
 
-    protected processCreateRoom(response: Response): Promise<Room> {
+    protected processCreateRoom(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Room;
-            return result200;
+            return;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Room>(null as any);
+        return Promise.resolve<void>(null as any);
+    }
+
+    deleteRoom(id: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/DeleteRoom?";
+        if (id === null)
+            throw new globalThis.Error("The parameter 'id' cannot be null.");
+        else if (id !== undefined)
+            url_ += "id=" + encodeURIComponent("" + id) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDeleteRoom(_response);
+        });
+    }
+
+    protected processDeleteRoom(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    updateRoom(newRoom: Room): Promise<void> {
+        let url_ = this.baseUrl + "/UpdateRoom";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(newRoom);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdateRoom(_response);
+        });
+    }
+
+    protected processUpdateRoom(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
     }
 
     getRooms(connectionId: string | undefined): Promise<RealtimeListenResponseOfListOfRoom> {

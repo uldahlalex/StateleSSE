@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace StateleSSE.AspNetCore.EfRealtime;
 
@@ -8,14 +9,16 @@ internal sealed class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
 {
     private readonly RealtimeManager _manager;
     private readonly ISseBackplane _backplane;
+    private readonly ILogger<RealtimeSaveChangesInterceptor> _logger;
 
     // Keyed by DbContext instance ID so concurrent saves on different contexts don't collide.
     private readonly ConcurrentDictionary<Guid, List<RealtimeSubscription>> _pending = new();
 
-    public RealtimeSaveChangesInterceptor(RealtimeManager manager, ISseBackplane backplane)
+    public RealtimeSaveChangesInterceptor(RealtimeManager manager, ISseBackplane backplane, ILogger<RealtimeSaveChangesInterceptor> logger)
     {
         _manager = manager;
         _backplane = backplane;
+        _logger = logger;
     }
 
     // --- Before save: snapshot change tracker state and match against criteria ---
@@ -90,24 +93,51 @@ internal sealed class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
     private void CaptureMatchingSubscriptions(DbContext context)
     {
         var snapshot = CreateSnapshot(context);
-        var matched = _manager.GetSubscriptionsForContext(context.GetType())
-            .Where(s => s.Criteria(snapshot))
-            .ToList();
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            foreach (var entry in snapshot.Entries)
+                _logger.LogDebug("EfRealtime: Change detected - {EntityType} ({State})", entry.Entity.GetType().Name, entry.State);
+        }
+
+        var subscriptions = _manager.GetSubscriptionsForContext(context.GetType()).ToList();
+        _logger.LogDebug("EfRealtime: Evaluating {Count} subscriptions for {ContextType}", subscriptions.Count, context.GetType().Name);
+
+        var matched = subscriptions.Where(s =>
+        {
+            var result = s.Criteria(snapshot);
+            _logger.LogDebug("EfRealtime: Subscription '{Group}' criteria returned {Result}", s.GroupName, result);
+            return result;
+        }).ToList();
 
         if (matched.Count > 0)
             _pending[context.ContextId.InstanceId] = matched;
+
+        _logger.LogDebug("EfRealtime: {MatchedCount} subscriptions matched", matched.Count);
     }
 
     private async Task BroadcastAsync(DbContext context)
     {
         if (!_pending.TryRemove(context.ContextId.InstanceId, out var matched))
+        {
+            _logger.LogDebug("EfRealtime: No pending subscriptions to broadcast for context {ContextId}", context.ContextId.InstanceId);
             return;
+        }
+
+        _logger.LogDebug("EfRealtime: Broadcasting to {Count} matched subscriptions", matched.Count);
 
         foreach (var sub in matched)
         {
             var data = await sub.Query(context);
             if (data is not null)
+            {
+                _logger.LogDebug("EfRealtime: Sending to group '{Group}'", sub.GroupName);
                 await _backplane.Clients.SendToGroupAsync(sub.GroupName, data);
+            }
+            else
+            {
+                _logger.LogDebug("EfRealtime: Query for group '{Group}' returned null, skipping broadcast", sub.GroupName);
+            }
         }
     }
 

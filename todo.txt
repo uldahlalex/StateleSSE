@@ -1,0 +1,28 @@
+efrealtime:
+- useStream med kun et parameter
+    - kan stadig bruges til events hvor der ikke er presistens
+        - publish npm
+- skal ting yderligere unifies? 
+    - så der er mindre forskel på traditionel lytte til events versus lytte til persistensændringer
+    - ja nok useStream
+
+- er addRealtime til DI bare mtode til addRealtimeManager?
+- json serializer kommer fra DI - er dette også i readme og testet?
+- kan man lave en v4 hvor connect metoden bare eksisterer per automatik i en base class ? og provideren per automatik bare har defaultet "connected"?
+- til readme:
+    - 
+_____
+
+- Lave "recipe" / step by step guide
+
+_____
+
+iot
+- færdiggøre windmill inspection
+    - deploy til de studerende
+    - hvor ofte kommer alerts?
+    - selve mock device setuppet er umiddelbart fint, så nu laver jeg bare API'en og client app'en og så baserer jeg undervisningen ud fra dette
+        - Lave controllers
+        - Lave broadcast dtos
+        - Lave klient app
+            - Det er en ting man nok skal "acceptere" at man ikke i løbet af applikationens levetid kan subscribe/unsubscribe til/fra topics (brugeres parameteriserede adfærd)
