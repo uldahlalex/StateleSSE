@@ -91,30 +91,31 @@ export class ChatClient {
         return Promise.resolve<LoginResponse>(null as any);
     }
 
-    listenToRoomMessages(connectionId: string | undefined, roomId: string): Promise<RealtimeListenResponseOfListOfMessage> {
-        let url_ = this.baseUrl + "/listen/room-messages/{roomId}?";
-        if (roomId === undefined || roomId === null)
-            throw new globalThis.Error("The parameter 'roomId' must be defined.");
-        url_ = url_.replace("{roomId}", encodeURIComponent("" + roomId));
+    getMessages(connectionId: string | undefined, roomId: string | undefined): Promise<RealtimeListenResponseOfListOfMessage> {
+        let url_ = this.baseUrl + "/GetMessages?";
         if (connectionId === null)
             throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
         else if (connectionId !== undefined)
             url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        if (roomId === null)
+            throw new globalThis.Error("The parameter 'roomId' cannot be null.");
+        else if (roomId !== undefined)
+            url_ += "roomId=" + encodeURIComponent("" + roomId) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
-            method: "POST",
+            method: "GET",
             headers: {
                 "Accept": "application/json"
             }
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processListenToRoomMessages(_response);
+            return this.processGetMessages(_response);
         });
     }
 
-    protected processListenToRoomMessages(response: Response): Promise<RealtimeListenResponseOfListOfMessage> {
+    protected processGetMessages(response: Response): Promise<RealtimeListenResponseOfListOfMessage> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -131,41 +132,42 @@ export class ChatClient {
         return Promise.resolve<RealtimeListenResponseOfListOfMessage>(null as any);
     }
 
-    connect(): Promise<ConnectionResponse> {
-        let url_ = this.baseUrl + "/Connect";
+    updateMessage(newMessage: Message): Promise<void> {
+        let url_ = this.baseUrl + "/UpdateMessage";
         url_ = url_.replace(/[?&]$/, "");
 
+        const content_ = JSON.stringify(newMessage);
+
         let options_: RequestInit = {
-            method: "GET",
+            body: content_,
+            method: "PATCH",
             headers: {
-                "Accept": "application/json"
+                "Content-Type": "application/json",
             }
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processConnect(_response);
+            return this.processUpdateMessage(_response);
         });
     }
 
-    protected processConnect(response: Response): Promise<ConnectionResponse> {
+    protected processUpdateMessage(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ConnectionResponse;
-            return result200;
+            return;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<ConnectionResponse>(null as any);
+        return Promise.resolve<void>(null as any);
     }
 
-    sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<void> {
-        let url_ = this.baseUrl + "/SendMessageToGroup";
+    createMessage(dto: CreateMessageRequestDto): Promise<void> {
+        let url_ = this.baseUrl + "/CreateMessage";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(dto);
@@ -179,11 +181,11 @@ export class ChatClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processSendMessageToGroup(_response);
+            return this.processCreateMessage(_response);
         });
     }
 
-    protected processSendMessageToGroup(response: Response): Promise<void> {
+    protected processCreateMessage(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -336,6 +338,148 @@ export class ChatClient {
         }
         return Promise.resolve<RealtimeListenResponseOfListOfRoom>(null as any);
     }
+
+    getMembers(connectionId: string | undefined, roomId: string | undefined): Promise<RealtimeListenResponseOfIReadOnlyListOfString> {
+        let url_ = this.baseUrl + "/GetMembers?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        if (roomId === null)
+            throw new globalThis.Error("The parameter 'roomId' cannot be null.");
+        else if (roomId !== undefined)
+            url_ += "roomId=" + encodeURIComponent("" + roomId) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMembers(_response);
+        });
+    }
+
+    protected processGetMembers(response: Response): Promise<RealtimeListenResponseOfIReadOnlyListOfString> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfIReadOnlyListOfString;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<RealtimeListenResponseOfIReadOnlyListOfString>(null as any);
+    }
+
+    getPokes(connectionId: string | undefined): Promise<RealtimeListenResponseOfObject> {
+        let url_ = this.baseUrl + "/GetPokes?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPokes(_response);
+        });
+    }
+
+    protected processGetPokes(response: Response): Promise<RealtimeListenResponseOfObject> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfObject;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<RealtimeListenResponseOfObject>(null as any);
+    }
+
+    poke(connectionId: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/Poke?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processPoke(_response);
+        });
+    }
+
+    protected processPoke(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    connect(): Promise<void> {
+        let url_ = this.baseUrl + "/sse";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processConnect(_response);
+        });
+    }
+
+    protected processConnect(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
 }
 
 export interface LoginResponse {
@@ -391,16 +535,7 @@ export interface Room {
     userRooms?: UserRoom[];
 }
 
-/** Models used for server sent events to clients should preferably use this model. It automatically attaches "EventType" as a property with type name as value. */
-export interface BaseResponseDto {
-    eventType?: string;
-}
-
-export interface ConnectionResponse extends BaseResponseDto {
-    connectionId?: string;
-}
-
-export interface SendGroupMessageRequestDto {
+export interface CreateMessageRequestDto {
     message?: string;
     groupId?: string;
 }
@@ -410,13 +545,18 @@ export interface RealtimeListenResponseOfListOfRoom extends RealtimeListenRespon
     data?: Room[] | undefined;
 }
 
+/** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
+export interface RealtimeListenResponseOfIReadOnlyListOfString extends RealtimeListenResponse {
+    data?: string[] | undefined;
+}
+
+/** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
+export interface RealtimeListenResponseOfObject extends RealtimeListenResponse {
+    data?: any;
+}
+
 export enum StringConstants {
-    UserLeftResponseDto = "UserLeftResponseDto",
-    PokeResponseDto = "PokeResponseDto",
-    JoinGroupResponse = "JoinGroupResponse",
-    ConnectionResponse = "ConnectionResponse",
-    MessageResponseDto = "MessageResponseDto",
-    JoinGroupBroadcast = "JoinGroupBroadcast",
+    UserDisconnectedResponseDto = "UserDisconnectedResponseDto",
 }
 
 export class ApiException extends Error {

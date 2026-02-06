@@ -70,12 +70,12 @@
         }
       }
     },
-    "/listen/room-messages/{roomId}": {
-      "post": {
+    "/GetMessages": {
+      "get": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_ListenToRoomMessages",
+        "operationId": "Chat_GetMessages",
         "parameters": [
           {
             "name": "connectionId",
@@ -87,8 +87,7 @@
           },
           {
             "name": "roomId",
-            "in": "path",
-            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             },
@@ -109,38 +108,43 @@
         }
       }
     },
-    "/Connect": {
-      "get": {
+    "/UpdateMessage": {
+      "patch": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_Connect",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConnectionResponse"
-                }
+        "operationId": "Chat_UpdateMessage",
+        "requestBody": {
+          "x-name": "newMessage",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Message"
               }
             }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": ""
           }
         }
       }
     },
-    "/SendMessageToGroup": {
+    "/CreateMessage": {
       "post": {
         "tags": [
           "Chat"
         ],
-        "operationId": "Chat_SendMessageToGroup",
+        "operationId": "Chat_CreateMessage",
         "requestBody": {
           "x-name": "dto",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendGroupMessageRequestDto"
+                "$ref": "#/components/schemas/CreateMessageRequestDto"
               }
             }
           },
@@ -271,6 +275,110 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/GetMembers": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_GetMembers",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "roomId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfIReadOnlyListOfString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetPokes": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_GetPokes",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Poke": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Poke",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/sse": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_Connect",
+        "responses": {
+          "200": {
+            "description": ""
           }
         }
       }
@@ -433,34 +541,7 @@
           }
         }
       },
-      "ConnectionResponse": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/BaseResponseDto"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "connectionId": {
-                "type": "string"
-              }
-            }
-          }
-        ]
-      },
-      "BaseResponseDto": {
-        "type": "object",
-        "description": "Models used for server sent events to clients should preferably use this model.\nIt automatically attaches \"EventType\" as a property with type name as value.",
-        "x-abstract": true,
-        "additionalProperties": false,
-        "properties": {
-          "eventType": {
-            "type": "string"
-          }
-        }
-      },
-      "SendGroupMessageRequestDto": {
+      "CreateMessageRequestDto": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -493,15 +574,46 @@
           }
         ]
       },
+      "RealtimeListenResponseOfIReadOnlyListOfString": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RealtimeListenResponseOfObject": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {}
+            }
+          }
+        ]
+      },
       "StringConstants": {
         "type": "string",
         "enum": [
-          "UserLeftResponseDto",
-          "PokeResponseDto",
-          "JoinGroupResponse",
-          "ConnectionResponse",
-          "MessageResponseDto",
-          "JoinGroupBroadcast"
+          "UserDisconnectedResponseDto"
         ]
       }
     },

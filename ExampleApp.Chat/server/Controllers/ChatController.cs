@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.EfRealtime;
+using StateleSSE.AspNetCore.GroupRealtime;
 
 namespace server.Controllers;
 
@@ -14,6 +15,7 @@ namespace server.Controllers;
 public class ChatController(ISseBackplane backplane,
     JwtService jwtService,
     IRealtimeManager realtimeManager,
+    IGroupRealtimeManager groupRealtimeManager,
     MyDbContext ctx) : RealtimeControllerBase(backplane)
 {
     [HttpPost(nameof(Login))]
@@ -48,9 +50,8 @@ public class ChatController(ISseBackplane backplane,
         return (new LoginResponse(jwtService.GenerateToken(u.Id)));
     }
 
-    [HttpPost("listen/room-messages/{roomId}")]
-    // [ProducesResponseType(typeof(List<Message>), 201)]
-    public async Task<RealtimeListenResponse<List<Message>>> ListenToRoomMessages(string connectionId, string roomId)
+    [HttpGet(nameof(GetMessages))]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
     {
         var group = $"room-messages:{roomId}";
         await backplane.Groups.AddToGroupAsync(connectionId, group);
@@ -71,11 +72,19 @@ public class ChatController(ISseBackplane backplane,
             .Where(m => m.RoomId == roomId)
             .ToList());
     }
-    
+
+    [HttpPatch(nameof(UpdateMessage))]
+    public async Task UpdateMessage([FromBody]Message newMessage)
+    {
+        var message = ctx.Messages.FirstOrDefault(m => m.Id == newMessage.Id)
+                      ?? throw new ValidationException("message not found");
+        ctx.Entry(message).CurrentValues.SetValues(newMessage);
+        await ctx.SaveChangesAsync();
+    }
 
     [Authorize]
-    [HttpPost(nameof(SendMessageToGroup))]
-    public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
+    [HttpPost(nameof(CreateMessage))]
+    public async Task CreateMessage([FromBody] CreateMessageRequestDto dto)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var message = new Message()
@@ -126,11 +135,8 @@ public class ChatController(ISseBackplane backplane,
         ctx.Entry(room).CurrentValues.SetValues(newRoom);
         await ctx.SaveChangesAsync();
     }
-
-
-
+    
     [HttpGet(nameof(GetRooms))]
-    // [ProducesResponseType(typeof(List<Room>), 201)]
     public async Task<RealtimeListenResponse<List<Room>>> GetRooms(string connectionId)
     {
         var group = "rooms";
@@ -145,15 +151,38 @@ public class ChatController(ISseBackplane backplane,
         return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList()); 
     }
     
+    [HttpGet(nameof(GetMembers))]
+    public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
+    {
+        var listenGroup = $"room-members:{roomId}";
+        var roomGroup = $"room-messages:{roomId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
+
+        groupRealtimeManager.Subscribe(listenGroup,
+            criteria: change => change.GroupName == roomGroup,
+            query: async groups => await groups.GetMembersAsync(roomGroup));
+
+        return new RealtimeListenResponse<IReadOnlyList<string>>(listenGroup,
+            await backplane.Groups.GetMembersAsync(roomGroup));
+    }
+    
+
+    [HttpGet(nameof(GetPokes))]                               
+    public async Task<RealtimeListenResponse<object?>> GetPokes(string connectionId)                             
+    {                                                                                                            
+        var group = $"poke:{connectionId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+        return new RealtimeListenResponse<object?>(group, null);
+    }
+
+    [HttpPost(nameof(Poke))]
+    public async Task Poke(string connectionId)
+    {
+        await backplane.Clients.SendToGroupAsync($"poke:{connectionId}", new { message = "You have been poked"
+        });
+    }
+
+    
+
     
 }
-
-
-
-public record SendGroupMessageRequestDto(string Message, string GroupId);
-
-
-public record LoginRequest(string Username, string Password);
-public record LoginResponse(string Token);
-
-

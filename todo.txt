@@ -1,21 +1,20 @@
 efrealtime:
-- useStream med kun et parameter
-    - kan stadig bruges til events hvor der ikke er presistens
-        - publish npm
-- skal ting yderligere unifies? 
-    - så der er mindre forskel på traditionel lytte til events versus lytte til persistensændringer
-    - ja nok useStream
-
-- er addRealtime til DI bare mtode til addRealtimeManager?
-- json serializer kommer fra DI - er dette også i readme og testet?
-- kan man lave en v4 hvor connect metoden bare eksisterer per automatik i en base class ? og provideren per automatik bare har defaultet "connected"?
-- til readme:
-    - 
-    
-
-TS6385: config is deprecated. 
+- fjern baseresponsedto
+- fjern enkelt usestream
+    - fjern først efter jeg har lavet ny demo helt uden den
+              useRealtimeListen<Room[]>(
+            (connId) => chatClient.listenToSomeArbitraryBroadcastThatHasNothingToDoWithEf(connId!, params!.roomId!),
+            (dto) => alert(dto),
+            []
+        );
+    - bruges internt til realtime funktionen, men det er ikke sikkert den er et godt fit - der skal i hvert fald ikke være to 
+    TS6385: config is deprecated. 
     - skal useStream overhovedet eksistere eller kan det som ikke er collection baseret blot være:
     
+
+
+Redvider readme
+    - how to adjust json serializer (uses the controllers basic json serializer)
         useRealtimeListen<Room[]>(
             (connId) => chatClient.listenToSomeArbitraryBroadcastThatHasNothingToDoWithEf(connId!, params!.roomId!),
             (dto) => alert(dto),

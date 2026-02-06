@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,9 +11,9 @@ using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
 using StackExchange.Redis;
-using Microsoft.AspNetCore.Diagnostics;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
+using StateleSSE.AspNetCore.GroupRealtime;
 
 var builder = WebApplication.CreateBuilder(args);
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
@@ -31,17 +32,17 @@ builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    var config = ConfigurationOptions.Parse( redis    );
+    var config = ConfigurationOptions.Parse(redis);
     config.AbortOnConnectFail = false;
     return ConnectionMultiplexer.Connect(config);
 });
 builder.Services.AddRedisSseBackplane();
+builder.Services.AddGroupRealtime();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
     conf.UseNpgsql(db);
     conf.AddEfRealtimeInterceptor(sp); // hooks into SaveChanges
-
 });
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -54,7 +55,6 @@ builder.Services.AddOpenApiDocument(config =>
     });
     config.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("Bearer"));
     config.AddStringConstants<MyConstants>();
-
 });
 
 builder.Services.AddSingleton<JwtService>();
@@ -73,9 +73,9 @@ var app = builder.Build();
 app.UseExceptionHandler(config => { });
 app.UseCors(c =>
     c.AllowAnyHeader()
-    .AllowAnyMethod()
-    .AllowAnyOrigin()
-    .SetIsOriginAllowed(_ => true));
+        .AllowAnyMethod()
+        .AllowAnyOrigin()
+        .SetIsOriginAllowed(_ => true));
 app.UseOpenApi();
 app.UseSwaggerUi();
 app.UseAuthentication();
@@ -84,39 +84,30 @@ app.MapControllers();
 
 
 app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
-var backplane = app.Services.GetRequiredService<ISseBackplane>();                                                                                                                         
-backplane.OnClientDisconnected += async (_, e) =>                                                                                                                                         
-{                                                                                                                                                                                         
-                                                                                                                                                                                    
-        await backplane.Clients.SendToGroupAsync("user-left", new UserLeftResponseDto(e.ConnectionId));                                                                                        
-                                                                                                                                                    
-};
+
 using (var scope = app.Services.CreateScope())
 {
- var ctx =   scope.ServiceProvider.GetRequiredService<MyDbContext>();
- Console.WriteLine(ctx.Database.GenerateCreateScript());
+    var ctx = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+    Console.WriteLine(ctx.Database.GenerateCreateScript());
 
- ctx.Database.EnsureCreated();
- var exists = ctx.Users.Any(u => u.Id == "test");
- if (!exists)
- {
-     
-     var salt = "word";
-     var password = "pass";
-     ctx.Users.Add(new User()
-     {
-         Id = Guid.NewGuid().ToString(),
-         Nickname = "test",
-         //password is "pass", salt is "word"
-         Hash = Convert.ToBase64String(
-             System.Security.Cryptography.SHA256.HashData(
-                 System.Text.Encoding.UTF8.GetBytes(password + salt))),
-         Salt = salt,
-     });
-     ctx.SaveChanges();
- }
+    ctx.Database.EnsureCreated();
+    var exists = ctx.Users.Any(u => u.Id == "test");
+    if (!exists)
+    {
+        var salt = "word";
+        var password = "pass";
+        ctx.Users.Add(new User()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Nickname = "test",
+            //password is "pass", salt is "word"
+            Hash = Convert.ToBase64String(
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(password + salt))),
+            Salt = salt,
+        });
+        ctx.SaveChanges();
+    }
 }
 
 app.Run();
-
-public record UserLeftResponseDto(string ConnectionId) : BaseResponseDto;

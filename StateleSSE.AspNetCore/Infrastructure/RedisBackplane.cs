@@ -87,6 +87,9 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
 
     /// <inheritdoc/>
+    public event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
+
+    /// <inheritdoc/>
     public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
@@ -144,7 +147,14 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         state.Channel.Writer.Complete();
         _logger.LogDebug("Client {ConnectionId} disconnected", connectionId);
 
-        // Raise disconnection event
+        foreach (var group in clientGroups)
+        {
+            OnGroupChanged?.Invoke(this, new GroupChangedEventArgs
+            {
+                ConnectionId = connectionId, GroupName = group, ChangeType = GroupChangeType.Removed
+            });
+        }
+
         OnClientDisconnected?.Invoke(this, new ClientDisconnectedEventArgs
         {
             ConnectionId = connectionId,
@@ -173,6 +183,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         }
 
         _logger.LogDebug("Client {ConnectionId} added to group '{Group}'", connectionId, groupName);
+        OnGroupChanged?.Invoke(this, new GroupChangedEventArgs
+        {
+            ConnectionId = connectionId, GroupName = groupName, ChangeType = GroupChangeType.Added
+        });
     }
 
     internal async Task RemoveFromGroupAsync(string connectionId, string groupName)
@@ -186,6 +200,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         }
 
         _logger.LogDebug("Client {ConnectionId} removed from group '{Group}'", connectionId, groupName);
+        OnGroupChanged?.Invoke(this, new GroupChangedEventArgs
+        {
+            ConnectionId = connectionId, GroupName = groupName, ChangeType = GroupChangeType.Removed
+        });
     }
 
     internal async Task<int> GetGroupMemberCountAsync(string groupName)

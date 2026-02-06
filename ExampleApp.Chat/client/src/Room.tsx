@@ -1,9 +1,10 @@
 import {useRealtimeListen, useStream} from "./useStream.tsx";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {
-    type Message, type RealtimeListenResponseOfListOfMessage,
-    type Room,
-    type SendGroupMessageRequestDto
+    type CreateMessageRequestDto,
+    type Message,
+    type RealtimeListenResponseOfListOfMessage,
+
 } from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {useNavigate, useParams} from "react-router";
@@ -13,24 +14,46 @@ export type RoomParams = {
 }
 
 export function Room() {
-    // const stream = useStream();
+    const stream = useStream()
     const navigate = useNavigate()
     const params = useParams<RoomParams>();
+    const [members, setMembers] = useState<any[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
-    // const [members, setMembers] = useState<ConnectionIdAndUserName[]>([]);
-    const [message, setMessage] = useState<SendGroupMessageRequestDto>({
+    const [message, setMessage] = useState<CreateMessageRequestDto>({
         groupId: params.roomId,
         message: ""
     })
-    useRealtimeListen<Room[]>(
-        (connId) => chatClient.listenToRoomMessages(connId!, params!.roomId!),
-        (msgs) => setMessages(msgs),
-        [params.roomId]
-    );
+    useRealtimeListen(
+        (id) => sub(id),
+        (data) => setMessages(data),
+        [params.roomId]);
+    // useRealtimeListen(
+    //     (id) => {
+    //
+    //     },
+    //     (data) => alert('poked!'),
+    //     []
+    // )
 
+    useRealtimeListen(
+        (id) => chatClient.getMembers(id, params.roomId),
+        (data) => {
+            setMembers(data)
+        },
+        [params.roomId]
+    )
+
+    useRealtimeListen(
+        (id) => chatClient.getPokes(id),
+        data => {
+            if(data)
+                alert("poked");
+        },
+        []
+    )
 
     function sub(id: string): Promise<RealtimeListenResponseOfListOfMessage> {
-        return chatClient.listenToRoomMessages(id, params.roomId!)
+        return chatClient.getMessages(id, params.roomId!)
             .then(r => {
                 setMessages(r.data!);
                 return r; // must have { group, data? }
@@ -40,12 +63,6 @@ export function Room() {
                 throw e;
             });
     }
-
-    useRealtimeListen((id) => sub(id),
-        (data) => {
-            setMessages(data)
-        }, [params.roomId]);
-
 
 
 
@@ -83,14 +100,14 @@ export function Room() {
                             value={message.message}
                             onKeyDown={e => {
                                 if (e.key === 'Enter' && message.message?.trim()) {
-                                    chatClient.sendMessageToGroup(message)
+                                    chatClient.createMessage(message)
                                 }
                             }}
                         />
                         <button
                             className="btn btn-primary"
                             onClick={() => {
-                                chatClient.sendMessageToGroup(message)
+                                chatClient.createMessage(message)
                             }}
                         >
                             Send
@@ -100,32 +117,31 @@ export function Room() {
             </div>
 
             <div className="members-panel">
-                {/*<div className="members-header">*/}
-                {/*    <h3>Members</h3>*/}
-                {/*    <div className="members-count">{members.length} online</div>*/}
-                {/*</div>*/}
-                {/*<div className="members-list">*/}
-                {/*    {members.map(m => (*/}
-                {/*        <div className="member-item" key={m.connectionId}>*/}
-                {/*            <div className="member-info">*/}
-                {/*                <div className="member-avatar">*/}
-                {/*                    {(m.userName || 'A').charAt(0).toUpperCase()}*/}
-                {/*                </div>*/}
-                {/*                <span className="member-name">{m.userName || 'Anonymous'}</span>*/}
-                {/*            </div>*/}
-                {/*            <button*/}
-                {/*                className="btn btn-ghost btn-sm"*/}
-                {/*                onClick={() => {*/}
-                {/*                    // chatClient.poke(m.connectionId).then(r => {*/}
-                {/*                    //     alert('poke sent')*/}
-                {/*                    // })*/}
-                {/*                }}*/}
-                {/*            >*/}
-                {/*                Poke*/}
-                {/*            </button>*/}
-                {/*        </div>*/}
-                {/*    ))}*/}
-                {/*</div>*/}
+                <div className="members-header">
+                    <h3>Members</h3>
+                </div>
+                <div className="members-list">
+                    {members && members.map(m => (
+                        <div className="member-item" key={m.connectionId}>
+                            <div className="member-info">
+                                <div className="member-avatar">
+                                    {(m.userName || 'A').charAt(0).toUpperCase()}
+                                </div>
+                                <span className="member-name">{m.userName || 'Anonymous'}</span>
+                            </div>
+                            <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => {
+                                    chatClient.poke(m.connectionId).then(r => {
+                                        alert('poke sent')
+                                    })
+                                }}
+                            >
+                                Poke
+                            </button>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

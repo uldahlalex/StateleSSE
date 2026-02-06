@@ -315,6 +315,72 @@ Calling `Subscribe` with the same group name replaces the previous subscription 
 
 ---
 
+## Group Realtime (GroupRealtime)
+
+Automatic realtime updates driven by backplane group membership changes. When clients join/leave groups or disconnect, registered queries are executed and results are broadcast to subscribers via the SSE backplane.
+
+This complements EfRealtime: where EfRealtime reacts to database changes (`SaveChanges`), GroupRealtime reacts to non-DB state like "who's in a room" (`AddToGroupAsync`, `RemoveFromGroupAsync`, client disconnect).
+
+### How it works
+
+1. A controller endpoint **subscribes** clients to a group realtime feature by defining a **criteria** (which group change triggers it) and a **query** (what data to send, run against `IBackplaneGroups`).
+2. Clients join a backplane group for that feature.
+3. The backplane fires `OnGroupChanged` whenever `AddToGroupAsync`, `RemoveFromGroupAsync`, or client disconnect occurs. The `GroupRealtimeManager` listens to this event, evaluates matching subscriptions, and broadcasts query results.
+
+### Setup
+
+```csharp
+builder.Services.AddInMemorySseBackplane(); // or AddRedisSseBackplane()
+builder.Services.AddGroupRealtime();
+```
+
+Registration order does not matter — `AddGroupRealtime()` subscribes to the backplane's `OnGroupChanged` event at runtime via DI.
+
+### Subscribing clients to group membership updates
+
+In a controller, use `IGroupRealtimeManager` to register a subscription. The criteria inspects a `GroupChangedEventArgs`, and the query runs against `IBackplaneGroups`:
+
+```csharp
+public class ChatController(ISseBackplane backplane, IGroupRealtimeManager groupRealtime) : ControllerBase
+{
+    [HttpGet("members/{roomId}")]
+    public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
+    {
+        var group = $"room-members:{roomId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        groupRealtime.Subscribe(group,
+            criteria: change => change.GroupName == $"room:{roomId}",
+            query: async groups => await groups.GetMembersAsync($"room:{roomId}"));
+
+        return new RealtimeListenResponse<IReadOnlyList<string>>(group,
+            await backplane.Groups.GetMembersAsync($"room:{roomId}"));
+    }
+}
+```
+
+Note: the criteria watches `"room:{roomId}"` (the actual room group), not `"room-members:{roomId}"` (the listener group), so subscribing to listen doesn't trigger a broadcast to yourself.
+
+### GroupChangedEventArgs API
+
+The `criteria` function receives a `GroupChangedEventArgs` with:
+
+```csharp
+change.ConnectionId  // the client that joined/left
+change.GroupName     // the group that changed
+change.ChangeType    // GroupChangeType.Added or GroupChangeType.Removed
+```
+
+### Unsubscribing
+
+```csharp
+groupRealtime.Unsubscribe("room-members:5");
+```
+
+Calling `Subscribe` with the same group name replaces the previous subscription.
+
+---
+
 ## OpenAPI String Constants
 
 `StringConstantsDiscovery` helps expose event type names in your OpenAPI spec for client code generation. It extracts:

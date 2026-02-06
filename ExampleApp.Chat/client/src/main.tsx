@@ -6,7 +6,7 @@ import Routes from "./Routes.tsx";
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(
-    <StreamProvider url={`${BASE_URL}`}>
+    <StreamProvider url={`${BASE_URL}/sse`}>
         <Routes/>
     </StreamProvider>
 )
