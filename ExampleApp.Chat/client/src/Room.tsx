@@ -18,7 +18,6 @@ export function Room() {
     const params = useParams<RoomParams>();
     const [messages, setMessages] = useState<Message[]>([]);
     // const [members, setMembers] = useState<ConnectionIdAndUserName[]>([]);
-    const [room, setRoom] = useState<Room | undefined>(undefined)
     const [message, setMessage] = useState<SendGroupMessageRequestDto>({
         groupId: params.roomId,
         message: ""
@@ -48,16 +47,13 @@ export function Room() {
         }, [params.roomId]);
 
 
-    if (!room)
-        return <div className="loading">Loading room...</div>
+
 
 
     return (
         <div className="room-container">
             <div className="chat-panel">
-                <div className="chat-header">
-                    <h2>{room.name!}</h2>
-                </div>
+       
 
                 <div className="messages-container">
                     {messages.length === 0 ? (

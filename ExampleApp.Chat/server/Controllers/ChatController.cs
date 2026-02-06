@@ -60,7 +60,7 @@ public class ChatController(ISseBackplane backplane,
             criteria: changes =>
             {
                 return changes.OfType<Message>()
-                    .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId);
+                    .Any(e => e.Entity.RoomId == roomId);
             },
             query: async c => await c.Messages
                 .Where(m => m.RoomId == roomId)
