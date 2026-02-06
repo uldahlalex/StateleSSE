@@ -242,11 +242,19 @@ const StreamContext = createContext<Stream | null>(null);
 // ============================================================================
 
 export interface StreamProviderProps {
-    config: StreamConfig;
+    /** The SSE endpoint URL. Defaults to "/sse" */
+    url?: string;
+    /** The SSE event name that delivers the connection response. Defaults to "connected" */
+    connectEvent?: string;
+    /** @deprecated Use url and connectEvent props instead */
+    config?: StreamConfig;
     children: ReactNode;
 }
 
-export function StreamProvider({ config, children }: StreamProviderProps) {
+export function StreamProvider({ url, connectEvent, config, children }: StreamProviderProps) {
+    const resolvedUrl = url ?? config?.urlForStreamEndpoint ?? "/sse";
+    const resolvedConnectEvent = connectEvent ?? config?.connectEvent ?? "connected";
+
     const coreRef = useRef<StreamCore | null>(null);
     const [connectionId, setConnectionId] = useState<string | null>(null);
 
@@ -257,12 +265,12 @@ export function StreamProvider({ config, children }: StreamProviderProps) {
     useEffect(() => {
         const core = coreRef.current!;
         core.onConnectionChange = setConnectionId;
-        core.connect(config);
+        core.connect({ urlForStreamEndpoint: resolvedUrl, connectEvent: resolvedConnectEvent });
 
         return () => {
             core.disconnect();
         };
-    }, [config.urlForStreamEndpoint, config.connectEvent]);
+    }, [resolvedUrl, resolvedConnectEvent]);
 
     const stream: Stream = {
         connectionId,

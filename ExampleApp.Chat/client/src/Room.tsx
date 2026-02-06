@@ -53,7 +53,7 @@ export function Room() {
     return (
         <div className="room-container">
             <div className="chat-panel">
-       
+
 
                 <div className="messages-container">
                     {messages.length === 0 ? (

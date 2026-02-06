@@ -6,10 +6,7 @@ import Routes from "./Routes.tsx";
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(
-    <StreamProvider config={{
-        urlForStreamEndpoint: `${BASE_URL}/Connect`,
-        connectEvent: "ConnectionResponse",
-    }}>
+    <StreamProvider url={`${BASE_URL}`}>
         <Routes/>
     </StreamProvider>
 )

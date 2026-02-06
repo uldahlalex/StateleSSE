@@ -11,6 +11,18 @@ efrealtime:
 - kan man lave en v4 hvor connect metoden bare eksisterer per automatik i en base class ? og provideren per automatik bare har defaultet "connected"?
 - til readme:
     - 
+    
+
+TS6385: config is deprecated. 
+    - skal useStream overhovedet eksistere eller kan det som ikke er collection baseret blot være:
+    
+        useRealtimeListen<Room[]>(
+            (connId) => chatClient.listenToSomeArbitraryBroadcastThatHasNothingToDoWithEf(connId!, params!.roomId!),
+            (dto) => alert(dto),
+            []
+        );
+
+
 _____
 
 - Lave "recipe" / step by step guide
