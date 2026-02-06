@@ -50,22 +50,27 @@ public class ChatController(ISseBackplane backplane,
     }
 
     [HttpPost("listen/room-messages/{roomId}")]
-    public async Task<RealtimeListenResponse> ListenToRoomMessages(string connectionId, string roomId)
+    // [ProducesResponseType(typeof(List<Message>), 201)]
+    public async Task<RealtimeListenResponse<List<Message>>> ListenToRoomMessages(string connectionId, string roomId)
     {
         var group = $"room-messages:{roomId}";
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
         realtimeManager.Subscribe<MyDbContext>(group,
-            criteria: changes => changes.HasAdded<Message>(),
+            criteria: changes =>
+            {
+                return changes.OfType<Message>()
+                    .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId);
+            },
             query: async c => await c.Messages
                 .Where(m => m.RoomId == roomId)
                 .OrderByDescending(m => m.CreatedAt)
-                .Take(10)
-                .Select(m => new { m.Content, User = m.User.Nickname })
                 .ToListAsync()
         );
 
-        return new RealtimeListenResponse(group);
+        return new RealtimeListenResponse<List<Message>>(group, ctx.Messages
+            .Where(m => m.RoomId == roomId)
+            .ToList());
     }
 
     /*
@@ -96,7 +101,7 @@ public class ChatController(ISseBackplane backplane,
     }
     
     
-    [HttpPost(nameof(JoinGroup))]
+    /*[HttpPost(nameof(JoinGroup))]
     [ProducesResponseType(typeof(JoinGroupBroadcast), 202)]
     [ProducesResponseType(typeof(JoinGroupResponse), 200)]
     [ProducesResponseType(typeof(UserLeftResponseDto), 400)]
@@ -122,19 +127,19 @@ public class ChatController(ISseBackplane backplane,
         return new JoinGroupResponse(room);
 
 
-    }
+    }*/
 
-    [Authorize]
-    [HttpPost(nameof(Poke))]
-    [ProducesResponseType(typeof(PokeResponseDto), 200)]
-    public async Task Poke(PokeRequestDto dto)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
-        var name = u?.Nickname ?? "Anonymous";
-
-        await backplane.Clients.SendToClientAsync(dto.connectionIdToPoke, new PokeResponseDto(name));
-    }
+    // [Authorize]
+    // [HttpPost(nameof(Poke))]
+    // [ProducesResponseType(typeof(PokeResponseDto), 200)]
+    // public async Task Poke(PokeRequestDto dto)
+    // {
+    //     var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    //     var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
+    //     var name = u?.Nickname ?? "Anonymous";
+    //
+    //     await backplane.Clients.SendToClientAsync(dto.connectionIdToPoke, new PokeResponseDto(name));
+    // }
 
     [Authorize]
     [HttpPost(nameof(SendMessageToGroup))]
@@ -171,9 +176,25 @@ public class ChatController(ISseBackplane backplane,
 
 
     [HttpGet(nameof(GetRooms))]
-    public async Task<List<Room>> GetRooms()
-        => ctx.Rooms.ToList();
+    // [ProducesResponseType(typeof(List<Room>), 201)]
+    public async Task<RealtimeListenResponse<List<Room>>> GetRooms(string connectionId)
+    {
+        var group = "rooms";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        realtimeManager.Subscribe<MyDbContext>(group,
+            criteria: changes =>
+            {
+                return changes.HasAdded<Room>();
+            },
+            query:async (context) => await context.Rooms.ToListAsync()); 
+        return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList()); 
+    }
+    
+    
 }
+
+
 
 public record PokeResponseDto(string pokedBy) : BaseResponseDto;
 public record PokeRequestDto(string connectionIdToPoke);

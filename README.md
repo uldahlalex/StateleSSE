@@ -247,10 +247,42 @@ public class ChatController(ISseBackplane backplane, IRealtimeManager realtime) 
                 .ToListAsync()
         );
 
-        return Ok();
+        return new RealtimeListenResponse(group);
     }
 }
 ```
+
+**Why return `RealtimeListenResponse` with the group name?**
+
+The client needs to know which SSE event name to listen for. The group name is used as the SSE event name when broadcasting, so the client must call `stream.on(group, callback)` with the exact same group string. Returning it from the subscribe endpoint:
+- Keeps the group naming logic on the server (single source of truth)
+- Lets the server change naming conventions without breaking clients
+- Makes the client code simpler - just use whatever the server returns
+
+**Returning initial data with `RealtimeListenResponse<T>`**
+
+Often clients need the current state immediately, then listen for subsequent changes. Use the generic version to include initial data:
+
+```csharp
+[HttpPost("listen/room-messages/{roomId}")]
+public async Task<RealtimeListenResponse<List<MessageDto>>> ListenToRoomMessages(string connectionId, int roomId)
+{
+    var group = $"room-messages:{roomId}";
+    await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+    realtime.Subscribe<MyDbContext>(group,
+        criteria: changes => changes.OfType<Message>()
+            .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId),
+        query: async ctx => await GetMessages(ctx, roomId)
+    );
+
+    // Return group AND initial data
+    var initialMessages = await GetMessages(ctx, roomId);
+    return new RealtimeListenResponse<List<MessageDto>>(group, initialMessages);
+}
+```
+
+The `useRealtimeListen` hook automatically calls `onData` with the initial data before setting up the SSE listener.
 
 Now whenever *any* code calls `SaveChangesAsync()` on `MyDbContext` and a `Message` with matching `RoomId` was added, the query executes and all clients in the `"room-messages:{roomId}"` group receive the result.
 

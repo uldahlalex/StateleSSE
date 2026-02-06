@@ -11,6 +11,7 @@ namespace StateleSSE.AspNetCore.Infrastructure;
 public class InMemoryBackplane : ISseBackplane, IDisposable
 {
     private readonly ILogger<InMemoryBackplane> _logger;
+    private readonly JsonSerializerOptions _jsonOptions;
     private readonly ConcurrentDictionary<string, ConnectionState> _connections = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _groups = new();
 
@@ -18,11 +19,12 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
     private readonly InMemoryGroups _groupsApi;
 
     /// <summary>
-    /// Creates an InMemoryBackplane instance with logging.
+    /// Creates an InMemoryBackplane instance with logging and JSON options.
     /// </summary>
-    public InMemoryBackplane(ILogger<InMemoryBackplane> logger)
+    public InMemoryBackplane(ILogger<InMemoryBackplane> logger, JsonSerializerOptions? jsonOptions = null)
     {
         _logger = logger;
+        _jsonOptions = jsonOptions ?? new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
         _clients = new InMemoryClients(this);
         _groupsApi = new InMemoryGroups(this);
     }
@@ -107,10 +109,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
     {
         if (_connections.TryGetValue(connectionId, out var state))
         {
-            var json = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
+            var json = JsonSerializer.SerializeToElement(data, _jsonOptions);
             var evt = new SseEvent(groupName, json);
             await state.Channel.Writer.WriteAsync(evt);
         }
@@ -118,10 +117,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
 
     internal async Task SendToAllAsync(object data)
     {
-        var json = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        var json = JsonSerializer.SerializeToElement(data, _jsonOptions);
         var evt = new SseEvent(null, json);
 
         var tasks = _connections.Values
@@ -138,10 +134,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
             return;
         }
 
-        var json = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        var json = JsonSerializer.SerializeToElement(data, _jsonOptions);
         var evt = new SseEvent(groupName, json);
 
         var tasks = members.Keys

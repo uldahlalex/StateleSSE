@@ -1,5 +1,5 @@
 import {createBrowserRouter, RouterProvider} from "react-router";
-import Rooms from "./Rooms.tsx";
+import {Rooms} from "./Rooms.tsx";
 import {Room} from "./Room.tsx";
 
 export default function Routes() {

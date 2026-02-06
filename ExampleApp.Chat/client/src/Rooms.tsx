@@ -1,20 +1,27 @@
 import Login from "./Login.tsx";
 import {useEffect, useState} from "react";
-import type {Room} from "./generated-ts-client.ts";
+import type {RealtimeListenResponseOfListOfRoom, Room} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {Outlet, useNavigate} from "react-router";
+import {useRealtimeListen} from "./useStream.tsx";
 
-export default function Rooms() {
+export function Rooms() {
 
     const [rooms, setRooms] = useState<Room[]>([])
     const [createRoomForm, setCreateRoomFormm] = useState<string>("your awesome room name")
     const navigate = useNavigate();
 
-    useEffect(() => {
-        chatClient.getRooms().then(r => {
-            setRooms(r)
+    async function getRooms(id: string): Promise<RealtimeListenResponseOfListOfRoom> {
+        return await chatClient.getRooms(id).then(r => {
+            setRooms(r.data!)
+            return r;
         })
-    }, []);
+    }
+
+    useRealtimeListen((id) => getRooms(id),
+        data => {
+            setRooms(data)
+        }, [])
 
 
     return (
@@ -40,9 +47,7 @@ export default function Rooms() {
                     <button
                         className="btn btn-primary"
                         onClick={() => {
-                            chatClient.createRoom(createRoomForm).then(r => {
-                                setRooms(prev => [...prev, r])
-                            })
+                            chatClient.createRoom(createRoomForm);
                         }}
                     >
                         Create Room
@@ -60,12 +65,12 @@ export default function Rooms() {
                             <p>No rooms yet. Create one above!</p>
                         </div>
                     ) : (
-                        rooms.map(r => (
+                        rooms && rooms.length> 0 &&rooms?.map(r => (
                             <div className="room-item" key={r.id}>
                                 <span className="room-name">{r.name || `Room ${r.id}`}</span>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    onClick={() => navigate('/room/'+r.id)}
+                                    onClick={() => navigate('/room/' + r.id)}
                                 >
                                     Join Room
                                 </button>
@@ -75,7 +80,7 @@ export default function Rooms() {
                 </div>
             </div>
 
-            <Outlet />
+            <Outlet/>
         </div>
     );
 }

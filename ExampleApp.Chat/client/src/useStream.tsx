@@ -337,21 +337,24 @@ export function useStream(): Stream {
  * the SSE listener (which receives broadcasts when SaveChanges triggers).
  *
  * @param subscribe - Async function that calls the subscribe endpoint. Receives the connectionId
- *                    and must return an object with a `group` field (RealtimeListenResponse).
- * @param onData - Callback invoked whenever the server broadcasts new data for this subscription.
+ *                    and must return an object with a `group` field and optional `data` for initial state.
+ * @param onData - Callback invoked with initial data (if provided) and whenever the server broadcasts.
  * @param deps - Additional dependency array for re-subscribing (e.g., [roomId]).
+ * @param onError - Optional callback invoked if the subscribe call fails.
  *
  * @example
  * useRealtimeListen<Message[]>(
  *     (connId) => chatClient.listenToRoomMessages(roomId, connId),
  *     (messages) => setMessages(messages),
- *     [roomId]
+ *     [roomId],
+ *     (error) => navigate("/")
  * );
  */
 export function useRealtimeListen<T>(
-    subscribe: (connectionId: string) => Promise<{ group: string }>,
+    subscribe: (connectionId: string) => Promise<{ group?: string; data?: T }>,
     onData: (data: T) => void,
-    deps: unknown[] = []
+    deps: unknown[] = [],
+    onError?: (error: unknown) => void
 ) {
     const stream = useStream();
 
@@ -361,10 +364,19 @@ export function useRealtimeListen<T>(
         let unsub: Unsubscribe | undefined;
         let cancelled = false;
 
-        subscribe(stream.connectionId).then(({ group }) => {
-            if (cancelled) return;
-            unsub = stream.on<T>(group, onData);
-        });
+        subscribe(stream.connectionId)
+            .then(({ group, data }) => {
+                if (cancelled) return;
+                if (group == null)
+                    throw new Error("Group / event is null");
+                if (data !== undefined)
+                    onData(data);
+                unsub = stream.on<T>(group, onData);
+            })
+            .catch(e => {
+                if (cancelled) return;
+                onError?.(e);
+            });
 
         return () => {
             cancelled = true;

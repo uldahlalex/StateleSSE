@@ -91,7 +91,7 @@ export class ChatClient {
         return Promise.resolve<LoginResponse>(null as any);
     }
 
-    listenToRoomMessages(connectionId: string | undefined, roomId: string): Promise<RealtimeListenResponse> {
+    listenToRoomMessages(connectionId: string | undefined, roomId: string): Promise<RealtimeListenResponseOfListOfMessage> {
         let url_ = this.baseUrl + "/listen/room-messages/{roomId}?";
         if (roomId === undefined || roomId === null)
             throw new globalThis.Error("The parameter 'roomId' must be defined.");
@@ -114,13 +114,13 @@ export class ChatClient {
         });
     }
 
-    protected processListenToRoomMessages(response: Response): Promise<RealtimeListenResponse> {
+    protected processListenToRoomMessages(response: Response): Promise<RealtimeListenResponseOfListOfMessage> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponse;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfListOfMessage;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -128,7 +128,7 @@ export class ChatClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<RealtimeListenResponse>(null as any);
+        return Promise.resolve<RealtimeListenResponseOfListOfMessage>(null as any);
     }
 
     connect(): Promise<ConnectionResponse> {
@@ -162,92 +162,6 @@ export class ChatClient {
             });
         }
         return Promise.resolve<ConnectionResponse>(null as any);
-    }
-
-    joinGroup(request: JoinGroupRequest): Promise<JoinGroupResponse> {
-        let url_ = this.baseUrl + "/JoinGroup";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processJoinGroup(_response);
-        });
-    }
-
-    protected processJoinGroup(response: Response): Promise<JoinGroupResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinGroupResponse;
-            return result200;
-            });
-        } else if (status === 202) {
-            return response.text().then((_responseText) => {
-            let result202: any = null;
-            result202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as JoinGroupBroadcast;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result202);
-            });
-        } else if (status === 400) {
-            return response.text().then((_responseText) => {
-            let result400: any = null;
-            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as UserLeftResponseDto;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<JoinGroupResponse>(null as any);
-    }
-
-    poke(connectionIdToPoke: string | undefined): Promise<PokeResponseDto> {
-        let url_ = this.baseUrl + "/Poke?";
-        if (connectionIdToPoke === null)
-            throw new globalThis.Error("The parameter 'connectionIdToPoke' cannot be null.");
-        else if (connectionIdToPoke !== undefined)
-            url_ += "connectionIdToPoke=" + encodeURIComponent("" + connectionIdToPoke) + "&";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "POST",
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processPoke(_response);
-        });
-    }
-
-    protected processPoke(response: Response): Promise<PokeResponseDto> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PokeResponseDto;
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<PokeResponseDto>(null as any);
     }
 
     sendMessageToGroup(dto: SendGroupMessageRequestDto): Promise<void> {
@@ -321,8 +235,12 @@ export class ChatClient {
         return Promise.resolve<Room>(null as any);
     }
 
-    getRooms(): Promise<Room[]> {
-        let url_ = this.baseUrl + "/GetRooms";
+    getRooms(connectionId: string | undefined): Promise<RealtimeListenResponseOfListOfRoom> {
+        let url_ = this.baseUrl + "/GetRooms?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -337,13 +255,13 @@ export class ChatClient {
         });
     }
 
-    protected processGetRooms(response: Response): Promise<Room[]> {
+    protected processGetRooms(response: Response): Promise<RealtimeListenResponseOfListOfRoom> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Room[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfListOfRoom;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -351,7 +269,7 @@ export class ChatClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Room[]>(null as any);
+        return Promise.resolve<RealtimeListenResponseOfListOfRoom>(null as any);
     }
 }
 
@@ -369,34 +287,9 @@ export interface RealtimeListenResponse {
     group?: string;
 }
 
-/** Models used for server sent events to clients should preferably use this model. It automatically attaches "EventType" as a property with type name as value. */
-export interface BaseResponseDto {
-    eventType?: string;
-}
-
-export interface ConnectionResponse extends BaseResponseDto {
-    connectionId?: string;
-}
-
-export interface JoinGroupBroadcast extends BaseResponseDto {
-    connectedUsers?: ConnectionIdAndUserName[];
-}
-
-export interface ConnectionIdAndUserName {
-    connectionId?: string;
-    userName?: string;
-}
-
-export interface JoinGroupResponse extends BaseResponseDto {
-    room?: Room;
-}
-
-export interface Room {
-    id?: string;
-    name?: string;
-    createdBy?: string;
-    messages?: Message[];
-    userRooms?: UserRoom[];
+/** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
+export interface RealtimeListenResponseOfListOfMessage extends RealtimeListenResponse {
+    data?: Message[] | undefined;
 }
 
 export interface Message {
@@ -425,22 +318,31 @@ export interface UserRoom {
     room?: Room;
 }
 
-export interface UserLeftResponseDto extends BaseResponseDto {
-    connectionId?: string;
+export interface Room {
+    id?: string;
+    name?: string;
+    createdBy?: string;
+    messages?: Message[];
+    userRooms?: UserRoom[];
 }
 
-export interface JoinGroupRequest {
-    connectionId?: string;
-    group?: string;
+/** Models used for server sent events to clients should preferably use this model. It automatically attaches "EventType" as a property with type name as value. */
+export interface BaseResponseDto {
+    eventType?: string;
 }
 
-export interface PokeResponseDto extends BaseResponseDto {
-    pokedBy?: string;
+export interface ConnectionResponse extends BaseResponseDto {
+    connectionId?: string;
 }
 
 export interface SendGroupMessageRequestDto {
     message?: string;
     groupId?: string;
+}
+
+/** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
+export interface RealtimeListenResponseOfListOfRoom extends RealtimeListenResponse {
+    data?: Room[] | undefined;
 }
 
 export enum StringConstants {

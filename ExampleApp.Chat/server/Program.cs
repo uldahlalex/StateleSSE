@@ -87,10 +87,9 @@ app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./ope
 var backplane = app.Services.GetRequiredService<ISseBackplane>();                                                                                                                         
 backplane.OnClientDisconnected += async (_, e) =>                                                                                                                                         
 {                                                                                                                                                                                         
-    foreach (var group in e.Groups)                                                                                                                                                       
-    {                                                                                                                                                                                     
-        await backplane.Clients.SendToGroupAsync(group, new UserLeftResponseDto(e.ConnectionId));                                                                                        
-    }                                                                                                                                                                                     
+                                                                                                                                                                                    
+        await backplane.Clients.SendToGroupAsync("user-left", new UserLeftResponseDto(e.ConnectionId));                                                                                        
+                                                                                                                                                    
 };
 using (var scope = app.Services.CreateScope())
 {
