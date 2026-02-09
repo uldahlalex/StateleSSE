@@ -1,443 +1,188 @@
 # StateleSSE
 
-Type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core with a SignalR-style backplane.
+Realtime SSE framework for ASP.NET Core with horizontal scaling via Redis. Pair with the [`statele-sse`](statele-sse-client) npm package for a type-safe client.
 
-## Installation
+## Install
 
 ```bash
 dotnet add package StateleSSE.AspNetCore
 ```
 
-## Depenendency Injection
+## Quick start
 
-When doing group / client management for broadcasting / pushing data, the ISseBackplane abstraction can be used. It must be injected as following:
+### Server
 
 ```csharp
-builder.Services.AddRedisSseBackplane(configure: conf =>
-{
-    conf.RedisConnectionString = "localhost:6379";
-});
+// Program.cs
+builder.Services.AddInMemorySseBackplane(); // or AddRedisSseBackplane() for scaling
+builder.Services.AddControllers();
 ```
-Or if you want separate IConnectionMultiplexer for Redis (the "traditional" DI for Redis), you can do it in separate statements:
-```csharp
-//With redis backplane:
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    {
-        var config = ConfigurationOptions.Parse(
-            "localhost:6379"
-            );
-        config.AbortOnConnectFail = false;
-        return ConnectionMultiplexer.Connect(config);
-    });
 
-builder.Services.AddRedisSseBackplane();
-````
-For simple testing / non horizontal scaling, the simple InMemoryBackplane can be used instead:
+```csharp
+public class MyController(ISseBackplane backplane) : RealtimeControllerBase(backplane)
+{
+    // RealtimeControllerBase provides GET /sse automatically
+
+    [HttpPost("join")]
+    public async Task Join(string connectionId, string room)
+        => await backplane.Groups.AddToGroupAsync(connectionId, room);
+
+    [HttpPost("send")]
+    public async Task Send(string room, string message)
+        => await backplane.Clients.SendToGroupAsync(room, new { message });
+}
+```
+
+### Client
+
+```bash
+npm i statele-sse
+```
+
+```ts
+import { StateleSSEClient } from 'statele-sse'
+
+const sse = new StateleSSEClient('http://localhost:5000/sse')
+
+sse.onStatusChange = (status) => console.log(status)
+
+const unsub = sse.listen(
+    async (id) => {
+        await fetch(`/join?connectionId=${id}&room=chat`, { method: 'POST' })
+        return { group: 'chat' }
+    },
+    (data) => console.log(data)
+)
+```
+
+## EF Core Realtime
+
+Automatic broadcasts when `SaveChanges` modifies data. Add a criteria (what change triggers it) and a query (what data to send).
+
+### Setup
 
 ```csharp
 builder.Services.AddInMemorySseBackplane();
-```
-
-
-### Set up a route for connecting to the API + adding connection to backplane (for client/group management):
-
-```csharp
-
-//You may also use Minimal API / other framework, as long as you can access the HttpContext.
-public class ChatController(ISseBackplane backplane) : ControllerBase
-{
-    /* this will produce the following response:
-       id: 1
-       event: ConnectionResponse
-       data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","eventType":"ConnectionResponse"}
-     */
-    [HttpGet(nameof(Connect))]
-    public async Task Connect()
-    {
-        await using var sse = await HttpContext.OpenSseStreamAsync(); 
-        await using var connection = backplane.CreateConnection();
-
-        await sse.WriteAsync("ConnectionResponse", 
-            JsonSerializer.Serialize(new {eventType = "ConnectionResponse", connectionId = connection.ConnectionId});
-        
-        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
-        {
-            if (evt.Group != null)
-                await sse.WriteAsync(evt.Group, evt.Data);
-            else
-                await sse.WriteAsync(evt.Data);
-        }
-    }
-
-```
-
-You may simply connect to the API using a simple "EventSource" from the browser like:
-
-```js
-const es = new EventSource('http://localhost:5000/connect')
-es.addEventListener('group', e => {
-    const data = JSON.parse(e.data);
-    //do something with the data
-})
-```
-
-(Also see "React client best practices" further down if you're using React)
-
-
-### Using the backplane methods
-
-```csharp
-using StateleSSE.AspNetCore;
-
-public class Example(ISseBackplane backplane)
-{
-    public async Task Send(string connectionId, object data, string id1 = "abc", string id2 = "xyz")
-    {
-        // Broadcast to all
-        await backplane.Clients.SendToAllAsync(data);
-
-        // Send to group
-        await backplane.Clients.SendToGroupAsync("room-1", data);
-
-        // Send to multiple groups
-        await backplane.Clients.SendToGroupsAsync(["room-1", "room-2"], data);
-
-        // Send to specific client
-        await backplane.Clients.SendToClientAsync(connectionId, data);
-
-        // Send to multiple clients
-        await backplane.Clients.SendToClientsAsync([id1, id2], data);
-    }
-
-    public async Task Group(string connectionId)
-    {
-        // Add/remove from group
-        await backplane.Groups.AddToGroupAsync(connectionId, "room-1");
-        await backplane.Groups.RemoveFromGroupAsync(connectionId, "room-1");
-
-        // Query membership
-        var members = await backplane.Groups.GetMembersAsync("room-1");
-        var count = await backplane.Groups.GetMemberCountAsync("room-1");
-        var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
-    }
-}
-
-```
-
-### React best practices
-
-I recommend using the useStream hook I have placed in [useStream.tsx](ExampleApp.Chat/client/src/useStream.tsx)
-
-Simply copy the file contents of useStream.tsx into your project and add the provider like this:
-
-```jsx
-<StreamProvider config={{
-    urlForStreamEndpoint: `${BASE_URL}/Connect`, //Simply target the endpoint for connecting with a GET request
-    connectEvent: "ConnectionResponse", //This value must correspond with the event string emitted by the connection method
-}}>
-    <Chat/>
-</StreamProvider>
-```
-
-And use the useStream hook in a React component like this:
-
-```tsx
-export function Group(params: GroupParams) {
-    const stream = useStream(); //exposes the on<T>(group, eventType, action) method + the connectionId for the current client
-    useEffect(() => {
-        stream.on<JoinGroupResponse>(
-            "room/123", //always place the "group", so the same "key" as when using the backplane on the server
-            "JoinGroupResponse", //the value for the "eventType" property in the sent object to the client
-            (dto) => {
-                alert('Someone has joined the room')
-            });
-    })
-}
-```
-
-There is also a video demonstration here: https://www.youtube.com/watch?v=uTZ4b-X64nU
-
-### C# BaseResponseDto
-
-Since the useStream assumes the server always attached "eventType" in the JSON response (camelCase), you can extend BaseResponseDto for return types to automatically include this:
-
-
-```csharp
-public record MessageResponseDto : BaseResponseDto
-{
-    public string Message { get; set; } = "";
-    public string? User { get; set; } = "";
-}
-```
-
-
-## Quick Start
-
-See [`ExampleApp.Quickstart`](ExampleApp.Quickstart) for a minimal working example:
-
-- [Program.cs](ExampleApp.Quickstart/Program.cs) - Server setup
-- [RealtimeController.cs](ExampleApp.Quickstart/RealtimeController.cs) - SSE endpoints
-- [wwwroot/index.html](ExampleApp.Quickstart/wwwroot/index.html) - Browser client
-
-Run it:
-```bash
-cd ExampleApp.Quickstart
-dotnet run
-#then navigate to http://localhost:5000 to use the client app
-```
-
-The quickstart is also demo'ed on my Youtube channel here: https://www.youtube.com/watch?v=2TI6JUEHw4k
-
-## Example app with scalability and more "best practices"
-
-Features Redis backplane, NSwag with codegen, horisontal scaling, increased typesafety + React client example
-
-- [ExampleApp.Chat](ExampleApp.Chat)
-
-
-## EF Core Realtime (EfRealtime)
-
-Automatic realtime updates for web clients driven by EF Core's `SaveChanges`. When data is saved, registered queries are executed and results are broadcast to subscribers via the SSE backplane.
-
-### How it works
-
-1. A controller endpoint **subscribes** clients to a realtime feature by defining a **criteria** (what kind of change triggers it) and a **query** (what data to send).
-2. Clients join a backplane group for that feature.
-3. When `SaveChanges`/`SaveChangesAsync` is called on the DbContext, the interceptor:
-   - Snapshots the change tracker **before** save (so Added/Modified/Deleted states are visible)
-   - After save succeeds, executes the query against the committed database state
-   - Broadcasts the result to the backplane group
-
-### Setup
-
-```csharp
-builder.Services.AddInMemorySseBackplane(); // or AddRedisSseBackplane()
 builder.Services.AddEfRealtime();
 
-builder.Services.AddDbContext<MyDbContext>((sp, options) =>
-{
+builder.Services.AddDbContext<MyDbContext>((sp, options) => {
     options.UseNpgsql(connectionString);
-    options.AddEfRealtimeInterceptor(sp); // hooks into SaveChanges
+    options.AddEfRealtimeInterceptor(sp);
 });
 ```
 
-### Subscribing clients to realtime features
-
-In a controller, use `IRealtimeManager` to register a subscription. The criteria inspects a `ChangeSnapshot` captured before save, and the query runs after save:
+### Subscribe endpoint
 
 ```csharp
-public class ChatController(ISseBackplane backplane, IRealtimeManager realtime) : ControllerBase
+public class ChatController(ISseBackplane backplane, IRealtimeManager realtime, MyDbContext ctx)
+    : RealtimeControllerBase(backplane)
 {
-    [HttpPost("listen/room-messages/{roomId}")]
-    public async Task<IActionResult> ListenToRoomMessages(string connectionId, int roomId)
+    [HttpGet(nameof(GetMessages))]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
     {
         var group = $"room-messages:{roomId}";
-
-        // Add client to the backplane group
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        // Register the realtime subscription for this group
-        realtime.Subscribe<MyDbContext>(group,
-            criteria: changes => changes.OfType<Message>()
-                .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId),
-            query: async ctx => await ctx.Messages
-                .Where(m => m.RoomId == roomId)
-                .OrderByDescending(m => m.CreatedAt)
-                .Take(10)
-                .ToListAsync()
-        );
+        realtime.Subscribe<MyDbContext>(connectionId, group,
+            criteria: changes => changes.OfType<Message>().Any(e => e.Entity.RoomId == roomId),
+            query: async c => await c.Messages.Where(m => m.RoomId == roomId).ToListAsync());
 
-        return new RealtimeListenResponse(group);
+        return new RealtimeListenResponse<List<Message>>(group, ctx.Messages.Where(m => m.RoomId == roomId).ToList());
     }
 }
 ```
 
-**Why return `RealtimeListenResponse` with the group name?**
+### Client
 
-The client needs to know which SSE event name to listen for. The group name is used as the SSE event name when broadcasting, so the client must call `stream.on(group, callback)` with the exact same group string. Returning it from the subscribe endpoint:
-- Keeps the group naming logic on the server (single source of truth)
-- Lets the server change naming conventions without breaking clients
-- Makes the client code simpler - just use whatever the server returns
+`listen` handles the full lifecycle — calls the endpoint, delivers initial data, then listens for SSE updates:
 
-**Returning initial data with `RealtimeListenResponse<T>`**
+```ts
+const sse = new StateleSSEClient('http://localhost:5000/sse')
 
-Often clients need the current state immediately, then listen for subsequent changes. Use the generic version to include initial data:
-
-```csharp
-[HttpPost("listen/room-messages/{roomId}")]
-public async Task<RealtimeListenResponse<List<MessageDto>>> ListenToRoomMessages(string connectionId, int roomId)
-{
-    var group = $"room-messages:{roomId}";
-    await backplane.Groups.AddToGroupAsync(connectionId, group);
-
-    realtime.Subscribe<MyDbContext>(group,
-        criteria: changes => changes.OfType<Message>()
-            .Any(e => e.State == EntityState.Added && e.Entity.RoomId == roomId),
-        query: async ctx => await GetMessages(ctx, roomId)
-    );
-
-    // Return group AND initial data
-    var initialMessages = await GetMessages(ctx, roomId);
-    return new RealtimeListenResponse<List<MessageDto>>(group, initialMessages);
-}
+const unsub = sse.listen<Message[]>(
+    (id) => fetch(`/GetMessages?connectionId=${id}&roomId=abc`).then(r => r.json()),
+    (messages) => console.log(messages)
+)
 ```
 
-The `useRealtimeListen` hook automatically calls `onData` with the initial data before setting up the SSE listener.
-
-Now whenever *any* code calls `SaveChangesAsync()` on `MyDbContext` and a `Message` with matching `RoomId` was added, the query executes and all clients in the `"room-messages:{roomId}"` group receive the result.
+Any `SaveChanges` touching a `Message` with that `roomId` re-executes the query and broadcasts to all listeners.
 
 ### ChangeSnapshot API
 
-The `criteria` function receives a `ChangeSnapshot` with these helpers:
-
 ```csharp
-// Typed access to changed entities
-changes.OfType<Message>()          // IEnumerable<ChangeEntry<Message>>
-
-// Quick checks
-changes.HasChanges<Message>()      // any Added, Modified, or Deleted
-changes.HasAdded<Message>()        // any Added
-changes.HasModified<Message>()     // any Modified
-changes.HasDeleted<Message>()      // any Deleted
-
-// Each ChangeEntry<T> has:
-//   .Entity  (T)           - the entity instance
-//   .State   (EntityState)  - Added, Modified, or Deleted
+changes.OfType<Message>()       // IEnumerable<ChangeEntry<Message>>
+changes.HasChanges<Message>()   // any Added, Modified, or Deleted
+changes.HasAdded<Message>()
+changes.HasModified<Message>()
+changes.HasDeleted<Message>()
+// Each ChangeEntry<T> has .Entity (T) and .State (EntityState)
 ```
 
-### Unsubscribing
+## Group Realtime
 
-```csharp
-realtime.Unsubscribe("room-messages:5");
-```
-
-Calling `Subscribe` with the same group name replaces the previous subscription (no duplicates).
-
----
-
-## Group Realtime (GroupRealtime)
-
-Automatic realtime updates driven by backplane group membership changes. When clients join/leave groups or disconnect, registered queries are executed and results are broadcast to subscribers via the SSE backplane.
-
-This complements EfRealtime: where EfRealtime reacts to database changes (`SaveChanges`), GroupRealtime reacts to non-DB state like "who's in a room" (`AddToGroupAsync`, `RemoveFromGroupAsync`, client disconnect).
-
-### How it works
-
-1. A controller endpoint **subscribes** clients to a group realtime feature by defining a **criteria** (which group change triggers it) and a **query** (what data to send, run against `IBackplaneGroups`).
-2. Clients join a backplane group for that feature.
-3. The backplane fires `OnGroupChanged` whenever `AddToGroupAsync`, `RemoveFromGroupAsync`, or client disconnect occurs. The `GroupRealtimeManager` listens to this event, evaluates matching subscriptions, and broadcasts query results.
+Broadcasts driven by group membership changes (joins/leaves/disconnects) instead of DB changes.
 
 ### Setup
 
 ```csharp
-builder.Services.AddInMemorySseBackplane(); // or AddRedisSseBackplane()
+builder.Services.AddInMemorySseBackplane();
 builder.Services.AddGroupRealtime();
 ```
 
-Registration order does not matter — `AddGroupRealtime()` subscribes to the backplane's `OnGroupChanged` event at runtime via DI.
-
-### Subscribing clients to group membership updates
-
-In a controller, use `IGroupRealtimeManager` to register a subscription. The criteria inspects a `GroupChangedEventArgs`, and the query runs against `IBackplaneGroups`:
+### Subscribe endpoint
 
 ```csharp
-public class ChatController(ISseBackplane backplane, IGroupRealtimeManager groupRealtime) : ControllerBase
+[HttpGet(nameof(GetMembers))]
+public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
 {
-    [HttpGet("members/{roomId}")]
-    public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
-    {
-        var group = $"room-members:{roomId}";
-        await backplane.Groups.AddToGroupAsync(connectionId, group);
+    var listenGroup = $"room-members:{roomId}";
+    var roomGroup = $"room-messages:{roomId}";
+    await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
 
-        groupRealtime.Subscribe(group,
-            criteria: change => change.GroupName == $"room:{roomId}",
-            query: async groups => await groups.GetMembersAsync($"room:{roomId}"));
+    groupRealtime.Subscribe(listenGroup,
+        criteria: change => change.GroupName == roomGroup,
+        query: async groups => await groups.GetMembersAsync(roomGroup));
 
-        return new RealtimeListenResponse<IReadOnlyList<string>>(group,
-            await backplane.Groups.GetMembersAsync($"room:{roomId}"));
-    }
+    return new RealtimeListenResponse<IReadOnlyList<string>>(listenGroup,
+        await backplane.Groups.GetMembersAsync(roomGroup));
 }
 ```
 
-Note: the criteria watches `"room:{roomId}"` (the actual room group), not `"room-members:{roomId}"` (the listener group), so subscribing to listen doesn't trigger a broadcast to yourself.
-
-### GroupChangedEventArgs API
-
-The `criteria` function receives a `GroupChangedEventArgs` with:
+## Backplane API
 
 ```csharp
-change.ConnectionId  // the client that joined/left
-change.GroupName     // the group that changed
-change.ChangeType    // GroupChangeType.Added or GroupChangeType.Removed
+// Send
+await backplane.Clients.SendToAllAsync(data);
+await backplane.Clients.SendToGroupAsync("room-1", data);
+await backplane.Clients.SendToGroupsAsync(["room-1", "room-2"], data);
+await backplane.Clients.SendToClientAsync(connectionId, data);
+await backplane.Clients.SendToClientsAsync([id1, id2], data);
+
+// Groups
+await backplane.Groups.AddToGroupAsync(connectionId, "room-1");
+await backplane.Groups.RemoveFromGroupAsync(connectionId, "room-1");
+var members = await backplane.Groups.GetMembersAsync("room-1");
+var count = await backplane.Groups.GetMemberCountAsync("room-1");
+var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
 ```
 
-### Unsubscribing
+## Scaling with Redis
+
+Swap `AddInMemorySseBackplane()` for Redis to scale across multiple server instances:
 
 ```csharp
-groupRealtime.Unsubscribe("room-members:5");
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect("localhost:6379"));
+builder.Services.AddRedisSseBackplane();
 ```
 
-Calling `Subscribe` with the same group name replaces the previous subscription.
+All backplane operations (send, groups, membership) work transparently across instances.
 
----
+## Examples
 
-## OpenAPI String Constants
+- [`ExampleApp.Quickstart`](ExampleApp.Quickstart) — minimal server + vanilla JS client
+- [`ExampleApp.Chat`](ExampleApp.Chat) — full chat app with React, Redis, EfRealtime, and horizontal scaling
 
-`StringConstantsDiscovery` helps expose event type names in your OpenAPI spec for client code generation. It extracts:
-- All `BaseResponseDto` subclass names (event types)
-- String constants from a class you specify
+## License
 
-This way you don't have to use error prone hardcoded string in your client app. This allows for:
-
-```tsx
-const stream = useStream();
-useEffect(() => {
-    stream.on<JoinGroupResponse>(params.room.id!,
-        StringConstants.JoinGroupResponse, //this comes from OpenAPI-based scaffolded TS code. Also see the ExampleApp.Chat/ which uses NSwag to do this
-        (dto) => {
-        setMembers(dto.members ?? []);
-    });
-}, [])
-
-```
-
-
-
-For NSwag integration, create a thin wrapper: (assuming you have already added required NSwag Nugets)
-
-```csharp
-using NJsonSchema;
-using NSwag.Generation;
-using NSwag.Generation.Processors;
-using NSwag.Generation.Processors.Contexts;
-using StateleSSE.AspNetCore;
-
-public static class NSwagExtensions
-{
-    public static void AddStringConstants<T>(this OpenApiDocumentGeneratorSettings settings)
-    {
-        settings.DocumentProcessors.Add(new StringConstantsProcessor<T>());
-    }
-
-    private sealed class StringConstantsProcessor<T> : IDocumentProcessor
-    {
-        public void Process(DocumentProcessorContext context)
-        {
-            var schema = new JsonSchema { Type = JsonObjectType.String };
-            foreach (var c in StringConstantsDiscovery.GetAll<T>())
-                schema.Enumeration.Add(c);
-            context.Document.Definitions["StringConstants"] = schema;
-        }
-    }
-}
-```
-
-Then in `Program.cs`:
-
-```csharp
-builder.Services.AddOpenApiDocument(config =>
-{
-    config.AddStringConstants<MyConstants>(); //MyConstants is arbitrary class name - will simply include string constants defined here
-});
-```
-
+MIT

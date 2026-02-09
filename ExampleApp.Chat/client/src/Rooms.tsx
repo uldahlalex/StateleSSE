@@ -1,9 +1,8 @@
 import Login from "./Login.tsx";
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import type {RealtimeListenResponseOfListOfRoom, Room} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {Outlet, useNavigate} from "react-router";
-import {useRealtimeListen} from "./useStream.tsx";
 
 function ChangeRoomName(props: { room: Room }) {
 
@@ -13,7 +12,8 @@ function ChangeRoomName(props: { room: Room }) {
         <button
             className="btn btn-secondary btn-sm"
             onClick={() => chatClient.updateRoom(roomForm)}
-        >Change name</button>
+        >Change name
+        </button>
     </>
 
 }
@@ -21,20 +21,11 @@ function ChangeRoomName(props: { room: Room }) {
 export function Rooms() {
 
     const [rooms, setRooms] = useState<Room[]>([])
-    const [createRoomForm, setCreateRoomFormm] = useState<string>("your awesome room name")
+    const [createRoomForm, setCreateRoomForm] = useState<string>("your awesome room name")
     const navigate = useNavigate();
 
-    async function getRooms(id: string): Promise<RealtimeListenResponseOfListOfRoom> {
-        return await chatClient.getRooms(id).then(r => {
-            setRooms(r.data!)
-            return r;
-        })
-    }
 
-    useRealtimeListen((id) => getRooms(id),
-        data => {
-            setRooms(data)
-        }, [])
+    //todo get all rooms and sync
 
 
     return (
@@ -53,7 +44,7 @@ export function Rooms() {
                 <div className="create-room-form">
                     <input
                         className="input"
-                        onChange={e => setCreateRoomFormm(e.target.value)}
+                        onChange={e => setCreateRoomForm(e.target.value)}
                         value={createRoomForm}
                         placeholder="Enter room name..."
                     />
@@ -78,7 +69,7 @@ export function Rooms() {
                             <p>No rooms yet. Create one above!</p>
                         </div>
                     ) : (
-                        rooms && rooms.length> 0 &&rooms?.map(r => (
+                        rooms && rooms.length > 0 && rooms?.map(r => (
                             <div className="room-item" key={r.id}>
                                 <span className="room-name">{r.name || `Room ${r.id}`}</span>
                                 <button
@@ -89,11 +80,11 @@ export function Rooms() {
                                 </button>
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    onClick={()=> chatClient.deleteRoom(r.id)}
+                                    onClick={() => chatClient.deleteRoom(r.id)}
                                 >
                                     Delete room
                                 </button>
-                             <ChangeRoomName room={r} />
+                                <ChangeRoomName room={r}/>
 
                             </div>
                         ))

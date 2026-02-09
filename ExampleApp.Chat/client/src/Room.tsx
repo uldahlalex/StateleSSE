@@ -1,11 +1,5 @@
-import {useRealtimeListen, useStream} from "./useStream.tsx";
-import {useEffect, useState} from "react";
-import {
-    type CreateMessageRequestDto,
-    type Message,
-    type RealtimeListenResponseOfListOfMessage,
-
-} from "./generated-ts-client.ts";
+import {useState} from "react";
+import {type CreateMessageRequestDto, type Message,} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {useNavigate, useParams} from "react-router";
 
@@ -14,7 +8,6 @@ export type RoomParams = {
 }
 
 export function Room() {
-    const stream = useStream()
     const navigate = useNavigate()
     const params = useParams<RoomParams>();
     const [members, setMembers] = useState<any[]>([]);
@@ -23,48 +16,9 @@ export function Room() {
         groupId: params.roomId,
         message: ""
     })
-    useRealtimeListen(
-        (id) => sub(id),
-        (data) => setMessages(data),
-        [params.roomId]);
-    // useRealtimeListen(
-    //     (id) => {
-    //
-    //     },
-    //     (data) => alert('poked!'),
-    //     []
-    // )
-
-    useRealtimeListen(
-        (id) => chatClient.getMembers(id, params.roomId),
-        (data) => {
-            setMembers(data)
-        },
-        [params.roomId]
-    )
-
-    useRealtimeListen(
-        (id) => chatClient.getPokes(id),
-        data => {
-            if(data)
-                alert("poked");
-        },
-        []
-    )
-
-    function sub(id: string): Promise<RealtimeListenResponseOfListOfMessage> {
-        return chatClient.getMessages(id, params.roomId!)
-            .then(r => {
-                setMessages(r.data!);
-                return r; // must have { group, data? }
-            })
-            .catch(e => {
-                navigate("/");
-                throw e;
-            });
-    }
 
 
+//todo get messages, pokes and group members realtime
 
 
     return (

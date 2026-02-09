@@ -1,27 +1,3 @@
-efrealtime:
-- fjern baseresponsedto + nswag tingene som dette bruger
-- fjern enkelt usestream
-    - fjern først efter jeg har lavet ny demo helt uden den
-              useRealtimeListen<Room[]>(
-            (connId) => chatClient.listenToSomeArbitraryBroadcastThatHasNothingToDoWithEf(connId!, params!.roomId!),
-            (dto) => alert(dto),
-            []
-        );
-    - bruges internt til realtime funktionen, men det er ikke sikkert den er et godt fit - der skal i hvert fald ikke være to 
-    TS6385: config is deprecated. 
-    - skal useStream overhovedet eksistere eller kan det som ikke er collection baseret blot være:
-    
-- kan det betale sig at lave en fronten framework agnostisk wrapper?
-
-
-Redvider readme
-    - how to adjust json serializer (uses the controllers basic json serializer)
-        useRealtimeListen<Room[]>(
-            (connId) => chatClient.listenToSomeArbitraryBroadcastThatHasNothingToDoWithEf(connId!, params!.roomId!),
-            (dto) => alert(dto),
-            []
-        );
-
 
 _____
 
