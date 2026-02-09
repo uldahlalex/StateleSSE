@@ -147,7 +147,7 @@ public class RealtimeController(ISseBackplane backplane, IRealtimeManager realti
 
 Automatic broadcasts when `SaveChanges` modifies data. Add a criteria (what change triggers it) and a query (what data to send).
 
-### Setup
+### Setup for EF Core Realtime
 
 ```cs
 builder.Services.AddInMemorySseBackplane();
@@ -159,7 +159,7 @@ builder.Services.AddDbContext<MyDbContext>((sp, options) => {
 });
 ```
 
-### Subscribe endpoint
+### Subscribe endpoint for EF Core Realtime
 
 ```cs
 public class ChatController(ISseBackplane backplane, IRealtimeManager realtime, MyDbContext ctx)
@@ -180,31 +180,7 @@ public class ChatController(ISseBackplane backplane, IRealtimeManager realtime, 
 }
 ```
 
-### Client
-
-`listen` handles the full lifecycle — calls the endpoint, delivers initial data, then listens for SSE updates:
-
-```ts
-const url = '/sse'
-const sse = new StateleSSEClient(url)
-
-const unsub = sse.listen<Message[]>(
-    (id) => fetch(`/GetMessages?connectionId=${id}&roomId=abc`).then(r => r.json()),
-    (messages) => console.log(messages)
-)
-```
-
-Any `SaveChanges` touching a `Message` with that `roomId` re-executes the query and broadcasts to all listeners.
-
-### ChangeSnapshot API
-
-```cs
-changes.OfType<Message>()
-changes.HasChanges<Message>()
-changes.HasAdded<Message>()
-changes.HasModified<Message>()
-changes.HasDeleted<Message>()
-```
+That's it. Any `SaveChanges` touching a `Message` with that `roomId` re-executes the query and broadcasts to all listeners.
 
 ## Group Realtime
 
@@ -217,7 +193,7 @@ builder.Services.AddInMemorySseBackplane();
 builder.Services.AddGroupRealtime();
 ```
 
-### Subscribe endpoint
+### Example subscribe endpoint for getting all members in a group in realtime
 
 ```cs
 [HttpGet(nameof(GetMembers))]
@@ -236,7 +212,51 @@ public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(stri
 }
 ```
 
-## Backplane API
+## Client library: statele-sse
+
+A very small TS/JS client can be downloaded from npm with:
+
+```bash
+npm i statele-sse
+```
+
+
+`listen` handles the full lifecycle — calls the endpoint, delivers initial data, then listens for SSE updates:
+
+```ts
+const url = '/sse'
+const sse = new StateleSSEClient(url)
+
+const unsub = sse.listen<Message[]>(
+    (id) => fetch(`/GetMessages?connectionId=${id}&roomId=abc`).then(r => r.json()),
+    (messages) => console.log(messages)
+)
+```
+For more docs on the statele-sse-client, please see https://www.npmjs.com/package/statele-sse
+
+## Public signatures & API reference
+
+### "Criteria" for triggering a query with EF realtime:
+
+```cs
+//When using the realtimeManager:
+        realtime.Subscribe<MyDbContext>(connectionId, group,
+            criteria: changes => changes.OfType<Message>().Any(e => e.Entity.RoomId == roomId),
+            query: async c => await c.Messages.Where(m => m.RoomId == roomId).ToListAsync()); 
+
+//The criteria API is as following:
+changes.OfType<Message>()
+changes.HasChanges<Message>()
+changes.HasAdded<Message>()
+changes.HasModified<Message>()
+changes.HasDeleted<Message>()
+```
+
+### "Criteria" for triggering a query with Group realtime manager:
+
+tood
+
+### Backplane API
 
 ```cs
 await backplane.Clients.SendToAllAsync(data);
@@ -252,6 +272,18 @@ var count = await backplane.Groups.GetMemberCountAsync("room-1");
 var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
 ```
 
+### The RealtimeListenResponse
+
+todo
+
+## Live query system architecture visualization
+
+todo
+
+## Using without Entity Framework (simple backplane for basic event driven design & no live queries)
+
+todo
+
 ## Scaling with Redis
 
 Swap `AddInMemorySseBackplane()` for Redis to scale across multiple server instances:
@@ -263,11 +295,12 @@ builder.Services.AddRedisSseBackplane();
 ```
 
 All backplane operations (send, groups, membership) work transparently across instances.
+The EF.Realtime + Group Changes (like waiting for Entity Framework DbContext.SaveChanges()) does not currently support horizontal scaling.
 
 ## Examples
 
 - [`ExampleApp.Quickstart`](ExampleApp.Quickstart) — minimal server + vanilla JS client
-- [`ExampleApp.Chat`](ExampleApp.Chat) — full chat app with React, Redis, EfRealtime, and horizontal scaling
+- [`ExampleApp.Chat`](ExampleApp.Chat) — full chat app with React, Redis, EfRealtime
 
 ## License
 
