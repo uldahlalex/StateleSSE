@@ -79,6 +79,14 @@ using StateleSSE.AspNetCore.EfRealtime;
 public class RealtimeController(ISseBackplane backplane, IRealtimeManager realtimeManager, AppDb db)
     : RealtimeControllerBase(backplane)
 {
+    /// <summary>
+    ///Will produce the following in the browser's response tab:
+    ///id: 2
+    ///event: messages
+    ///data: [{"id":1,"content":"hi","createdAt":"2026-02-09T10:34:37.1856196+00:00"},{"id":2,"content":"asd","createdAt":"2026-02-09T10:34:40.5670584+00:00"},{"id":3,"content":"a","createdAt":"2026-02-09T11:11:34.6666671+00:00"}]
+    /// </summary>
+    /// <param name="connectionId"></param>
+    /// <returns></returns>
     [HttpGet("messages")]
     public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId)
     {
@@ -93,6 +101,10 @@ public class RealtimeController(ISseBackplane backplane, IRealtimeManager realti
             await db.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
     }
 
+    /// <summary>
+    /// Since this calls .SaveChangesAsync() on dbcontext, it triggers the "Listener" to make a new query and broadcast to the group
+    /// </summary>
+    /// <param name="message"></param>
     [HttpPost("send")]
     public async Task Send(string message)
     {
@@ -272,13 +284,74 @@ var count = await backplane.Groups.GetMemberCountAsync("room-1");
 var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
 ```
 
-### The RealtimeListenResponse
+### The RealtimeListenResponse<T>
 
-todo
+Since the initial HTTP response of a realtime query should return the "group" / event to listen for, the RealtimeListenResponse is used a long with optional initial data:
+
+```cs
+public record RealtimeListenResponse([Required][NotNull]string Group = null!);
+public record RealtimeListenResponse<T>(
+    [Required][NotNull] string Group = null!,
+    T? Data = default
+) : RealtimeListenResponse(Group);
+```
+
+The client library automatically is compliant with this "wrapper" object
+
+```typescript
+sse.listen<Room[]>(
+    async (id) => await chatClient.getRooms(id), //this method technically returns RealtimeListenerResponse<Room[]>
+    data => setRooms(data)  //here it is unwrapped when the state it used - this line will fire every time the "rooms" state is changed
+);
+```
 
 ## Live query system architecture visualization
 
-todo
+```
+ Browser                          ASP.NET Core Server
+ ──────                          ──────────────────────────────────────────────────
+
+  EventSource ───GET /sse──────► RealtimeControllerBase
+       │                              │
+       │◄── event: connected ─────────┘  (connectionId)
+       │
+       │                          Subscribe endpoint
+       ├────GET /messages ──────► ┌──────────────────────────────────────────────┐
+       │    ?connectionId=xxx     │ backplane.Groups.AddToGroup(connId, group)   │
+       │                          │ realtimeManager.Subscribe(connId, group,     │
+       │                          │     criteria: changes => ...,               │
+       │                          │     query: async ctx => ...)                │
+       │◄── { group, data } ──── │ return RealtimeListenResponse(group, data)   │
+       │    (initial state)       └──────────────────────────────────────────────┘
+       │
+       │    sse.listen(onData)
+       │    renders initial data
+       │
+       ·                          ┌──────────────────────────────────────────────┐
+       ·                          │ Any mutation endpoint                        │
+       ·    POST /send ─────────► │   db.Messages.Add(...)                      │
+       ·                          │   db.SaveChangesAsync() ──┐                 │
+       ·                          └───────────────────────────┼─────────────────┘
+       ·                                                      ▼
+       ·                          ┌──────────────────────────────────────────────┐
+       ·                          │ SaveChangesInterceptor (automatic)           │
+       ·                          │                                              │
+       ·                          │  Before save:                                │
+       ·                          │    snapshot = ChangeTracker entries           │
+       ·                          │    matched = subscriptions.Where(criteria)   │
+       ·                          │                                              │
+       ·                          │  After save:                                 │
+       ·                          │    for each matched subscription:            │
+       ·                          │      result = await query(dbContext)          │
+       ·                          │      backplane.SendToGroup(group, result) ───┼──┐
+       ·                          └──────────────────────────────────────────────┘  │
+       │                                                                            │
+       │◄── event: messages ────────────── SSE push ◄──────────────────────────────┘
+       │    data: [updated query result]
+       │
+       │    onData(newMessages)
+       ▼    renders updated data
+```
 
 ## Using without Entity Framework (simple backplane for basic event driven design & no live queries)
 

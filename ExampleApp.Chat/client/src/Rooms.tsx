@@ -1,10 +1,14 @@
 import Login from "./Login.tsx";
-import {useState} from "react";
-import type {RealtimeListenResponseOfListOfRoom, Room} from "./generated-ts-client.ts";
+import {useEffect, useState} from "react";
+import type {Room} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {Outlet, useNavigate} from "react-router";
+import {StateleSSEClient} from "statele-sse";
 
-function ChangeRoomName(props: { room: Room }) {
+export const sse = new StateleSSEClient("http://localhost:5000/sse");
+
+
+    function ChangeRoomName(props: { room: Room }) {
 
     const [roomForm, setRoomForm] = useState<Room>(props.room)
     return <>
@@ -24,8 +28,12 @@ export function Rooms() {
     const [createRoomForm, setCreateRoomForm] = useState<string>("your awesome room name")
     const navigate = useNavigate();
 
-
-    //todo get all rooms and sync
+    useEffect(() => {
+         sse.listen<Room[]>(
+             async (id) => await chatClient.getRooms(id),
+                 data => setRooms(data)
+        );
+    }, []);
 
 
     return (

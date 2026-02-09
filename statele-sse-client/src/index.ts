@@ -1,7 +1,7 @@
 export type SseClientStatus = 'connecting' | 'connected' | 'disconnected';
 
 type Subscription = {
-    register: (connectionId: string) => Promise<{ group: string; data?: unknown }>;
+    register: (connectionId: string) => Promise<{ group?: string; data?: unknown }>;
     onData: (data: unknown) => void;
     onError?: (error: unknown) => void;
     listenerKey: symbol | null;
@@ -35,8 +35,8 @@ export class StateleSSEClient {
     }
 
     listen<T>(
-        register: (connectionId: string) => Promise<{ group: string; data?: T }>,
-        onData: (data: T) => void,
+        register: (connectionId: string) => Promise<{ group?: string | null; data?: T | null }>,
+        onData: (data: T & {}) => void,
         onError?: (error: unknown) => void
     ): () => void {
         const key = Symbol();
@@ -106,8 +106,8 @@ export class StateleSSEClient {
         try {
             const { group, data } = await sub.register(this._connectionId);
             if (gen !== this._generation || !this._subscriptions.has(key)) return;
-            if (data !== undefined) sub.onData(data);
-            sub.listenerKey = this.addListener(group, sub.onData);
+            if (data != null) sub.onData(data);
+            if (group) sub.listenerKey = this.addListener(group, sub.onData);
         } catch (e) {
             if (gen !== this._generation || !this._subscriptions.has(key)) return;
             sub.onError?.(e);

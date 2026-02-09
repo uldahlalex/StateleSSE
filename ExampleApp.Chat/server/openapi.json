@@ -25,12 +25,12 @@
           "x-position": 1
         },
         "responses": {
-          "314": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
+                  "$ref": "#/components/schemas/LoginResponse"
                 }
               }
             }
@@ -57,12 +57,12 @@
           "x-position": 1
         },
         "responses": {
-          "314": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
+                  "$ref": "#/components/schemas/LoginResponse"
                 }
               }
             }
@@ -95,12 +95,12 @@
           }
         ],
         "responses": {
-          "314": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfListOfMessage"
                 }
               }
             }
@@ -127,15 +127,8 @@
           "x-position": 1
         },
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         }
       }
@@ -159,15 +152,8 @@
           "x-position": 1
         },
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         },
         "security": [
@@ -194,15 +180,8 @@
           }
         ],
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         },
         "security": [
@@ -229,15 +208,8 @@
           }
         ],
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         },
         "security": [
@@ -266,15 +238,8 @@
           "x-position": 1
         },
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         },
         "security": [
@@ -301,12 +266,12 @@
           }
         ],
         "responses": {
-          "314": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfListOfRoom"
                 }
               }
             }
@@ -339,12 +304,12 @@
           }
         ],
         "responses": {
-          "314": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfIReadOnlyListOfString"
                 }
               }
             }
@@ -369,12 +334,12 @@
           }
         ],
         "responses": {
-          "314": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfObject"
                 }
               }
             }
@@ -399,15 +364,8 @@
           }
         ],
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         }
       }
@@ -419,15 +377,8 @@
         ],
         "operationId": "Chat_Connect",
         "responses": {
-          "314": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MyRandomType"
-                }
-              }
-            }
+          "200": {
+            "description": ""
           }
         }
       }
@@ -435,11 +386,11 @@
   },
   "components": {
     "schemas": {
-      "MyRandomType": {
+      "LoginResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "lol": {
+          "token": {
             "type": "string"
           }
         }
@@ -455,6 +406,27 @@
             "type": "string"
           }
         }
+      },
+      "RealtimeListenResponseOfListOfMessage": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        ]
       },
       "Message": {
         "type": "object",
@@ -559,6 +531,16 @@
           }
         }
       },
+      "RealtimeListenResponse": {
+        "type": "object",
+        "description": "Returned by subscribe endpoints so the client knows which SSE group to listen on.",
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "type": "string"
+          }
+        }
+      },
       "CreateMessageRequestDto": {
         "type": "object",
         "additionalProperties": false,
@@ -571,10 +553,61 @@
           }
         }
       },
-      "StringConstants": {
-        "type": "string",
-        "enum": [
-          "UserDisconnectedResponseDto"
+      "RealtimeListenResponseOfListOfRoom": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RealtimeListenResponseOfIReadOnlyListOfString": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RealtimeListenResponseOfObject": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {}
+            }
+          }
         ]
       }
     },
