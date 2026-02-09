@@ -13,7 +13,6 @@ namespace StateleSSE.AspNetCore.Infrastructure;
 /// </summary>
 public class RedisBackplane : ISseBackplane, IAsyncDisposable
 {
-    private readonly IConnectionMultiplexer _redis;
     private readonly ISubscriber _subscriber;
     private readonly IDatabase _db;
     private readonly string _prefix;
@@ -45,7 +44,6 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         TimeSpan? connectionTtl = null,
         JsonSerializerOptions? jsonOptions = null)
     {
-        _redis = redis;
         _subscriber = redis.GetSubscriber();
         _db = redis.GetDatabase();
         _prefix = prefix;

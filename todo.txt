@@ -1,5 +1,5 @@
 efrealtime:
-- fjern baseresponsedto
+- fjern baseresponsedto + nswag tingene som dette bruger
 - fjern enkelt usestream
     - fjern først efter jeg har lavet ny demo helt uden den
               useRealtimeListen<Room[]>(
@@ -11,6 +11,7 @@ efrealtime:
     TS6385: config is deprecated. 
     - skal useStream overhovedet eksistere eller kan det som ikke er collection baseret blot være:
     
+- kan det betale sig at lave en fronten framework agnostisk wrapper?
 
 
 Redvider readme

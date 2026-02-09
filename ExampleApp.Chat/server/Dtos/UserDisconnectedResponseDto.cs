@@ -1,3 +1,3 @@
 using StateleSSE.AspNetCore;
 
-public record UserDisconnectedResponseDto(string ConnectionId) : BaseResponseDto;
+public record UserDisconnectedResponseDto(string ConnectionId);

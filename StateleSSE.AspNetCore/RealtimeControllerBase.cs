@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace StateleSSE.AspNetCore;
 
+/// <summary>
+/// This exists because it needs to send the connection ID to the client upon opening the connection.
+/// It is merely a wrapper for a string.
+/// </summary>
+/// <param name="ConnectionId"></param>
 public record RealtimeConnectionResponse(string ConnectionId);
 
 public abstract class RealtimeControllerBase(ISseBackplane backplane) : ControllerBase

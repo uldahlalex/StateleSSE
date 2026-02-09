@@ -56,7 +56,7 @@ public class ChatController(ISseBackplane backplane,
         var group = $"room-messages:{roomId}";
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        realtimeManager.Subscribe<MyDbContext>(group,
+        realtimeManager.Subscribe<MyDbContext>(connectionId, group,
             criteria: changes =>
             {
                 return changes.OfType<Message>()
@@ -142,7 +142,7 @@ public class ChatController(ISseBackplane backplane,
         var group = "rooms";
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        realtimeManager.Subscribe<MyDbContext>("rooms",
+        realtimeManager.Subscribe<MyDbContext>(connectionId, "rooms",
             criteria: changes =>
             {
                 return changes.OfType<Room>().Any();

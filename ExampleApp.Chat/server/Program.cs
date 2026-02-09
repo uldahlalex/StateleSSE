@@ -54,7 +54,6 @@ builder.Services.AddOpenApiDocument(config =>
         Description = "Enter your JWT token"
     });
     config.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("Bearer"));
-    config.AddStringConstants<MyConstants>();
 });
 
 builder.Services.AddSingleton<JwtService>();
