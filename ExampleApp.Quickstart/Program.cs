@@ -1,11 +1,14 @@
+using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.Configure<HostOptions>(options =>
-{
-    options.ShutdownTimeout = TimeSpan.FromSeconds(0); 
-});
 builder.Services.AddInMemorySseBackplane();
+builder.Services.AddEfRealtime();
+builder.Services.AddDbContext<AppDb>((sp, opt) =>
+{
+    opt.UseInMemoryDatabase("quickstart");
+    opt.AddEfRealtimeInterceptor(sp);
+});
 builder.Services.AddControllers();
 
 var app = builder.Build();

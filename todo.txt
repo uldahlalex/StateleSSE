@@ -1,4 +1,5 @@
-
+- finish quickstart with listener demo
+- no-EF demo
 _____
 
 - Lave "recipe" / step by step guide

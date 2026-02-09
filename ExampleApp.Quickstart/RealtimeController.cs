@@ -1,30 +1,29 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.EfRealtime;
 
-public class RealtimeController(ISseBackplane backplane) : ControllerBase
+public class RealtimeController(ISseBackplane backplane, IRealtimeManager realtimeManager, AppDb db)
+    : RealtimeControllerBase(backplane)
 {
-    [HttpGet("connect")]
-    public async Task Connect()
+    [HttpGet("messages")]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId)
     {
-        await using var sse = await HttpContext.OpenSseStreamAsync();
-        await using var connection = backplane.CreateConnection();
+        var group = "messages";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        await sse.WriteAsync("connected", JsonSerializer.Serialize(new { connection.ConnectionId },
-            new JsonSerializerOptions()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }));
+        realtimeManager.Subscribe<AppDb>(connectionId, group,
+            criteria: changes => changes.HasChanges<Message>(),
+            query: async ctx => await ctx.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
 
-        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
-            await sse.WriteAsync(evt.Group ?? "message", evt.Data);
+        return new RealtimeListenResponse<List<Message>>(group,
+            await db.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
     }
 
-    [HttpPost("join")]
-    public async Task Join(string connectionId, string room)
-        => await backplane.Groups.AddToGroupAsync(connectionId, room);
-
     [HttpPost("send")]
-    public async Task Send(string room, string message)
-        => await backplane.Clients.SendToGroupAsync(room, new { message });
+    public async Task Send(string message)
+    {
+        db.Messages.Add(new Message { Content = message });
+        await db.SaveChangesAsync();
+    }
 }

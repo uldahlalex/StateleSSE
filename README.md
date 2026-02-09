@@ -1,6 +1,17 @@
 # StateleSSE
 
-Realtime SSE framework for ASP.NET Core with horizontal scaling via Redis. Pair with the [`statele-sse`](statele-sse-client) npm package for a type-safe client.
+Realtime SSE framework for ASP.NET Core with live queries. Pair with the [`statele-sse`](statele-sse-client) npm package for a type-safe client.
+
+## Dependencies
+
+| | Required     | Notes |
+|---|-------------------------|---|
+| .NET | 6.0+                    | Targets net6.0, net8.0, net9.0, net10.0 |
+| ASP.NET Core | yes                     | `FrameworkReference` — comes with the SDK |
+| Entity Framework Core | only for EfRealtime     | Bundled in the package but unused unless you call `AddEfRealtime()` |
+| StackExchange.Redis | only for Redis backplane | Bundled in the package but unused unless you call `AddRedisSseBackplane()` |
+
+Minimal setup (in-memory backplane, no EfRealtime) requires no additional packages from the consumer — just ASP.NET Core.
 
 ## Install
 
@@ -10,49 +21,126 @@ dotnet add package StateleSSE.AspNetCore
 
 ## Quick start
 
+> These snippets are from [`ExampleApp.Quickstart`](ExampleApp.Quickstart).
+
 ### Server
 
-```csharp
-// Program.cs
-builder.Services.AddInMemorySseBackplane(); // or AddRedisSseBackplane() for scaling
+```cs
+// ExampleApp.Quickstart/Program.cs
+
+using Microsoft.EntityFrameworkCore;
+using StateleSSE.AspNetCore;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddInMemorySseBackplane();
+builder.Services.AddEfRealtime();
+builder.Services.AddDbContext<AppDb>((sp, opt) =>
+{
+    opt.UseInMemoryDatabase("quickstart");
+    opt.AddEfRealtimeInterceptor(sp);
+});
 builder.Services.AddControllers();
+
+var app = builder.Build();
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapControllers();
+app.Run();
+
 ```
 
-```csharp
-public class MyController(ISseBackplane backplane) : RealtimeControllerBase(backplane)
-{
-    // RealtimeControllerBase provides GET /sse automatically
+```cs
+// ExampleApp.Quickstart/AppDb.cs
 
-    [HttpPost("join")]
-    public async Task Join(string connectionId, string room)
-        => await backplane.Groups.AddToGroupAsync(connectionId, room);
+using Microsoft.EntityFrameworkCore;
+
+public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
+{
+    public DbSet<Message> Messages => Set<Message>();
+}
+
+public class Message
+{
+    public int Id { get; set; }
+    public string Content { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+```
+
+```cs
+// ExampleApp.Quickstart/RealtimeController.cs
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.EfRealtime;
+
+public class RealtimeController(ISseBackplane backplane, IRealtimeManager realtimeManager, AppDb db)
+    : RealtimeControllerBase(backplane)
+{
+    [HttpGet("messages")]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId)
+    {
+        var group = "messages";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        realtimeManager.Subscribe<AppDb>(connectionId, group,
+            criteria: changes => changes.HasChanges<Message>(),
+            query: async ctx => await ctx.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
+
+        return new RealtimeListenResponse<List<Message>>(group,
+            await db.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
+    }
 
     [HttpPost("send")]
-    public async Task Send(string room, string message)
-        => await backplane.Clients.SendToGroupAsync(room, new { message });
+    public async Task Send(string message)
+    {
+        db.Messages.Add(new Message { Content = message });
+        await db.SaveChangesAsync();
+    }
 }
+
 ```
 
 ### Client
 
-```bash
-npm i statele-sse
-```
+```html
+<!-- ExampleApp.Quickstart/wwwroot/index.html -->
 
-```ts
-import { StateleSSEClient } from 'statele-sse'
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="messages"></div>
+  <input id="msg" placeholder="Message" />
+  <button onclick="send()">Send</button>
 
-const sse = new StateleSSEClient('http://localhost:5000/sse')
+  <script type="module">
+    import { StateleSSEClient } from 'https://cdn.jsdelivr.net/npm/statele-sse/dist/index.js'
 
-sse.onStatusChange = (status) => console.log(status)
+    const sse = new StateleSSEClient("/sse");
 
-const unsub = sse.listen(
-    async (id) => {
-        await fetch(`/join?connectionId=${id}&room=chat`, { method: 'POST' })
-        return { group: 'chat' }
-    },
-    (data) => console.log(data)
-)
+    sse.listen(
+        async (id) => {
+          const res = await fetch(`/messages?connectionId=${id}`);
+          return await res.json();
+        },
+        (data) => render(data)
+    );
+
+    function render(messages) {
+      document.getElementById("messages").innerHTML =
+        messages.map(m => `<p>${m.content}</p>`).join("");
+    }
+
+    window.send = () => {
+      fetch(`/send?message=${document.getElementById("msg").value}`, { method: "POST" });
+      document.getElementById("msg").value = "";
+    };
+  </script>
+</body>
+</html>
+
 ```
 
 ## EF Core Realtime
@@ -61,7 +149,7 @@ Automatic broadcasts when `SaveChanges` modifies data. Add a criteria (what chan
 
 ### Setup
 
-```csharp
+```cs
 builder.Services.AddInMemorySseBackplane();
 builder.Services.AddEfRealtime();
 
@@ -73,7 +161,7 @@ builder.Services.AddDbContext<MyDbContext>((sp, options) => {
 
 ### Subscribe endpoint
 
-```csharp
+```cs
 public class ChatController(ISseBackplane backplane, IRealtimeManager realtime, MyDbContext ctx)
     : RealtimeControllerBase(backplane)
 {
@@ -97,7 +185,8 @@ public class ChatController(ISseBackplane backplane, IRealtimeManager realtime, 
 `listen` handles the full lifecycle — calls the endpoint, delivers initial data, then listens for SSE updates:
 
 ```ts
-const sse = new StateleSSEClient('http://localhost:5000/sse')
+const url = '/sse'
+const sse = new StateleSSEClient(url)
 
 const unsub = sse.listen<Message[]>(
     (id) => fetch(`/GetMessages?connectionId=${id}&roomId=abc`).then(r => r.json()),
@@ -109,13 +198,12 @@ Any `SaveChanges` touching a `Message` with that `roomId` re-executes the query 
 
 ### ChangeSnapshot API
 
-```csharp
-changes.OfType<Message>()       // IEnumerable<ChangeEntry<Message>>
-changes.HasChanges<Message>()   // any Added, Modified, or Deleted
+```cs
+changes.OfType<Message>()
+changes.HasChanges<Message>()
 changes.HasAdded<Message>()
 changes.HasModified<Message>()
 changes.HasDeleted<Message>()
-// Each ChangeEntry<T> has .Entity (T) and .State (EntityState)
 ```
 
 ## Group Realtime
@@ -124,14 +212,14 @@ Broadcasts driven by group membership changes (joins/leaves/disconnects) instead
 
 ### Setup
 
-```csharp
+```cs
 builder.Services.AddInMemorySseBackplane();
 builder.Services.AddGroupRealtime();
 ```
 
 ### Subscribe endpoint
 
-```csharp
+```cs
 [HttpGet(nameof(GetMembers))]
 public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
 {
@@ -150,15 +238,13 @@ public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(stri
 
 ## Backplane API
 
-```csharp
-// Send
+```cs
 await backplane.Clients.SendToAllAsync(data);
 await backplane.Clients.SendToGroupAsync("room-1", data);
 await backplane.Clients.SendToGroupsAsync(["room-1", "room-2"], data);
 await backplane.Clients.SendToClientAsync(connectionId, data);
 await backplane.Clients.SendToClientsAsync([id1, id2], data);
 
-// Groups
 await backplane.Groups.AddToGroupAsync(connectionId, "room-1");
 await backplane.Groups.RemoveFromGroupAsync(connectionId, "room-1");
 var members = await backplane.Groups.GetMembersAsync("room-1");
@@ -170,7 +256,7 @@ var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
 
 Swap `AddInMemorySseBackplane()` for Redis to scale across multiple server instances:
 
-```csharp
+```cs
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect("localhost:6379"));
 builder.Services.AddRedisSseBackplane();
