@@ -12,7 +12,6 @@ using NSwag.Generation.Processors.Security;
 using server;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
-using StateleSSE.AspNetCore.GroupRealtime;
 
 var builder = WebApplication.CreateBuilder(args);
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
@@ -28,8 +27,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-builder.Services.AddPostgresSseBackplane(opts => opts.ConnectionString = db!);
-builder.Services.AddGroupRealtime();
+builder.Services.AddEfSseBackplane<MyDbContext>();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
@@ -80,8 +78,12 @@ using (var scope = app.Services.CreateScope())
 {
     var ctx = scope.ServiceProvider.GetRequiredService<MyDbContext>();
     Console.WriteLine(ctx.Database.GenerateCreateScript());
-
-    ctx.Database.EnsureCreated();
+    // if (app.Environment.IsDevelopment())
+    // {
+    //     ctx.Database.EnsureDeleted();
+    //     ctx.Database.EnsureCreated();
+    // }
+    //
     var exists = ctx.Users.Any(u => u.Id == "test");
     if (!exists)
     {

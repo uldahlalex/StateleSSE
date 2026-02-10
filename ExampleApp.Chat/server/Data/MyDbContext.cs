@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using StateleSSE.AspNetCore.EfBackplane;
 
 namespace server;
 
-public class MyDbContext : DbContext
+public class MyDbContext : SseDbContext
 {
     public MyDbContext(DbContextOptions<MyDbContext> options)
         : base(options)

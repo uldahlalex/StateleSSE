@@ -20,7 +20,7 @@ dotnet run
 
 ## Running (Scaled with Load Balancer)
 
-Requires Redis running on `localhost:6379`.
+Uses PostgreSQL for both domain data and the SSE backplane (LISTEN/NOTIFY) — no Redis needed.
 
 ```bash
 # Linux/Mac
@@ -37,4 +37,4 @@ This starts:
 - **Server 1** on `:5001`
 - **Server 2** on `:5002`
 
-Open multiple browser tabs to `http://localhost:5000` - requests will be distributed across both servers, but messages flow through Redis so all clients see all messages.
+Open multiple browser tabs to `http://localhost:5000` - requests will be distributed across both servers, but messages flow through PostgreSQL LISTEN/NOTIFY so all clients see all messages.

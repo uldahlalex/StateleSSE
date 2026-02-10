@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.EfBackplane;
 using StateleSSE.AspNetCore.EfRealtime;
-using StateleSSE.AspNetCore.GroupRealtime;
 
 namespace server.Controllers;
 
@@ -15,7 +15,6 @@ namespace server.Controllers;
 public class ChatController(ISseBackplane backplane,
     JwtService jwtService,
     IRealtimeManager realtimeManager,
-    IGroupRealtimeManager groupRealtimeManager,
     MyDbContext ctx) : RealtimeControllerBase(backplane)
 {
     
@@ -169,28 +168,40 @@ public class ChatController(ISseBackplane backplane,
         var listenGroup = "members:"+roomId;
         await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
 
-        groupRealtimeManager.Subscribe(listenGroup,
-            criteria: change => change.GroupName == listenGroup || change.ConnectionId.StartsWith("nickname/"),
-            query: async bp =>
+        realtimeManager.Subscribe<MyDbContext>(connectionId, listenGroup,
+            criteria: changes => changes.HasChanges<SseGroupMember>(),
+            query: async c =>
             {
-                var members = await bp.Groups.GetMembersAsync(listenGroup);
+                var members = await c.SseGroupMembers
+                    .Where(gm => gm.GroupName == listenGroup)
+                    .Select(gm => gm.ConnectionId)
+                    .ToListAsync();
                 var list = new List<MemberInfo>();
                 foreach (var m in members)
                 {
-                    var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-                    list.Add(new MemberInfo(m, nickname.FirstOrDefault() ?? "Anonymous"));
+                    var nicknames = await c.SseGroupMembers
+                        .Where(gm => gm.ConnectionId == "nickname/" + m)
+                        .Select(gm => gm.GroupName)
+                        .ToListAsync();
+                    list.Add(new MemberInfo(m, nicknames.FirstOrDefault() ?? "Anonymous"));
                 }
-
                 return list;
             });
-        var members = await backplane.Groups.GetMembersAsync(roomId);
-        var list = new List<MemberInfo>();
-        foreach (var m in members)
+
+        var currentMembers = await ctx.SseGroupMembers
+            .Where(gm => gm.GroupName == listenGroup)
+            .Select(gm => gm.ConnectionId)
+            .ToListAsync();
+        var result = new List<MemberInfo>();
+        foreach (var m in currentMembers)
         {
-            var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-            list.Add(new MemberInfo(m, nickname.FirstOrDefault() ?? "Anonymous"));
+            var nicknames = await ctx.SseGroupMembers
+                .Where(gm => gm.ConnectionId == "nickname/" + m)
+                .Select(gm => gm.GroupName)
+                .ToListAsync();
+            result.Add(new MemberInfo(m, nicknames.FirstOrDefault() ?? "Anonymous"));
         }
-        return new RealtimeListenResponse<List<MemberInfo>>(listenGroup, list);
+        return new RealtimeListenResponse<List<MemberInfo>>(listenGroup, result);
     }
     
 
