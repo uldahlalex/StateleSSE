@@ -25,6 +25,32 @@ public class ClientDisconnectedEventArgs : EventArgs
 }
 
 /// <summary>
+/// Whether a client was added to or removed from a group.
+/// </summary>
+public enum GroupChangeType { Added, Removed }
+
+/// <summary>
+/// Event args for group membership changes.
+/// </summary>
+public class GroupChangedEventArgs : EventArgs
+{
+    /// <summary>
+    /// The connection ID of the client whose membership changed.
+    /// </summary>
+    public required string ConnectionId { get; init; }
+
+    /// <summary>
+    /// The group whose membership changed.
+    /// </summary>
+    public required string GroupName { get; init; }
+
+    /// <summary>
+    /// Whether the client was added or removed.
+    /// </summary>
+    public required GroupChangeType ChangeType { get; init; }
+}
+
+/// <summary>
 /// Backplane interface for SSE with horizontal scaling support.
 /// Modeled after SignalR's Clients/Groups pattern.
 /// </summary>
@@ -54,6 +80,11 @@ public interface ISseBackplane
     /// Raised when a client disconnects. Use this to broadcast "user left" events.
     /// </summary>
     event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
+
+    /// <summary>
+    /// Raised when a client is added to or removed from a group (including during disconnect).
+    /// </summary>
+    event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
 }
 
 /// <summary>

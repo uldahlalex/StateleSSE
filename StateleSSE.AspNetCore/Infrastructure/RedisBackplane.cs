@@ -13,11 +13,11 @@ namespace StateleSSE.AspNetCore.Infrastructure;
 /// </summary>
 public class RedisBackplane : ISseBackplane, IAsyncDisposable
 {
-    private readonly IConnectionMultiplexer _redis;
     private readonly ISubscriber _subscriber;
     private readonly IDatabase _db;
     private readonly string _prefix;
     private readonly ILogger<RedisBackplane> _logger;
+    private readonly JsonSerializerOptions _jsonOptions;
     private readonly Guid _serverId = Guid.NewGuid();
     private readonly TimeSpan _connectionTtl;
     private readonly TimeSpan _heartbeatInterval;
@@ -36,17 +36,19 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
     /// <param name="logger">Logger instance</param>
     /// <param name="prefix">Prefix for all Redis keys (default: "sse")</param>
     /// <param name="connectionTtl">TTL for connection keys - connections not refreshed within this time are considered dead (default: 60s)</param>
+    /// <param name="jsonOptions">JSON serializer options (uses controller options if not specified)</param>
     public RedisBackplane(
         IConnectionMultiplexer redis,
         ILogger<RedisBackplane> logger,
         string prefix = "sse",
-        TimeSpan? connectionTtl = null)
+        TimeSpan? connectionTtl = null,
+        JsonSerializerOptions? jsonOptions = null)
     {
-        _redis = redis;
         _subscriber = redis.GetSubscriber();
         _db = redis.GetDatabase();
         _prefix = prefix;
         _logger = logger;
+        _jsonOptions = jsonOptions ?? new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
         _connectionTtl = connectionTtl ?? TimeSpan.FromSeconds(60);
         _heartbeatInterval = TimeSpan.FromSeconds(_connectionTtl.TotalSeconds / 3);
 
@@ -81,6 +83,9 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
 
     /// <inheritdoc/>
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
+
+    /// <inheritdoc/>
+    public event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
 
     /// <inheritdoc/>
     public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
@@ -140,7 +145,14 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         state.Channel.Writer.Complete();
         _logger.LogDebug("Client {ConnectionId} disconnected", connectionId);
 
-        // Raise disconnection event
+        foreach (var group in clientGroups)
+        {
+            OnGroupChanged?.Invoke(this, new GroupChangedEventArgs
+            {
+                ConnectionId = connectionId, GroupName = group, ChangeType = GroupChangeType.Removed
+            });
+        }
+
         OnClientDisconnected?.Invoke(this, new ClientDisconnectedEventArgs
         {
             ConnectionId = connectionId,
@@ -169,6 +181,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         }
 
         _logger.LogDebug("Client {ConnectionId} added to group '{Group}'", connectionId, groupName);
+        OnGroupChanged?.Invoke(this, new GroupChangedEventArgs
+        {
+            ConnectionId = connectionId, GroupName = groupName, ChangeType = GroupChangeType.Added
+        });
     }
 
     internal async Task RemoveFromGroupAsync(string connectionId, string groupName)
@@ -182,6 +198,10 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         }
 
         _logger.LogDebug("Client {ConnectionId} removed from group '{Group}'", connectionId, groupName);
+        OnGroupChanged?.Invoke(this, new GroupChangedEventArgs
+        {
+            ConnectionId = connectionId, GroupName = groupName, ChangeType = GroupChangeType.Removed
+        });
     }
 
     internal async Task<int> GetGroupMemberCountAsync(string groupName)
@@ -242,14 +262,8 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         var json = JsonSerializer.Serialize(new MessageEnvelope
         {
             Type = MessageType.Broadcast,
-            Data = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            })
-        },new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+            Data = JsonSerializer.SerializeToElement(data, _jsonOptions)
+        }, _jsonOptions);
 
         await _subscriber.PublishAsync(new RedisChannel($"{_prefix}:broadcast", RedisChannel.PatternMode.Literal), json);
         _logger.LogDebug("Broadcast message sent");
@@ -260,10 +274,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
         // Check if connection is local
         if (_localConnections.TryGetValue(connectionId, out var state))
         {
-            var evt = new SseEvent(groupName, JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }));
+            var evt = new SseEvent(groupName, JsonSerializer.SerializeToElement(data, _jsonOptions));
             await state.Channel.Writer.WriteAsync(evt);
             return;
         }
@@ -282,14 +293,8 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
             Type = MessageType.Client,
             TargetId = connectionId,
             GroupName = groupName,
-            Data = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            })
-        }, new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+            Data = JsonSerializer.SerializeToElement(data, _jsonOptions)
+        }, _jsonOptions);
 
         await _subscriber.PublishAsync(new RedisChannel($"{_prefix}:server:{serverId}", RedisChannel.PatternMode.Literal), json);
     }
@@ -341,10 +346,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
             });
         }
 
-        var jsonData = JsonSerializer.SerializeToElement(data, new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        var jsonData = JsonSerializer.SerializeToElement(data, _jsonOptions);
 
         // Send to each server
         foreach (var (serverId, connections) in serverConnections)
@@ -370,10 +372,7 @@ public class RedisBackplane : ISseBackplane, IAsyncDisposable
                     GroupName = groupName,
                     TargetIds = connections,
                     Data = jsonData
-                }, new JsonSerializerOptions()
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
+                }, _jsonOptions);
 
                 await _subscriber.PublishAsync(new RedisChannel($"{_prefix}:server:{serverId}", RedisChannel.PatternMode.Literal), json);
             }

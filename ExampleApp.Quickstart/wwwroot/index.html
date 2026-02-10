@@ -5,23 +5,28 @@
   <input id="msg" placeholder="Message" />
   <button onclick="send()">Send</button>
 
-  <script>
-    const room = "chat";
-    let connectionId;
+  <script type="module">
+    import { StateleSSEClient } from 'https://cdn.jsdelivr.net/npm/statele-sse/dist/index.js'
 
-    const es = new EventSource("/connect");
-    es.addEventListener("connected", e => {
-      connectionId = JSON.parse(e.data).connectionId;
-      fetch(`/join?connectionId=${connectionId}&room=${room}`, { method: "POST" });
-    });
-    es.addEventListener(room, e => {
-      document.getElementById("messages").innerHTML += `<p>${JSON.parse(e.data).message}</p>`;
-    });
+    const sse = new StateleSSEClient("/sse");
 
-    function send() {
-      fetch(`/send?room=${room}&message=${document.getElementById("msg").value}`, { method: "POST" });
-      document.getElementById("msg").value = "";
+    sse.listen(
+        async (id) => {
+          const res = await fetch(`/messages?connectionId=${id}`);
+          return await res.json();
+        },
+        (data) => render(data)
+    );
+
+    function render(messages) {
+      document.getElementById("messages").innerHTML =
+        messages.map(m => `<p>${m.content}</p>`).join("");
     }
+
+    window.send = () => {
+      fetch(`/send?message=${document.getElementById("msg").value}`, { method: "POST" });
+      document.getElementById("msg").value = "";
+    };
   </script>
 </body>
 </html>

@@ -2,25 +2,30 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.EfRealtime;
+using StateleSSE.AspNetCore.GroupRealtime;
 
 namespace server.Controllers;
 
 
 public class ChatController(ISseBackplane backplane,
     JwtService jwtService,
-    MyDbContext ctx) : ControllerBase
+    IRealtimeManager realtimeManager,
+    IGroupRealtimeManager groupRealtimeManager,
+    MyDbContext ctx) : RealtimeControllerBase(backplane)
 {
+    
     [HttpPost(nameof(Login))]
     public LoginResponse Login([FromBody] LoginRequest request)
     {
         var user = ctx.Users.FirstOrDefault(u => u.Nickname == request.Username) ??
                    throw new ValidationException("User does not exist");
         if(user.Hash == Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(request.Password + user.Salt))))
-            return (new LoginResponse(jwtService.GenerateToken(user.Id)));
+            return new LoginResponse(jwtService.GenerateToken(user.Id));
         throw new ValidationException("Not valid credentials");
     }
     [HttpPost(nameof(Register))]
@@ -46,81 +51,43 @@ public class ChatController(ISseBackplane backplane,
         return (new LoginResponse(jwtService.GenerateToken(u.Id)));
     }
 
-    /*
-     id: 1
-       event: ConnectionResponse
-       data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","eventType":"ConnectionResponse"}
-       
-     */
-    [HttpGet(nameof(Connect))]
-    [Produces<ConnectionResponse>]
-    public async Task Connect()
+    [HttpGet(nameof(GetMessages))]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
     {
-        await using var sse = await HttpContext.OpenSseStreamAsync();
-        await using var connection = backplane.CreateConnection();
+        var group = $"room-messages:{roomId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        await sse.WriteAsync(nameof(ConnectionResponse), JsonSerializer.Serialize(new ConnectionResponse(connection.ConnectionId), new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        }));
-        
-        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
-        {
-            if (evt.Group != null)
-                await sse.WriteAsync(evt.Group, evt.Data);
-            else
-                await sse.WriteAsync(evt.Data);
-        }
+        realtimeManager.Subscribe<MyDbContext>(connectionId, group,
+            criteria: changes =>
+            {
+                return changes.OfType<Message>()
+                    .Any(e => e.Entity.RoomId == roomId);
+            },
+            query: async c => await c.Messages
+                .Where(m => m.RoomId == roomId)
+                .OrderByDescending(m => m.CreatedAt)
+                .ToListAsync()
+        );
+
+        return new RealtimeListenResponse<List<Message>>(group, ctx.Messages
+            .Where(m => m.RoomId == roomId)
+            .ToList());
     }
-    
 
-    [HttpPost(nameof(JoinGroup))]
-    [ProducesResponseType(typeof(JoinGroupBroadcast), 202)]
-    [ProducesResponseType(typeof(JoinGroupResponse), 200)]
-    [ProducesResponseType(typeof(UserLeftResponseDto), 400)]
-    public async Task<JoinGroupResponse> JoinGroup([FromBody] JoinGroupRequest request)
+    [HttpPatch(nameof(UpdateMessage))]
+    public async Task UpdateMessage([FromBody]Message newMessage)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
-        var room = ctx.Rooms.FirstOrDefault(r => r.Id == request.Group) ??
-                   throw new ValidationException("Room does not exist");
-        var name = u?.Nickname ?? "Anonymous";
-        await backplane.Groups.AddToGroupAsync("nickname/"+request.ConnectionId, name);
-        await backplane.Groups.AddToGroupAsync(request.ConnectionId, request.Group);
-        var members = await backplane.Groups.GetMembersAsync(request.Group);
-        var list = new List<ConnectionIdAndUserName>();
-        foreach (var m in members)
-        {
-            var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-            list.Add(new ConnectionIdAndUserName(m, nickname.FirstOrDefault() ?? "Anonymous"));
-        }
-        await backplane.Clients.SendToGroupAsync(request.Group, new JoinGroupBroadcast(list));
-        
-        return new JoinGroupResponse(room);
-
-
+        var message = ctx.Messages.FirstOrDefault(m => m.Id == newMessage.Id)
+                      ?? throw new ValidationException("message not found");
+        ctx.Entry(message).CurrentValues.SetValues(newMessage);
+        await ctx.SaveChangesAsync();
     }
 
     [Authorize]
-    [HttpPost(nameof(Poke))]
-    [ProducesResponseType(typeof(PokeResponseDto), 200)]
-    public async Task Poke(PokeRequestDto dto)
+    [HttpPost(nameof(CreateMessage))]
+    public async Task CreateMessage([FromBody] CreateMessageRequestDto dto)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
-        var name = u?.Nickname ?? "Anonymous";
-
-        await backplane.Clients.SendToClientAsync(dto.connectionIdToPoke, new PokeResponseDto(name));
-    }
-
-    [Authorize]
-    [HttpPost(nameof(SendMessageToGroup))]
-    [Produces<MessageResponseDto>]
-    public async Task SendMessageToGroup([FromBody] SendGroupMessageRequestDto dto)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var u =  ctx.Users.FirstOrDefault(u => u.Id == userId);
-        var name = u?.Nickname ?? "Anonymous";
         var message = new Message()
         {
             UserId = userId,
@@ -131,16 +98,11 @@ public class ChatController(ISseBackplane backplane,
         };
         ctx.Messages.Add(message);
         await ctx.SaveChangesAsync();
-        await backplane.Clients.SendToGroupAsync(dto.GroupId, new MessageResponseDto
-        {
-            User = name,
-            Message = dto.Message
-        });
     }
 
     [Authorize]
     [HttpPost(nameof(CreateRoom))]
-    public async Task<Room> CreateRoom(string name)
+    public async Task CreateRoom(string name)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);    
         var room = new Room()
@@ -151,42 +113,77 @@ public class ChatController(ISseBackplane backplane,
         };
         ctx.Rooms.Add(room);
         await ctx.SaveChangesAsync();
-        return room;
+    }
+    
+    [Authorize]
+    [HttpPost(nameof(DeleteRoom))]
+    public async Task DeleteRoom(string id)
+    {
+        var room = await ctx.Rooms.FindAsync(id);
+        if (room is null)
+            return;
+        ctx.Rooms.Remove(room);
+         ctx.SaveChanges();
     }
 
-
+    [Authorize]                                                                                                  
+    [HttpPost(nameof(UpdateRoom))]
+    public async Task UpdateRoom([FromBody]Room newRoom)                                                        
+    {                                                                                  
+        var room = await ctx.Rooms.FindAsync(newRoom.Id);                                                                
+        if (room is null)                                                                                        
+            return;
+        ctx.Entry(room).CurrentValues.SetValues(newRoom);
+        await ctx.SaveChangesAsync();
+    }
+    
     [HttpGet(nameof(GetRooms))]
-    public async Task<List<Room>> GetRooms()
-        => ctx.Rooms.ToList();
+    public async Task<RealtimeListenResponse<List<Room>>> GetRooms(string connectionId)
+    {
+        var group = "rooms";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        realtimeManager.Subscribe<MyDbContext>(connectionId, "rooms",
+            criteria: changes =>
+            {
+                return changes.OfType<Room>().Any();
+            },
+            query:async (context) => await context.Rooms.ToListAsync()); 
+        return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList()); 
+    }
+    
+    [HttpGet(nameof(GetMembers))]
+    public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
+    {
+        var listenGroup = $"room-members:{roomId}";
+        var roomGroup = $"room-messages:{roomId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
+
+        groupRealtimeManager.Subscribe(listenGroup,
+            criteria: change => change.GroupName == roomGroup,
+            query: async groups => await groups.GetMembersAsync(roomGroup));
+
+        return new RealtimeListenResponse<IReadOnlyList<string>>(listenGroup,
+            await backplane.Groups.GetMembersAsync(roomGroup));
+    }
+    
+
+    [HttpGet(nameof(GetPokes))]                               
+    public async Task<RealtimeListenResponse<object?>> GetPokes(string connectionId)                             
+    {                                                                                                            
+        var group = $"poke:{connectionId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+        return new RealtimeListenResponse<object?>(group, null);
+    }
+
+    [HttpPost(nameof(Poke))]
+    public async Task Poke(string connectionId)
+    {
+        await backplane.Clients.SendToGroupAsync($"poke:{connectionId}", new { message = "You have been poked"
+        });
+    }
+
+    
+
+    
 }
-
-public record PokeResponseDto(string pokedBy) : BaseResponseDto;
-public record PokeRequestDto(string connectionIdToPoke);
-
-public record JoinGroupResponse(Room room) : BaseResponseDto;
-public record ConnectionResponse(string ConnectionId) : BaseResponseDto;
-
-
-public record JoinGroupRequest(string ConnectionId, string Group);
-
-public record SendGroupMessageRequestDto
-{
-    public string Message { get; set; } = "";
-    public string GroupId { get; set; } = "";
-}
-
-
-
-public record MessageResponseDto : BaseResponseDto
-{
-    public string Message { get; set; } = "";
-    public string? User { get; set; } = "";
-}
-
-public record LoginRequest(string Username, string Password);
-public record LoginResponse(string Token);
-
-
-public record JoinGroupBroadcast(List<ConnectionIdAndUserName> ConnectedUsers) : BaseResponseDto;
-
-public record ConnectionIdAndUserName(string ConnectionId, string UserName);

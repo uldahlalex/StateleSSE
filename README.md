@@ -1,257 +1,424 @@
 # StateleSSE
 
-Type-safe, horizontally-scalable Server-Sent Events (SSE) framework for ASP.NET Core with a SignalR-style backplane.
+Realtime SSE framework for ASP.NET Core with live queries. Pair with the [`statele-sse`](statele-sse-client) npm package for a type-safe client.
 
-## Installation
+These docs are for the newest version (v4). For older version (before live queries with EF.Realtime), see branch "v3"
+
+## Dependencies
+
+| | Required     | Notes |
+|---|-------------------------|---|
+| .NET | 6.0+                    | Targets net6.0, net8.0, net9.0, net10.0 |
+| ASP.NET Core | yes                     | `FrameworkReference` — comes with the SDK |
+| Entity Framework Core | only for EfRealtime     | Bundled in the package but unused unless you call `AddEfRealtime()` |
+| StackExchange.Redis | only for Redis backplane | Bundled in the package but unused unless you call `AddRedisSseBackplane()` |
+
+Minimal setup (in-memory backplane, no EfRealtime) requires no additional packages from the consumer — just ASP.NET Core.
+
+## Install
 
 ```bash
-dotnet add package StateleSSE.AspNetCore
+dotnet add package StateleSSE.AspNetCore --prerelease
 ```
 
-## Depenendency Injection
+## Quick start
 
-When doing group / client management for broadcasting / pushing data, the ISseBackplane abstraction can be used. It must be injected as following:
+> These snippets are from [`ExampleApp.Quickstart`](ExampleApp.Quickstart).
 
-```csharp
-builder.Services.AddRedisSseBackplane(configure: conf =>
-{
-    conf.RedisConnectionString = "localhost:6379";
-});
-```
-Or if you want separate IConnectionMultiplexer for Redis (the "traditional" DI for Redis), you can do it in separate statements:
-```csharp
-//With redis backplane:
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    {
-        var config = ConfigurationOptions.Parse(
-            "localhost:6379"
-            );
-        config.AbortOnConnectFail = false;
-        return ConnectionMultiplexer.Connect(config);
-    });
+### Server
 
-builder.Services.AddRedisSseBackplane();
-````
-For simple testing / non horizontal scaling, the simple InMemoryBackplane can be used instead:
+```cs
+// ExampleApp.Quickstart/Program.cs
 
-```csharp
+using Microsoft.EntityFrameworkCore;
+using StateleSSE.AspNetCore;
+
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddInMemorySseBackplane();
-```
-
-
-### Set up a route for connecting to the API + adding connection to backplane (for client/group management):
-
-```csharp
-
-//You may also use Minimal API / other framework, as long as you can access the HttpContext.
-public class ChatController(ISseBackplane backplane) : ControllerBase
+builder.Services.AddEfRealtime();
+builder.Services.AddDbContext<AppDb>((sp, opt) =>
 {
-    /* this will produce the following response:
-       id: 1
-       event: ConnectionResponse
-       data: {"connectionId":"8cc4cabc-e550-4e20-9732-5da6282f573b","eventType":"ConnectionResponse"}
-     */
-    [HttpGet(nameof(Connect))]
-    public async Task Connect()
-    {
-        await using var sse = await HttpContext.OpenSseStreamAsync(); 
-        await using var connection = backplane.CreateConnection();
+    opt.UseInMemoryDatabase("quickstart");
+    opt.AddEfRealtimeInterceptor(sp);
+});
+builder.Services.AddControllers();
 
-        await sse.WriteAsync("ConnectionResponse", 
-            JsonSerializer.Serialize(new {eventType = "ConnectionResponse", connectionId = connection.ConnectionId});
-        
-        await foreach (var evt in connection.ReadAllAsync(HttpContext.RequestAborted))
-        {
-            if (evt.Group != null)
-                await sse.WriteAsync(evt.Group, evt.Data);
-            else
-                await sse.WriteAsync(evt.Data);
-        }
-    }
+var app = builder.Build();
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapControllers();
+app.Run();
 
 ```
 
-You may simply connect to the API using a simple "EventSource" from the browser like:
+```cs
+// ExampleApp.Quickstart/AppDb.cs
 
-```js
-const es = new EventSource('http://localhost:5000/connect')
-es.addEventListener('group', e => {
-    const data = JSON.parse(e.data);
-    //do something with the data
-})
+using Microsoft.EntityFrameworkCore;
+
+public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
+{
+    public DbSet<Message> Messages => Set<Message>();
+}
+
+public class Message
+{
+    public int Id { get; set; }
+    public string Content { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 ```
 
-(Also see "React client best practices" further down if you're using React)
+```cs
+// ExampleApp.Quickstart/RealtimeController.cs
 
-
-### Using the backplane methods
-
-```csharp
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
+using StateleSSE.AspNetCore.EfRealtime;
 
-public class Example(ISseBackplane backplane)
+public class RealtimeController(ISseBackplane backplane, IRealtimeManager realtimeManager, AppDb db)
+    : RealtimeControllerBase(backplane)
 {
-    public async Task Send(string connectionId, object data, string id1 = "abc", string id2 = "xyz")
+    /// <summary>
+    ///Will produce the following in the browser's response tab:
+    ///id: 2
+    ///event: messages
+    ///data: [{"id":1,"content":"hi","createdAt":"2026-02-09T10:34:37.1856196+00:00"},{"id":2,"content":"asd","createdAt":"2026-02-09T10:34:40.5670584+00:00"},{"id":3,"content":"a","createdAt":"2026-02-09T11:11:34.6666671+00:00"}]
+    /// </summary>
+    /// <param name="connectionId"></param>
+    /// <returns></returns>
+    [HttpGet("messages")]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId)
     {
-        // Broadcast to all
-        await backplane.Clients.SendToAllAsync(data);
+        var group = "messages";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
 
-        // Send to group
-        await backplane.Clients.SendToGroupAsync("room-1", data);
+        realtimeManager.Subscribe<AppDb>(connectionId, group,
+            criteria: changes => changes.HasChanges<Message>(),
+            query: async ctx => await ctx.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
 
-        // Send to multiple groups
-        await backplane.Clients.SendToGroupsAsync(["room-1", "room-2"], data);
-
-        // Send to specific client
-        await backplane.Clients.SendToClientAsync(connectionId, data);
-
-        // Send to multiple clients
-        await backplane.Clients.SendToClientsAsync([id1, id2], data);
+        return new RealtimeListenResponse<List<Message>>(group,
+            await db.Messages.OrderBy(m => m.CreatedAt).ToListAsync());
     }
 
-    public async Task Group(string connectionId)
+    /// <summary>
+    /// Since this calls .SaveChangesAsync() on dbcontext, it triggers the "Listener" to make a new query and broadcast to the group
+    /// </summary>
+    /// <param name="message"></param>
+    [HttpPost("send")]
+    public async Task Send(string message)
     {
-        // Add/remove from group
-        await backplane.Groups.AddToGroupAsync(connectionId, "room-1");
-        await backplane.Groups.RemoveFromGroupAsync(connectionId, "room-1");
-
-        // Query membership
-        var members = await backplane.Groups.GetMembersAsync("room-1");
-        var count = await backplane.Groups.GetMemberCountAsync("room-1");
-        var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
+        db.Messages.Add(new Message { Content = message });
+        await db.SaveChangesAsync();
     }
 }
 
 ```
 
-### React best practices
+### Client
 
-I recommend using the useStream hook I have placed in [useStream.tsx](ExampleApp.Chat/client/src/useStream.tsx)
+```html
+<!-- ExampleApp.Quickstart/wwwroot/index.html -->
 
-Simply copy the file contents of useStream.tsx into your project and add the provider like this:
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="messages"></div>
+  <input id="msg" placeholder="Message" />
+  <button onclick="send()">Send</button>
 
-```jsx
-<StreamProvider config={{
-    urlForStreamEndpoint: `${BASE_URL}/Connect`, //Simply target the endpoint for connecting with a GET request
-    connectEvent: "ConnectionResponse", //This value must correspond with the event string emitted by the connection method
-}}>
-    <Chat/>
-</StreamProvider>
-```
+  <script type="module">
+    import { StateleSSEClient } from 'https://cdn.jsdelivr.net/npm/statele-sse/dist/index.js'
 
-And use the useStream hook in a React component like this:
+    const sse = new StateleSSEClient("/sse");
 
-```tsx
-export function Group(params: GroupParams) {
-    const stream = useStream(); //exposes the on<T>(group, eventType, action) method + the connectionId for the current client
-    useEffect(() => {
-        stream.on<JoinGroupResponse>(
-            "room/123", //always place the "group", so the same "key" as when using the backplane on the server
-            "JoinGroupResponse", //the value for the "eventType" property in the sent object to the client
-            (dto) => {
-                alert('Someone has joined the room')
-            });
-    })
-}
-```
+    sse.listen(
+        async (id) => {
+          const res = await fetch(`/messages?connectionId=${id}`);
+          return await res.json();
+        },
+        (data) => render(data)
+    );
 
-There is also a video demonstration here: https://www.youtube.com/watch?v=uTZ4b-X64nU
-
-### C# BaseResponseDto
-
-Since the useStream assumes the server always attached "eventType" in the JSON response (camelCase), you can extend BaseResponseDto for return types to automatically include this:
-
-
-```csharp
-public record MessageResponseDto : BaseResponseDto
-{
-    public string Message { get; set; } = "";
-    public string? User { get; set; } = "";
-}
-```
-
-
-## Quick Start
-
-See [`ExampleApp.Quickstart`](ExampleApp.Quickstart) for a minimal working example:
-
-- [Program.cs](ExampleApp.Quickstart/Program.cs) - Server setup
-- [RealtimeController.cs](ExampleApp.Quickstart/RealtimeController.cs) - SSE endpoints
-- [wwwroot/index.html](ExampleApp.Quickstart/wwwroot/index.html) - Browser client
-
-Run it:
-```bash
-cd ExampleApp.Quickstart
-dotnet run
-#then navigate to http://localhost:5000 to use the client app
-```
-
-The quickstart is also demo'ed on my Youtube channel here: https://www.youtube.com/watch?v=2TI6JUEHw4k
-
-## Example app with scalability and more "best practices"
-
-Features Redis backplane, NSwag with codegen, horisontal scaling, increased typesafety + React client example
-
-- [ExampleApp.Chat](ExampleApp.Chat)
-
-
-## OpenAPI String Constants
-
-`StringConstantsDiscovery` helps expose event type names in your OpenAPI spec for client code generation. It extracts:
-- All `BaseResponseDto` subclass names (event types)
-- String constants from a class you specify
-
-This way you don't have to use error prone hardcoded string in your client app. This allows for:
-
-```tsx
-const stream = useStream();
-useEffect(() => {
-    stream.on<JoinGroupResponse>(params.room.id!,
-        StringConstants.JoinGroupResponse, //this comes from OpenAPI-based scaffolded TS code. Also see the ExampleApp.Chat/ which uses NSwag to do this
-        (dto) => {
-        setMembers(dto.members ?? []);
-    });
-}, [])
-
-```
-
-
-
-For NSwag integration, create a thin wrapper: (assuming you have already added required NSwag Nugets)
-
-```csharp
-using NJsonSchema;
-using NSwag.Generation;
-using NSwag.Generation.Processors;
-using NSwag.Generation.Processors.Contexts;
-using StateleSSE.AspNetCore;
-
-public static class NSwagExtensions
-{
-    public static void AddStringConstants<T>(this OpenApiDocumentGeneratorSettings settings)
-    {
-        settings.DocumentProcessors.Add(new StringConstantsProcessor<T>());
+    function render(messages) {
+      document.getElementById("messages").innerHTML =
+        messages.map(m => `<p>${m.content}</p>`).join("");
     }
 
-    private sealed class StringConstantsProcessor<T> : IDocumentProcessor
-    {
-        public void Process(DocumentProcessorContext context)
-        {
-            var schema = new JsonSchema { Type = JsonObjectType.String };
-            foreach (var c in StringConstantsDiscovery.GetAll<T>())
-                schema.Enumeration.Add(c);
-            context.Document.Definitions["StringConstants"] = schema;
-        }
-    }
-}
+    window.send = () => {
+      fetch(`/send?message=${document.getElementById("msg").value}`, { method: "POST" });
+      document.getElementById("msg").value = "";
+    };
+  </script>
+</body>
+</html>
+
 ```
 
-Then in `Program.cs`:
+## EF Core Realtime
 
-```csharp
-builder.Services.AddOpenApiDocument(config =>
-{
-    config.AddStringConstants<MyConstants>(); //MyConstants is arbitrary class name - will simply include string constants defined here
+Automatic broadcasts when `SaveChanges` modifies data. Add a criteria (what change triggers it) and a query (what data to send).
+
+### Setup for EF Core Realtime
+
+```cs
+builder.Services.AddInMemorySseBackplane();
+builder.Services.AddEfRealtime();
+
+builder.Services.AddDbContext<MyDbContext>((sp, options) => {
+    options.UseNpgsql(connectionString);
+    options.AddEfRealtimeInterceptor(sp);
 });
 ```
 
+### Subscribe endpoint for EF Core Realtime
+
+```cs
+public class ChatController(ISseBackplane backplane, IRealtimeManager realtime, MyDbContext ctx)
+    : RealtimeControllerBase(backplane)
+{
+    [HttpGet(nameof(GetMessages))]
+    public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
+    {
+        var group = $"room-messages:{roomId}";
+        await backplane.Groups.AddToGroupAsync(connectionId, group);
+
+        realtime.Subscribe<MyDbContext>(connectionId, group,
+            criteria: changes => changes.OfType<Message>().Any(e => e.Entity.RoomId == roomId),
+            query: async c => await c.Messages.Where(m => m.RoomId == roomId).ToListAsync());
+
+        return new RealtimeListenResponse<List<Message>>(group, ctx.Messages.Where(m => m.RoomId == roomId).ToList());
+    }
+}
+```
+
+That's it. Any `SaveChanges` touching a `Message` with that `roomId` re-executes the query and broadcasts to all listeners.
+
+## Group Realtime
+
+Broadcasts driven by group membership changes (joins/leaves/disconnects) instead of DB changes.
+
+### Setup
+
+```cs
+builder.Services.AddInMemorySseBackplane();
+builder.Services.AddGroupRealtime();
+```
+
+### Example subscribe endpoint for getting all members in a group in realtime
+
+```cs
+[HttpGet(nameof(GetMembers))]
+public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
+{
+    var listenGroup = $"room-members:{roomId}";
+    var roomGroup = $"room-messages:{roomId}";
+    await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
+
+    groupRealtime.Subscribe(listenGroup,
+        criteria: change => change.GroupName == roomGroup,
+        query: async groups => await groups.GetMembersAsync(roomGroup));
+
+    return new RealtimeListenResponse<IReadOnlyList<string>>(listenGroup,
+        await backplane.Groups.GetMembersAsync(roomGroup));
+}
+```
+
+## Client library: statele-sse
+
+A very small TS/JS client can be downloaded from npm with:
+
+```bash
+npm i statele-sse
+```
+
+
+`listen` handles the full lifecycle — calls the endpoint, delivers initial data, then listens for SSE updates:
+
+```ts
+const url = '/sse'
+const sse = new StateleSSEClient(url)
+
+const unsub = sse.listen<Message[]>(
+    (id) => fetch(`/GetMessages?connectionId=${id}&roomId=abc`).then(r => r.json()),
+    (messages) => console.log(messages)
+)
+```
+For more docs on the statele-sse-client, please see https://www.npmjs.com/package/statele-sse
+
+## Public signatures & API reference
+
+### "Criteria" for triggering a query with EF realtime:
+
+```cs
+//When using the realtimeManager:
+        realtime.Subscribe<MyDbContext>(connectionId, group,
+            criteria: changes => changes.OfType<Message>().Any(e => e.Entity.RoomId == roomId),
+            query: async c => await c.Messages.Where(m => m.RoomId == roomId).ToListAsync()); 
+
+//The criteria API is as following:
+changes.OfType<Message>()
+changes.HasChanges<Message>()
+changes.HasAdded<Message>()
+changes.HasModified<Message>()
+changes.HasDeleted<Message>()
+```
+
+### "Criteria" for triggering a query with Group realtime manager:
+
+tood
+
+### Backplane API
+
+```cs
+await backplane.Clients.SendToAllAsync(data);
+await backplane.Clients.SendToGroupAsync("room-1", data);
+await backplane.Clients.SendToGroupsAsync(["room-1", "room-2"], data);
+await backplane.Clients.SendToClientAsync(connectionId, data);
+await backplane.Clients.SendToClientsAsync([id1, id2], data);
+
+await backplane.Groups.AddToGroupAsync(connectionId, "room-1");
+await backplane.Groups.RemoveFromGroupAsync(connectionId, "room-1");
+var members = await backplane.Groups.GetMembersAsync("room-1");
+var count = await backplane.Groups.GetMemberCountAsync("room-1");
+var groups = await backplane.Groups.GetClientGroupsAsync(connectionId);
+```
+
+### The RealtimeListenResponse<T>
+
+Since the initial HTTP response of a realtime query should return the "group" / event to listen for, the RealtimeListenResponse is used a long with optional initial data:
+
+```cs
+public record RealtimeListenResponse([Required][NotNull]string Group = null!);
+public record RealtimeListenResponse<T>(
+    [Required][NotNull] string Group = null!,
+    T? Data = default
+) : RealtimeListenResponse(Group);
+```
+
+The client library automatically is compliant with this "wrapper" object
+
+```typescript
+sse.listen<Room[]>(
+    async (id) => await chatClient.getRooms(id), //this method technically returns RealtimeListenerResponse<Room[]>
+    data => setRooms(data)  //here it is unwrapped when the state it used - this line will fire every time the "rooms" state is changed
+);
+```
+
+## Live query system architecture visualization
+
+```
+ Browser                          ASP.NET Core Server
+ ──────                          ──────────────────────────────────────────────────
+
+  EventSource ───GET /sse──────► RealtimeControllerBase
+       │                              │
+       │◄── event: connected ─────────┘  (connectionId)
+       │
+       │                          Subscribe endpoint
+       ├────GET /messages ──────► ┌──────────────────────────────────────────────┐
+       │    ?connectionId=xxx     │ backplane.Groups.AddToGroup(connId, group)   │
+       │                          │ realtimeManager.Subscribe(connId, group,     │
+       │                          │     criteria: changes => ...,               │
+       │                          │     query: async ctx => ...)                │
+       │◄── { group, data } ──── │ return RealtimeListenResponse(group, data)   │
+       │    (initial state)       └──────────────────────────────────────────────┘
+       │
+       │    sse.listen(onData)
+       │    renders initial data
+       │
+       ·                          ┌──────────────────────────────────────────────┐
+       ·                          │ Any mutation endpoint                        │
+       ·    POST /send ─────────► │   db.Messages.Add(...)                      │
+       ·                          │   db.SaveChangesAsync() ──┐                 │
+       ·                          └───────────────────────────┼─────────────────┘
+       ·                                                      ▼
+       ·                          ┌──────────────────────────────────────────────┐
+       ·                          │ SaveChangesInterceptor (automatic)           │
+       ·                          │                                              │
+       ·                          │  Before save:                                │
+       ·                          │    snapshot = ChangeTracker entries           │
+       ·                          │    matched = subscriptions.Where(criteria)   │
+       ·                          │                                              │
+       ·                          │  After save:                                 │
+       ·                          │    for each matched subscription:            │
+       ·                          │      result = await query(dbContext)          │
+       ·                          │      backplane.SendToGroup(group, result) ───┼──┐
+       ·                          └──────────────────────────────────────────────┘  │
+       │                                                                            │
+       │◄── event: messages ────────────── SSE push ◄──────────────────────────────┘
+       │    data: [updated query result]
+       │
+       │    onData(newMessages)
+       ▼    renders updated data
+```
+
+## Using without Entity Framework (simple backplane for basic event driven design & no live queries)
+
+You can use the framework without Entity Framework at all. Simply remove the EF-related DI stuff:
+
+```cs
+builder.Services.AddInMemorySseBackplane();
+//builder.Services.AddEfRealtime(); //not required
+
+/*builder.Services.AddDbContext<MyDbContext>((sp, options) => {
+    options.UseNpgsql(connectionString);
+    options.AddEfRealtimeInterceptor(sp);
+}); not required either */
+```
+
+And then rely on the backplane for doing the client management / broadcasting:
+
+```cs
+public class ChatController(ISseBackplane backplane) : RealtimeControllerBase(backplane)
+{
+    public async Task AddToGroup(string connectionId)
+    {
+        await backplane.Groups.AddToGroupAsync(connectionId, "room1");
+    }
+
+    public async Task SendToGrpoup(string message)
+    {
+        await backplane.Clients.SendToGroupAsync("room1", message);
+    }
+}
+```
+
+## Scaling with Redis
+
+Swap `AddInMemorySseBackplane()` for Redis to scale across multiple server instances:
+
+```cs
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect("localhost:6379"));
+builder.Services.AddRedisSseBackplane();
+```
+
+All backplane operations (send, groups, membership) work transparently across instances.
+The EF.Realtime + Group Changes (like waiting for Entity Framework DbContext.SaveChanges()) does not currently support horizontal scaling.
+
+## JsonSerializer settings
+
+To change broadcast serialization behavior, simply change the DI for controller's native serializer:
+
+```cs
+//example with arbitrary JSON serializer settings
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+```
+
+## Examples
+
+- [`ExampleApp.Quickstart`](ExampleApp.Quickstart) — minimal server + vanilla JS client
+- [`ExampleApp.Chat`](ExampleApp.Chat) — full chat app with React, Redis, EfRealtime
+
+## License
+
+MIT

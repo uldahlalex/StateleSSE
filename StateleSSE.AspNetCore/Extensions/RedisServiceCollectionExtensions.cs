@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using StateleSSE.AspNetCore.Infrastructure;
 
@@ -34,7 +36,8 @@ public static class RedisServiceCollectionExtensions
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RedisBackplane>>();
-            return new RedisBackplane(redis, logger, options.ChannelPrefix);
+            var jsonOptions = sp.GetService<IOptions<JsonOptions>>()?.Value.JsonSerializerOptions;
+            return new RedisBackplane(redis, logger, options.ChannelPrefix, jsonOptions: jsonOptions);
         });
 
         // Register ISseBackplane interface
@@ -58,7 +61,8 @@ public static class RedisServiceCollectionExtensions
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RedisBackplane>>();
-            return new RedisBackplane(redis, logger, channelPrefix);
+            var jsonOptions = sp.GetService<IOptions<JsonOptions>>()?.Value.JsonSerializerOptions;
+            return new RedisBackplane(redis, logger, channelPrefix, jsonOptions: jsonOptions);
         });
 
         // Register ISseBackplane interface
