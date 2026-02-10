@@ -3,12 +3,10 @@ import {useEffect, useState} from "react";
 import type {Room} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {Outlet, useNavigate} from "react-router";
-import {StateleSSEClient} from "statele-sse";
-
-export const sse = new StateleSSEClient("http://localhost:5000/sse");
+import {sse} from "./Sse.tsx";
 
 
-    function ChangeRoomName(props: { room: Room }) {
+function ChangeRoomName(props: { room: Room }) {
 
     const [roomForm, setRoomForm] = useState<Room>(props.room)
     return <>

@@ -1,7 +1,9 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {type CreateMessageRequestDto, type Message,} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {useNavigate, useParams} from "react-router";
+
+import {sse} from "./Sse.tsx";
 
 export type RoomParams = {
     roomId: string;
@@ -16,9 +18,42 @@ export function Room() {
         groupId: params.roomId,
         message: ""
     })
+    useEffect(() => {
 
+        sse.listen(
+            async(id) => {
+                const result = await chatClient.getMessages(id, params.roomId)
+                return result;
+            },
+            async (data) => {
+                setMessages(data);
+            }
 
-//todo get messages, pokes and group members realtime
+        )
+
+        sse.listen(
+            async(id) => {
+                const result = await chatClient.getPokes(id)
+                return result;
+            },
+            async (data) => {
+                alert('you have been poked')
+            }
+
+        )
+
+        sse.listen(
+            async(id) => {
+                const result = await chatClient.getMembers(id, params.roomId)
+                return result;
+            },
+            async (data) => {
+                setMembers(data)
+            }
+
+        )
+    }, []);
+
 
 
     return (

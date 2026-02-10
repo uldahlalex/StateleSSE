@@ -249,6 +249,34 @@
         ]
       }
     },
+    "/SetName": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_SetName",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/GetRooms": {
       "get": {
         "tags": [
@@ -309,7 +337,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RealtimeListenResponseOfIReadOnlyListOfString"
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfListOfValueTupleOfStringAndString"
                 }
               }
             }
@@ -574,7 +602,7 @@
           }
         ]
       },
-      "RealtimeListenResponseOfIReadOnlyListOfString": {
+      "RealtimeListenResponseOfListOfValueTupleOfStringAndString": {
         "allOf": [
           {
             "$ref": "#/components/schemas/RealtimeListenResponse"
@@ -586,14 +614,17 @@
             "properties": {
               "data": {
                 "type": "array",
-                "nullable": true,
                 "items": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/ValueTupleOfStringAndString"
                 }
               }
             }
           }
         ]
+      },
+      "ValueTupleOfStringAndString": {
+        "type": "object",
+        "additionalProperties": false
       },
       "RealtimeListenResponseOfObject": {
         "allOf": [

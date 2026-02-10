@@ -302,6 +302,40 @@ export class ChatClient {
         return Promise.resolve<void>(null as any);
     }
 
+    setName(connectionId: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/SetName?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSetName(_response);
+        });
+    }
+
+    protected processSetName(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
     getRooms(connectionId: string | undefined): Promise<RealtimeListenResponseOfListOfRoom> {
         let url_ = this.baseUrl + "/GetRooms?";
         if (connectionId === null)
@@ -339,7 +373,7 @@ export class ChatClient {
         return Promise.resolve<RealtimeListenResponseOfListOfRoom>(null as any);
     }
 
-    getMembers(connectionId: string | undefined, roomId: string | undefined): Promise<RealtimeListenResponseOfIReadOnlyListOfString> {
+    getMembers(connectionId: string | undefined, roomId: string | undefined): Promise<RealtimeListenResponseOfListOfValueTupleOfStringAndString> {
         let url_ = this.baseUrl + "/GetMembers?";
         if (connectionId === null)
             throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
@@ -363,13 +397,13 @@ export class ChatClient {
         });
     }
 
-    protected processGetMembers(response: Response): Promise<RealtimeListenResponseOfIReadOnlyListOfString> {
+    protected processGetMembers(response: Response): Promise<RealtimeListenResponseOfListOfValueTupleOfStringAndString> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfIReadOnlyListOfString;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfListOfValueTupleOfStringAndString;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -377,7 +411,7 @@ export class ChatClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<RealtimeListenResponseOfIReadOnlyListOfString>(null as any);
+        return Promise.resolve<RealtimeListenResponseOfListOfValueTupleOfStringAndString>(null as any);
     }
 
     getPokes(connectionId: string | undefined): Promise<RealtimeListenResponseOfObject> {
@@ -546,8 +580,11 @@ export interface RealtimeListenResponseOfListOfRoom extends RealtimeListenRespon
 }
 
 /** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
-export interface RealtimeListenResponseOfIReadOnlyListOfString extends RealtimeListenResponse {
-    data?: string[] | undefined;
+export interface RealtimeListenResponseOfListOfValueTupleOfStringAndString extends RealtimeListenResponse {
+    data?: ValueTupleOfStringAndString[];
+}
+
+export interface ValueTupleOfStringAndString {
 }
 
 /** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */

@@ -54,7 +54,7 @@ public class ChatController(ISseBackplane backplane,
     [HttpGet(nameof(GetMessages))]
     public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
     {
-        var group = $"room-messages:{roomId}";
+        var group = roomId;
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
         realtimeManager.Subscribe<MyDbContext>(connectionId, group,
@@ -136,6 +136,17 @@ public class ChatController(ISseBackplane backplane,
         ctx.Entry(room).CurrentValues.SetValues(newRoom);
         await ctx.SaveChangesAsync();
     }
+
+    [Authorize]
+    [HttpPost(nameof(SetName))]
+    public async Task SetName(string connectionId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var user = ctx.Users.FirstOrDefault(u => u.Id == userId) ??
+            throw new ValidationException("Could not find user with ID " + userId);
+
+        await backplane.Groups.AddToGroupAsync("nickname/"+connectionId, user.Nickname);
+    }
     
     [HttpGet(nameof(GetRooms))]
     public async Task<RealtimeListenResponse<List<Room>>> GetRooms(string connectionId)
@@ -153,18 +164,34 @@ public class ChatController(ISseBackplane backplane,
     }
     
     [HttpGet(nameof(GetMembers))]
-    public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(string connectionId, string roomId)
+    public async Task<RealtimeListenResponse<List<(string, string)>>> GetMembers(string connectionId, string roomId)
     {
-        var listenGroup = $"room-members:{roomId}";
-        var roomGroup = $"room-messages:{roomId}";
+        var listenGroup = roomId;
         await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
 
         groupRealtimeManager.Subscribe(listenGroup,
-            criteria: change => change.GroupName == roomGroup,
-            query: async groups => await groups.GetMembersAsync(roomGroup));
+            criteria: change => change.GroupName == listenGroup,
+            query: async groups =>
+            {
+                var members = await groups.GetMembersAsync(listenGroup);
+                var list = new List<(string, string)>();
+                foreach (var m in members)
+                {
+                    var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
+                    list.Add((m, nickname.FirstOrDefault() ?? "Anonymous"));
+                }
 
-        return new RealtimeListenResponse<IReadOnlyList<string>>(listenGroup,
-            await backplane.Groups.GetMembersAsync(roomGroup));
+                return list;
+            });
+        var members = await backplane.Groups.GetMembersAsync(roomId);
+        var list = new List<(string, string)>();
+        foreach (var m in members)
+        {
+            var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
+            list.Add((m, nickname.FirstOrDefault() ?? "Anonymous"));
+        }
+        return new RealtimeListenResponse<List<(string, string)>>
+        (listenGroup, list);
     }
     
 

@@ -1,6 +1,6 @@
 {
   "name": "statele-sse",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Zero-dependency framework-agnostic EventSource client for StateleSSE",
   "type": "module",
   "main": "dist/index.js",
