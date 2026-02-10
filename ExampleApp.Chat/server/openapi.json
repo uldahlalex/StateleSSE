@@ -337,7 +337,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RealtimeListenResponseOfListOfValueTupleOfStringAndString"
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfListOfMemberInfo"
                 }
               }
             }
@@ -602,7 +602,7 @@
           }
         ]
       },
-      "RealtimeListenResponseOfListOfValueTupleOfStringAndString": {
+      "RealtimeListenResponseOfListOfMemberInfo": {
         "allOf": [
           {
             "$ref": "#/components/schemas/RealtimeListenResponse"
@@ -614,17 +614,26 @@
             "properties": {
               "data": {
                 "type": "array",
+                "nullable": true,
                 "items": {
-                  "$ref": "#/components/schemas/ValueTupleOfStringAndString"
+                  "$ref": "#/components/schemas/MemberInfo"
                 }
               }
             }
           }
         ]
       },
-      "ValueTupleOfStringAndString": {
+      "MemberInfo": {
         "type": "object",
-        "additionalProperties": false
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          }
+        }
       },
       "RealtimeListenResponseOfObject": {
         "allOf": [

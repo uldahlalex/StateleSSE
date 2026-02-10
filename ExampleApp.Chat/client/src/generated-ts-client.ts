@@ -373,7 +373,7 @@ export class ChatClient {
         return Promise.resolve<RealtimeListenResponseOfListOfRoom>(null as any);
     }
 
-    getMembers(connectionId: string | undefined, roomId: string | undefined): Promise<RealtimeListenResponseOfListOfValueTupleOfStringAndString> {
+    getMembers(connectionId: string | undefined, roomId: string | undefined): Promise<RealtimeListenResponseOfListOfMemberInfo> {
         let url_ = this.baseUrl + "/GetMembers?";
         if (connectionId === null)
             throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
@@ -397,13 +397,13 @@ export class ChatClient {
         });
     }
 
-    protected processGetMembers(response: Response): Promise<RealtimeListenResponseOfListOfValueTupleOfStringAndString> {
+    protected processGetMembers(response: Response): Promise<RealtimeListenResponseOfListOfMemberInfo> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfListOfValueTupleOfStringAndString;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfListOfMemberInfo;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -411,7 +411,7 @@ export class ChatClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<RealtimeListenResponseOfListOfValueTupleOfStringAndString>(null as any);
+        return Promise.resolve<RealtimeListenResponseOfListOfMemberInfo>(null as any);
     }
 
     getPokes(connectionId: string | undefined): Promise<RealtimeListenResponseOfObject> {
@@ -580,11 +580,13 @@ export interface RealtimeListenResponseOfListOfRoom extends RealtimeListenRespon
 }
 
 /** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
-export interface RealtimeListenResponseOfListOfValueTupleOfStringAndString extends RealtimeListenResponse {
-    data?: ValueTupleOfStringAndString[];
+export interface RealtimeListenResponseOfListOfMemberInfo extends RealtimeListenResponse {
+    data?: MemberInfo[] | undefined;
 }
 
-export interface ValueTupleOfStringAndString {
+export interface MemberInfo {
+    connectionId?: string;
+    nickname?: string;
 }
 
 /** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */

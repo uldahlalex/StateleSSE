@@ -164,7 +164,7 @@ public class ChatController(ISseBackplane backplane,
     }
     
     [HttpGet(nameof(GetMembers))]
-    public async Task<RealtimeListenResponse<List<(string, string)>>> GetMembers(string connectionId, string roomId)
+    public async Task<RealtimeListenResponse<List<MemberInfo>>> GetMembers(string connectionId, string roomId)
     {
         var listenGroup = roomId;
         await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
@@ -174,24 +174,23 @@ public class ChatController(ISseBackplane backplane,
             query: async groups =>
             {
                 var members = await groups.GetMembersAsync(listenGroup);
-                var list = new List<(string, string)>();
+                var list = new List<MemberInfo>();
                 foreach (var m in members)
                 {
                     var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-                    list.Add((m, nickname.FirstOrDefault() ?? "Anonymous"));
+                    list.Add(new MemberInfo(m, nickname.FirstOrDefault() ?? "Anonymous"));
                 }
 
                 return list;
             });
         var members = await backplane.Groups.GetMembersAsync(roomId);
-        var list = new List<(string, string)>();
+        var list = new List<MemberInfo>();
         foreach (var m in members)
         {
             var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-            list.Add((m, nickname.FirstOrDefault() ?? "Anonymous"));
+            list.Add(new MemberInfo(m, nickname.FirstOrDefault() ?? "Anonymous"));
         }
-        return new RealtimeListenResponse<List<(string, string)>>
-        (listenGroup, list);
+        return new RealtimeListenResponse<List<MemberInfo>>(listenGroup, list);
     }
     
 

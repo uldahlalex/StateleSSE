@@ -268,7 +268,7 @@ changes.HasDeleted<Message>()
 
 ### "Criteria" for triggering a query with Group realtime manager:
 
-tood
+todo
 
 ### Backplane API
 
