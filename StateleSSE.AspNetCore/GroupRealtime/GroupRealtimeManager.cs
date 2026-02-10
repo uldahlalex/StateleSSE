@@ -16,7 +16,7 @@ internal sealed class GroupRealtimeManager : IGroupRealtimeManager
         _backplane.OnGroupChanged += HandleGroupChanged;
     }
 
-    public void Subscribe(string groupName, Func<GroupChangedEventArgs, bool> criteria, Func<IBackplaneGroups, Task<object?>> query)
+    public void Subscribe(string groupName, Func<GroupChangedEventArgs, bool> criteria, Func<ISseBackplane, Task<object?>> query)
     {
         _subscriptions[groupName] = new GroupRealtimeSubscription
         {
@@ -42,7 +42,7 @@ internal sealed class GroupRealtimeManager : IGroupRealtimeManager
 
         foreach (var sub in matched)
         {
-            var data = await sub.Query(_backplane.Groups);
+            var data = await sub.Query(_backplane);
             if (data is null)
                 continue;
 

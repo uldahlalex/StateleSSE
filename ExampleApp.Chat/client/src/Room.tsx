@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {type CreateMessageRequestDto, type Message,} from "./generated-ts-client.ts";
+import {type CreateMessageRequestDto, type MemberInfo, type Message,} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {useNavigate, useParams} from "react-router";
 
@@ -12,7 +12,7 @@ export type RoomParams = {
 export function Room() {
     const navigate = useNavigate()
     const params = useParams<RoomParams>();
-    const [members, setMembers] = useState<any[]>([]);
+    const [members, setMembers] = useState<MemberInfo[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [message, setMessage] = useState<CreateMessageRequestDto>({
         groupId: params.roomId,
@@ -20,39 +20,50 @@ export function Room() {
     })
     useEffect(() => {
 
-        sse.listen(
-            async(id) => {
-                const result = await chatClient.getMessages(id, params.roomId)
-                return result;
-            },
-            async (data) => {
-                setMessages(data);
-            }
+        sse.listen(async(id) => {
+            const result = await chatClient.setName(id);
+            return {group: id, data: null}
+        },
+            (data) => {
 
-        )
+            })
 
-        sse.listen(
-            async(id) => {
-                const result = await chatClient.getPokes(id)
-                return result;
-            },
-            async (data) => {
-                alert('you have been poked')
-            }
+            sse.listen(
+                async(id) => {
+                    const result = await chatClient.getMessages(id, params.roomId)
+                    return result;
+                },
+                async (data) => {
+                    setMessages(data);
+                    console.log(data)
+                }
 
-        )
+            )
 
-        sse.listen(
-            async(id) => {
-                const result = await chatClient.getMembers(id, params.roomId)
-                return result;
-            },
-            async (data) => {
-                setMembers(data)
-            }
+            sse.listen(
+                async(id) => {
+                    const result = await chatClient.getPokes(id)
+                    return result;
+                },
+                async (data) => {
+                    alert('you have been poked')
+                }
 
-        )
+            )
+
+            sse.listen(
+                async(id) => {
+                    const result = await chatClient.getMembers(id, params.roomId)
+                    return result;
+                },
+                async (data) => {
+                    setMembers(data)
+                }
+
+            )
+
     }, []);
+
 
 
 
@@ -114,9 +125,9 @@ export function Room() {
                         <div className="member-item" key={m.connectionId}>
                             <div className="member-info">
                                 <div className="member-avatar">
-                                    {(m.userName || 'A').charAt(0).toUpperCase()}
+                                    {(m.nickname || 'A').charAt(0).toUpperCase()}
                                 </div>
-                                <span className="member-name">{m.userName || 'Anonymous'}</span>
+                                <span className="member-name">{m.nickname || 'Anonymous'}</span>
                             </div>
                             <button
                                 className="btn btn-ghost btn-sm"

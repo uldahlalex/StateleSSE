@@ -219,7 +219,7 @@ public async Task<RealtimeListenResponse<IReadOnlyList<string>>> GetMembers(stri
 
     groupRealtime.Subscribe(listenGroup,
         criteria: change => change.GroupName == roomGroup,
-        query: async groups => await groups.GetMembersAsync(roomGroup));
+        query: async bp => await bp.Groups.GetMembersAsync(roomGroup));
 
     return new RealtimeListenResponse<IReadOnlyList<string>>(listenGroup,
         await backplane.Groups.GetMembersAsync(roomGroup));
@@ -268,7 +268,17 @@ changes.HasDeleted<Message>()
 
 ### "Criteria" for triggering a query with Group realtime manager:
 
-todo
+```cs
+//When using the groupRealtimeManager:
+        groupRealtime.Subscribe(listenGroup,
+            criteria: change => change.GroupName == roomGroup,
+            query: async bp => await bp.Groups.GetMembersAsync(roomGroup));
+
+//The criteria receives a GroupChangedEventArgs with:
+change.ConnectionId  // the connection ID of the client whose membership changed
+change.GroupName     // the group whose membership changed
+change.ChangeType    // GroupChangeType.Added or GroupChangeType.Removed
+```
 
 ### Backplane API
 

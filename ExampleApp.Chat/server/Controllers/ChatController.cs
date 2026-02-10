@@ -54,14 +54,14 @@ public class ChatController(ISseBackplane backplane,
     [HttpGet(nameof(GetMessages))]
     public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
     {
-        var group = roomId;
+        var group = "message:"+roomId;
         await backplane.Groups.AddToGroupAsync(connectionId, group);
 
         realtimeManager.Subscribe<MyDbContext>(connectionId, group,
             criteria: changes =>
             {
-                return changes.OfType<Message>()
-                    .Any(e => e.Entity.RoomId == roomId);
+                var change = changes.HasAdded<Message>();
+                return change;
             },
             query: async c => await c.Messages
                 .Where(m => m.RoomId == roomId)
@@ -166,14 +166,14 @@ public class ChatController(ISseBackplane backplane,
     [HttpGet(nameof(GetMembers))]
     public async Task<RealtimeListenResponse<List<MemberInfo>>> GetMembers(string connectionId, string roomId)
     {
-        var listenGroup = roomId;
+        var listenGroup = "members:"+roomId;
         await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
 
         groupRealtimeManager.Subscribe(listenGroup,
-            criteria: change => change.GroupName == listenGroup,
-            query: async groups =>
+            criteria: change => change.GroupName == listenGroup || change.ConnectionId.StartsWith("nickname/"),
+            query: async bp =>
             {
-                var members = await groups.GetMembersAsync(listenGroup);
+                var members = await bp.Groups.GetMembersAsync(listenGroup);
                 var list = new List<MemberInfo>();
                 foreach (var m in members)
                 {
