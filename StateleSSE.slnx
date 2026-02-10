@@ -7,5 +7,7 @@
         <Project Path="ExampleApp.Chat/loadbalancer/loadbalancer.csproj" />
         <Project Path="ExampleApp.Chat/server/server.csproj" />
     </Folder>
-
+    <Folder Name="/ExampleApp.IoT.WeatherStation/">
+        <Project Path="ExampleApp.IoT.WeatherStation/server/server.csproj" />
+    </Folder>
 </Solution>

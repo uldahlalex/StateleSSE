@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Station - Live View</title>
+    <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* ========== SCENIC VIEW ========== */
+        .scenic-view {
+            position: relative;
+            height: 50vh;
+            min-height: 320px;
+            background: linear-gradient(180deg,
+                #1a1a2e 0%,
+                #2d4a6f 25%,
+                #6a9bc3 50%,
+                #87b5d6 60%,
+                #4a7a4a 65%,
+                #3d6b3d 75%,
+                #2d5a2d 100%
+            );
+            overflow: hidden;
+        }
+
+        /* Clouds */
+        .clouds {
+            position: absolute;
+            top: 5%;
+            left: 0;
+            right: 0;
+            height: 30%;
+            opacity: 0.3;
+        }
+
+        .cloud {
+            position: absolute;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            filter: blur(20px);
+        }
+
+        /* Ground */
+        .ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40%;
+            background: linear-gradient(180deg,
+                #4a7a4a 0%,
+                #3d6b3d 40%,
+                #2d5a2d 100%
+            );
+        }
+
+        .grass-texture {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            background:
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(255,255,255,0.02) 40px,
+                    rgba(255,255,255,0.02) 80px
+                );
+        }
+
+        /* Station styling */
+        .stations-container {
+            position: absolute;
+            bottom: 38%;
+            left: 0;
+            right: 0;
+            height: 45%;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            padding: 0 15%;
+        }
+
+        .station {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: default;
+        }
+
+        .station-antenna {
+            width: 2px;
+            height: 30px;
+            background: linear-gradient(180deg, #e0e0e0 0%, #a0a0a0 100%);
+        }
+
+        .station-antenna-tip {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            margin-bottom: 2px;
+        }
+
+        .station-box {
+            width: 50px;
+            height: 35px;
+            background: linear-gradient(180deg, #d0d0d0 0%, #909090 100%);
+            border-radius: 4px;
+            position: relative;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .station-box .led {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #333;
+            transition: all 0.15s;
+        }
+
+        .station-box .led.pulse {
+            background: #7ee787;
+            box-shadow: 0 0 8px #7ee787;
+        }
+
+        .station-base {
+            width: 8px;
+            height: 20px;
+            background: #707070;
+            border-radius: 0 0 2px 2px;
+        }
+
+        .station-foot {
+            width: 30px;
+            height: 6px;
+            background: #505050;
+            border-radius: 2px;
+        }
+
+        .station-label {
+            position: absolute;
+            bottom: -25px;
+            white-space: nowrap;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.6);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        .station-readings {
+            position: absolute;
+            top: -65px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(6px);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.65rem;
+            white-space: nowrap;
+            color: rgba(255,255,255,0.8);
+            line-height: 1.4;
+        }
+
+        /* Command toast on station */
+        .station-toast {
+            position: absolute;
+            top: -90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 152, 0, 0.95);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            animation: toastPop 3s ease-out forwards;
+            z-index: 100;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        @keyframes toastPop {
+            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+        }
+
+        /* Connection status */
+        .connection-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f44336;
+        }
+
+        .connection-dot.connected {
+            background: #4CAF50;
+            box-shadow: 0 0 8px #4CAF50;
+        }
+
+        /* Transmission indicator */
+        .tx-indicator {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .tx-light {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #333;
+            transition: all 0.1s;
+        }
+
+        .tx-light.active {
+            background: #7ee787;
+            box-shadow: 0 0 6px #7ee787;
+        }
+
+        /* ========== TECHNICAL PANEL ========== */
+        .tech-panel {
+            background: #0d1117;
+            border-top: 1px solid #30363d;
+            min-height: 35vh;
+        }
+
+        .tech-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .tech-title {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #58a6ff;
+        }
+
+        .tech-title::before {
+            content: '> ';
+            color: #7ee787;
+        }
+
+        .station-id-display {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #8b949e;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .station-id-display code {
+            background: #21262d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #f0883e;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .station-id-display code:hover {
+            border-color: #30363d;
+        }
+
+        .station-id-input {
+            background: #21262d;
+            border: 1px solid #58a6ff;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #f0883e;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            width: 320px;
+        }
+
+        .station-id-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-sm {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn-sm:hover {
+            background: #30363d;
+            color: #c9d1d9;
+        }
+
+        .btn-sm.primary {
+            background: #238636;
+            border-color: #2ea043;
+            color: white;
+        }
+
+        .btn-sm.primary:hover {
+            background: #2ea043;
+        }
+
+        .tech-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: #30363d;
+        }
+
+        .tech-content.docs-layout {
+            grid-template-columns: 0.8fr 1.2fr 1.2fr;
+        }
+
+        @media (max-width: 1100px) {
+            .tech-content.docs-layout {
+                grid-template-columns: 1fr 1fr;
+            }
+            .tech-content.docs-layout .tech-section:first-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .tech-content, .tech-content.docs-layout {
+                grid-template-columns: 1fr;
+            }
+            .tech-content.docs-layout .tech-section:first-child {
+                grid-column: auto;
+            }
+        }
+
+        .tech-section {
+            background: #0d1117;
+            padding: 15px 20px;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .tech-section h4 {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: #7ee787;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        .docs-text {
+            font-size: 0.85rem;
+            color: #8b949e;
+            margin-bottom: 10px;
+        }
+
+        .docs-text strong {
+            color: #c9d1d9;
+        }
+
+        .docs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .docs-table th {
+            text-align: left;
+            padding: 6px 8px;
+            background: #161b22;
+            color: #8b949e;
+            font-weight: normal;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .docs-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+        }
+
+        .docs-table code {
+            background: #21262d;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #f0883e;
+            font-size: 0.75rem;
+        }
+
+        .docs-topic {
+            background: #161b22;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .docs-topic:last-child {
+            margin-bottom: 0;
+        }
+
+        .docs-topic-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .docs-topic-header code {
+            flex: 1;
+            background: #21262d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #58a6ff;
+            font-size: 0.8rem;
+            min-width: 200px;
+        }
+
+        .topic-badge {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .topic-badge.pub {
+            background: #238636;
+            color: white;
+        }
+
+        .topic-badge.sub {
+            background: #1f6feb;
+            color: white;
+        }
+
+        .docs-desc {
+            font-size: 0.8rem;
+            color: #8b949e;
+            margin-bottom: 8px;
+        }
+
+        .docs-desc strong {
+            color: #c9d1d9;
+        }
+
+        .docs-desc code {
+            background: #21262d;
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: #f0883e;
+            font-size: 0.75rem;
+        }
+
+        .docs-json {
+            background: #010409;
+            border: 1px solid #21262d;
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: #7ee787;
+            overflow-x: auto;
+            margin: 0;
+            white-space: pre;
+        }
+
+        .docs-command {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .docs-command-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #c9d1d9;
+            margin-bottom: 8px;
+        }
+
+        .docs-command .docs-json {
+            margin-bottom: 8px;
+        }
+
+        .docs-props {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .docs-props .prop {
+            font-size: 0.75rem;
+            color: #8b949e;
+        }
+
+        .docs-props .prop code {
+            background: #21262d;
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: #f0883e;
+            margin-right: 4px;
+        }
+
+        .copy-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        .copy-btn:hover {
+            background: #30363d;
+            color: #c9d1d9;
+        }
+    </style>
+</head>
+<body>
+    <!-- Scenic View -->
+    <div class="scenic-view">
+        <div class="clouds">
+            <div class="cloud" style="width: 200px; height: 60px; top: 20%; left: 10%;"></div>
+            <div class="cloud" style="width: 150px; height: 40px; top: 40%; left: 35%;"></div>
+            <div class="cloud" style="width: 180px; height: 50px; top: 10%; left: 65%;"></div>
+        </div>
+
+        <div class="ground">
+            <div class="grass-texture"></div>
+        </div>
+
+        <div class="stations-container" id="stationsContainer"></div>
+
+        <div class="connection-badge">
+            <div class="connection-dot" id="statusDot"></div>
+            <span id="statusText">Connecting...</span>
+        </div>
+
+        <div class="tx-indicator">
+            <div class="tx-light" id="txLight"></div>
+            <span>TX</span>
+        </div>
+    </div>
+
+    <!-- Technical Panel -->
+    <div class="tech-panel">
+        <div class="tech-header">
+            <div class="tech-title">MQTT Interface</div>
+            <div class="station-id-display" id="stationIdContainer">
+                <span>Station ID:</span>
+                <code id="stationIdDisplay" onclick="startEditStationId()" title="Click to edit">-</code>
+                <div class="station-id-actions" id="stationIdActions">
+                    <button class="btn-sm" onclick="copyStationId()">copy</button>
+                    <button class="btn-sm" onclick="startEditStationId()">edit</button>
+                    <button class="btn-sm" onclick="regenerateStationId()">new</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tech-content docs-layout">
+            <div class="tech-section">
+                <h4>// Devices</h4>
+                <div class="docs-text">This station contains <strong>2 weather sensors</strong>:</div>
+                <table class="docs-table">
+                    <thead>
+                        <tr><th>ID</th><th>Name</th><th>Placement</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>sensor-outdoor</code></td><td>Outdoor</td><td>Garden</td></tr>
+                        <tr><td><code>sensor-rooftop</code></td><td>Rooftop</td><td>Roof</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="tech-section">
+                <h4>// Device Publishes (subscribe to receive)</h4>
+
+                <div class="docs-topic">
+                    <div class="docs-topic-header">
+                        <span class="topic-badge pub">PUB</span>
+                        <code id="telemetryTopic"></code>
+                        <button class="copy-btn" onclick="copyTopic('telemetry')">copy</button>
+                    </div>
+                    <div class="docs-desc">Telemetry data sent every <strong>5 seconds</strong> per sensor.</div>
+                    <pre class="docs-json">{
+  "sensorId": "sensor-outdoor",
+  "sensorName": "Outdoor",
+  "stationId": "your-station-id",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "temperature": 18.3,
+  "humidity": 62.5,
+  "pressure": 1013.2,
+  "lightLevel": 540,
+  "status": "active"
+}</pre>
+                </div>
+
+            </div>
+
+            <div class="tech-section">
+                <h4>// Device Subscribes (publish to control)</h4>
+
+                <div class="docs-topic">
+                    <div class="docs-topic-header">
+                        <span class="topic-badge sub">SUB</span>
+                        <code id="commandTopic"></code>
+                        <button class="copy-btn" onclick="copyTopic('command')">copy</button>
+                    </div>
+                    <div class="docs-desc">Send commands to control sensor behavior. Replace <code>{sensorId}</code> with specific ID.</div>
+
+                    <div class="docs-command">
+                        <div class="docs-command-name">Set Reporting Interval</div>
+                        <pre class="docs-json">{
+  "action": "setInterval",
+  "value": 10
+}</pre>
+                        <div class="docs-props">
+                            <span class="prop"><code>action</code> string - must be "setInterval"</span>
+                            <span class="prop"><code>value</code> number - interval in seconds (1-60)</span>
+                        </div>
+                    </div>
+
+                    <div class="docs-command">
+                        <div class="docs-command-name">Reset Sensor</div>
+                        <pre class="docs-json">{
+  "action": "reset"
+}</pre>
+                        <div class="docs-props">
+                            <span class="prop"><code>action</code> string - must be "reset"</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
+
+        let stationId = localStorage.getItem('weather-station-id');
+        if (!stationId) {
+            stationId = crypto.randomUUID();
+            localStorage.setItem('weather-station-id', stationId);
+        }
+
+        const SENSORS = [
+            { id: 'sensor-outdoor', name: 'Outdoor' },
+            { id: 'sensor-rooftop', name: 'Rooftop' },
+        ];
+
+        let client = null;
+        let isConnected = false;
+        let simulationInterval = null;
+        let telemetryIntervalMs = 5000;
+        let simTime = 0;
+
+        const sensorState = new Map();
+        SENSORS.forEach(s => {
+            sensorState.set(s.id, {
+                temperatureBase: 18 + (Math.random() - 0.5) * 4,
+                pressureBase: 1013,
+                pressureDrift: 0,
+            });
+        });
+
+        function init() {
+            document.getElementById('stationIdDisplay').textContent = stationId;
+            updateTopicDisplays();
+            renderStations();
+            autoConnect();
+        }
+
+        function updateTopicDisplays() {
+            document.getElementById('telemetryTopic').textContent = `station/${stationId}/sensor/{sensorId}/telemetry`;
+            document.getElementById('commandTopic').textContent = `station/${stationId}/sensor/{sensorId}/command`;
+        }
+
+        function renderStations() {
+            const container = document.getElementById('stationsContainer');
+            container.innerHTML = SENSORS.map(s => `
+                <div class="station" id="station-${s.id}">
+                    <div class="station-readings" id="readings-${s.id}">--</div>
+                    <div class="station-antenna-tip"></div>
+                    <div class="station-antenna"></div>
+                    <div class="station-box">
+                        <div class="led" id="led-${s.id}"></div>
+                    </div>
+                    <div class="station-base"></div>
+                    <div class="station-foot"></div>
+                    <div class="station-label">${s.name}</div>
+                    <div id="toast-container-${s.id}"></div>
+                </div>
+            `).join('');
+        }
+
+        function autoConnect() {
+            client = mqtt.connect(BROKER_URL, {
+                clean: true,
+                connectTimeout: 5000
+            });
+
+            client.on('connect', () => {
+                isConnected = true;
+                document.getElementById('statusDot').classList.add('connected');
+                document.getElementById('statusText').textContent = 'Live';
+
+                const commandTopic = `station/${stationId}/sensor/+/command`;
+                client.subscribe(commandTopic);
+
+                startSimulation();
+            });
+
+            client.on('message', (topic, message) => {
+                handleIncomingCommand(topic, message.toString());
+            });
+
+            client.on('error', () => {
+                document.getElementById('statusText').textContent = 'Error';
+            });
+
+            client.on('close', () => {
+                isConnected = false;
+                document.getElementById('statusDot').classList.remove('connected');
+                document.getElementById('statusText').textContent = 'Disconnected';
+                stopSimulation();
+            });
+        }
+
+        function handleIncomingCommand(topic, payload) {
+            const parts = topic.split('/');
+            const sensorId = parts[3];
+
+            let data;
+            try {
+                data = JSON.parse(payload);
+            } catch {
+                data = { raw: payload };
+            }
+
+            showStationToast(sensorId, data);
+            executeCommand(sensorId, data);
+        }
+
+        function executeCommand(sensorId, data) {
+            const state = sensorState.get(sensorId);
+            if (!state) return;
+
+            switch (data.action) {
+                case 'setInterval':
+                    if (typeof data.value === 'number' && data.value >= 1 && data.value <= 60) {
+                        telemetryIntervalMs = data.value * 1000;
+                        if (simulationInterval) {
+                            clearInterval(simulationInterval);
+                            simulationInterval = setInterval(simulationTick, telemetryIntervalMs);
+                        }
+                        console.log(`Telemetry interval changed to ${data.value}s`);
+                    }
+                    break;
+
+                case 'reset':
+                    state.temperatureBase = 18 + (Math.random() - 0.5) * 4;
+                    state.pressureBase = 1013;
+                    state.pressureDrift = 0;
+                    console.log(`Sensor ${sensorId} reset to defaults`);
+                    break;
+
+                default:
+                    console.log(`Unknown command: ${data.action}`);
+            }
+        }
+
+        function showStationToast(sensorId, data) {
+            const container = document.getElementById(`toast-container-${sensorId}`);
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = 'station-toast';
+            toast.textContent = JSON.stringify(data);
+            container.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function startSimulation() {
+            if (simulationInterval) return;
+            simulationInterval = setInterval(simulationTick, telemetryIntervalMs);
+            simulationTick();
+        }
+
+        function stopSimulation() {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+            }
+        }
+
+        function simulationTick() {
+            simTime++;
+            SENSORS.forEach(publishTelemetry);
+            flashTxLight();
+        }
+
+        function publishTelemetry(sensor) {
+            if (!client || !isConnected) return;
+
+            const state = sensorState.get(sensor.id);
+            const dayPhase = Math.sin(simTime * 0.05);
+            const temperature = round(state.temperatureBase + dayPhase * 8 + (Math.random() - 0.5) * 1.5);
+            const humidity = round(Math.max(10, Math.min(100, 60 - dayPhase * 15 + (Math.random() - 0.5) * 5)));
+
+            state.pressureDrift += (Math.random() - 0.5) * 0.3;
+            state.pressureDrift = Math.max(-8, Math.min(8, state.pressureDrift));
+            const pressure = round(state.pressureBase + state.pressureDrift + (Math.random() - 0.5) * 0.5);
+
+            const lightLevel = Math.round(Math.max(0, Math.min(1000, 500 + dayPhase * 450 + (Math.random() - 0.5) * 50)));
+
+            const telemetry = {
+                sensorId: sensor.id,
+                sensorName: sensor.name,
+                stationId: stationId,
+                timestamp: new Date().toISOString(),
+                temperature: temperature,
+                humidity: humidity,
+                pressure: pressure,
+                lightLevel: lightLevel,
+                status: 'active'
+            };
+
+            const topic = `station/${stationId}/sensor/${sensor.id}/telemetry`;
+            client.publish(topic, JSON.stringify(telemetry), { qos: 1 });
+
+            // Update readings overlay
+            const readingsEl = document.getElementById(`readings-${sensor.id}`);
+            if (readingsEl) {
+                readingsEl.innerHTML = `${temperature}°C | ${humidity}% | ${lightLevel} lx`;
+            }
+
+            // Pulse LED
+            const led = document.getElementById(`led-${sensor.id}`);
+            if (led) {
+                led.classList.add('pulse');
+                setTimeout(() => led.classList.remove('pulse'), 300);
+            }
+
+        }
+
+        function flashTxLight() {
+            const light = document.getElementById('txLight');
+            light.classList.add('active');
+            setTimeout(() => light.classList.remove('active'), 200);
+        }
+
+        function round(n) {
+            return Math.round(n * 100) / 100;
+        }
+
+        // Station ID management
+        function copyStationId() {
+            navigator.clipboard.writeText(stationId);
+        }
+
+        function regenerateStationId() {
+            const newId = crypto.randomUUID();
+            setStationId(newId);
+        }
+
+        function startEditStationId() {
+            const container = document.getElementById('stationIdContainer');
+            const currentDisplay = document.getElementById('stationIdDisplay');
+            const actions = document.getElementById('stationIdActions');
+
+            currentDisplay.style.display = 'none';
+            actions.style.display = 'none';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'station-id-input';
+            input.id = 'stationIdInput';
+            input.value = stationId;
+
+            const editActions = document.createElement('div');
+            editActions.className = 'station-id-actions';
+            editActions.id = 'stationIdEditActions';
+            editActions.innerHTML = `
+                <button class="btn-sm primary" onclick="saveStationId()">save</button>
+                <button class="btn-sm" onclick="cancelEditStationId()">cancel</button>
+            `;
+
+            container.appendChild(input);
+            container.appendChild(editActions);
+            input.focus();
+            input.select();
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') saveStationId();
+                if (e.key === 'Escape') cancelEditStationId();
+            });
+        }
+
+        function saveStationId() {
+            const input = document.getElementById('stationIdInput');
+            const newId = input.value.trim();
+
+            if (newId && newId !== stationId) {
+                setStationId(newId);
+            }
+            cancelEditStationId();
+        }
+
+        function cancelEditStationId() {
+            const input = document.getElementById('stationIdInput');
+            const editActions = document.getElementById('stationIdEditActions');
+            const currentDisplay = document.getElementById('stationIdDisplay');
+            const actions = document.getElementById('stationIdActions');
+
+            if (input) input.remove();
+            if (editActions) editActions.remove();
+
+            currentDisplay.style.display = '';
+            actions.style.display = '';
+        }
+
+        function setStationId(newId) {
+            stationId = newId;
+            localStorage.setItem('weather-station-id', stationId);
+
+            document.getElementById('stationIdDisplay').textContent = stationId;
+            updateTopicDisplays();
+
+            if (client) {
+                client.end(true);
+                setTimeout(autoConnect, 500);
+            }
+        }
+
+        function copyTopic(type) {
+            const topics = {
+                telemetry: `station/${stationId}/sensor/{sensorId}/telemetry`,
+                command: `station/${stationId}/sensor/{sensorId}/command`
+            };
+            navigator.clipboard.writeText(topics[type]);
+        }
+
+        init();
+    </script>
+</body>
+</html>
