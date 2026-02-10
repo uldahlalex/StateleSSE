@@ -9,9 +9,7 @@
 
 
   <ItemGroup>
-    <!--
-            <PackageReference Include="StateleSSE.AspNetCore" Version="4" />
-    -->
+    <PackageReference Include="StateleSSE.AspNetCore" Version="4.0.0-preview.1" />
     <PackageReference Include="Mqtt.Controllers" Version="*" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
@@ -20,9 +18,9 @@
     <PackageReference Include="NSwag.Generation" Version="14.6.3" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\StateleSSE.AspNetCore\StateleSSE.AspNetCore.csproj" />
-  </ItemGroup>
+<!--  <ItemGroup>-->
+<!--    <ProjectReference Include="..\..\StateleSSE.AspNetCore\StateleSSE.AspNetCore.csproj" />-->
+<!--  </ItemGroup>-->
 
   
 </Project>

@@ -2,6 +2,8 @@
 
 Realtime SSE framework for ASP.NET Core with live queries. Pair with the [`statele-sse`](statele-sse-client) npm package for a type-safe client.
 
+These docs are for the newest version (v4). For older version (before live queries with EF.Realtime), see branch "v3"
+
 ## Dependencies
 
 | | Required     | Notes |
@@ -16,7 +18,7 @@ Minimal setup (in-memory backplane, no EfRealtime) requires no additional packag
 ## Install
 
 ```bash
-dotnet add package StateleSSE.AspNetCore
+dotnet add package StateleSSE.AspNetCore --prerelease
 ```
 
 ## Quick start
@@ -396,6 +398,21 @@ builder.Services.AddRedisSseBackplane();
 
 All backplane operations (send, groups, membership) work transparently across instances.
 The EF.Realtime + Group Changes (like waiting for Entity Framework DbContext.SaveChanges()) does not currently support horizontal scaling.
+
+## JsonSerializer settings
+
+To change broadcast serialization behavior, simply change the DI for controller's native serializer:
+
+```cs
+//example with arbitrary JSON serializer settings
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+```
 
 ## Examples
 

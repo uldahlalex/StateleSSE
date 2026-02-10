@@ -1,7 +1,0 @@
-- version 4.0.0 
-- video: Entity Framework Realtime Queries with StateleSSE
-- readme: json serializer settings
-
-_____
-
-- Lave "recipe" / step by step guide til iot system
