@@ -24,13 +24,5 @@
     <ProjectReference Include="..\..\StateleSSE.AspNetCore\StateleSSE.AspNetCore.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Controllers\" />
-    <Folder Include="Services\" />
-  </ItemGroup>
-
-
-
-
-
+  
 </Project>

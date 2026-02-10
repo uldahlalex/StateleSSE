@@ -12,6 +12,7 @@ using server;
 using StackExchange.Redis;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
+using StateleSSE.AspNetCore.GroupRealtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,7 +22,6 @@ configuration.GetSection(nameof(ConnectionStrings)).Bind(connectionStrings);
 
 
 builder.Services.AddSingleton(connectionStrings);
-
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
@@ -40,8 +40,11 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 });
 
 builder.Services.AddRedisSseBackplane();
-builder.Services.AddDbContext<MyDbContext>((conf) =>
+builder.Services.AddEfRealtime();
+builder.Services.AddGroupRealtime();
+builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
+    conf.AddEfRealtimeInterceptor(sp);
     conf.UseNpgsql(connectionStrings.DbConnectionString);
 });
 builder.Services.AddOpenApiDocument(config =>
@@ -77,6 +80,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 builder.Services.AddCors();
+builder.Services.AddScoped<Seeder>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
@@ -95,7 +99,11 @@ app.UseCors(c =>
  var mqttClient = app.Services.GetRequiredService<IMqttClientService>();
  await mqttClient.ConnectAsync(connectionStrings.MqttBroker, connectionStrings.MqttPort, "", "");
 app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
-app.Services.GetRequiredService<Seeder>().Seed();
+
+using(var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<Seeder>().Seed();
+}
 
 app.Run();
 
