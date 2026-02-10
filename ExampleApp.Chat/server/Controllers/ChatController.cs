@@ -18,6 +18,7 @@ public class ChatController(ISseBackplane backplane,
     IGroupRealtimeManager groupRealtimeManager,
     MyDbContext ctx) : RealtimeControllerBase(backplane)
 {
+    
     [HttpPost(nameof(Login))]
     public LoginResponse Login([FromBody] LoginRequest request)
     {

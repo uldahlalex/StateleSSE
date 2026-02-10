@@ -1,5 +1,7 @@
-- finish quickstart with listener demo
-- no-EF demo
+- no-EF demo + readme
+- package version after additions
+
+
 _____
 
 - Lave "recipe" / step by step guide

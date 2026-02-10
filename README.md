@@ -355,7 +355,34 @@ sse.listen<Room[]>(
 
 ## Using without Entity Framework (simple backplane for basic event driven design & no live queries)
 
-todo
+You can use the framework without Entity Framework at all. Simply remove the EF-related DI stuff:
+
+```cs
+builder.Services.AddInMemorySseBackplane();
+//builder.Services.AddEfRealtime(); //not required
+
+/*builder.Services.AddDbContext<MyDbContext>((sp, options) => {
+    options.UseNpgsql(connectionString);
+    options.AddEfRealtimeInterceptor(sp);
+}); not required either */
+```
+
+And then rely on the backplane for doing the client management / broadcasting:
+
+```cs
+public class ChatController(ISseBackplane backplane) : RealtimeControllerBase(backplane)
+{
+    public async Task AddToGroup(string connectionId)
+    {
+        await backplane.Groups.AddToGroupAsync(connectionId, "room1");
+    }
+
+    public async Task SendToGrpoup(string message)
+    {
+        await backplane.Clients.SendToGroupAsync("room1", message);
+    }
+}
+```
 
 ## Scaling with Redis
 

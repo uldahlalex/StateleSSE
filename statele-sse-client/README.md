@@ -139,6 +139,8 @@ const unsub = sse.listen(
 
 ## Server setup
 
+I recommend seeing the full server docs on http://github.com/uldahlalex/statelesse but here's a brief walkthrough:
+
 Install the NuGet package:
 
 ```
