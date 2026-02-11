@@ -83,7 +83,7 @@ public class PostgresBackplane : ISseBackplane, IAsyncDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect(string? userId = null)
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
         var connectionId = Guid.NewGuid().ToString();

@@ -14,11 +14,13 @@ public abstract class RealtimeControllerBase(ISseBackplane backplane) : Controll
 {
     protected ISseBackplane Backplane => backplane;
 
+    protected virtual string? GetConnectionUserId() => null;
+
     [HttpGet("sse")]
     public async Task Connect()
     {
         await using var sse = await HttpContext.OpenSseStreamAsync();
-        await using var connection = backplane.CreateConnection();
+        await using var connection = backplane.CreateConnection(GetConnectionUserId());
 
         await sse.WriteAsync("connected", JsonSerializer.Serialize(
             new RealtimeConnectionResponse(connection.ConnectionId),

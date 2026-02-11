@@ -49,7 +49,7 @@ public class InMemoryBackplane : ISseBackplane, IDisposable
     public event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
 
     /// <inheritdoc/>
-    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect(string? userId = null)
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
         var connectionId = Guid.NewGuid().ToString();

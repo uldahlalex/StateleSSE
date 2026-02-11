@@ -397,6 +397,89 @@ public class ChatController(ISseBackplane backplane) : RealtimeControllerBase(ba
 }
 ```
 
+## Scaling with EF Core Backplane
+
+The EF backplane stores connection and group state in your own `DbContext`. This means the backplane tables (`SseConnections`, `SseGroupMembers`) live in the same database as your application tables, enabling foreign keys and joins between them.
+
+### Setup
+
+Your `DbContext` must inherit from `SseDbContext` instead of `DbContext`:
+
+```cs
+public class MyDbContext : SseDbContext
+{
+    public MyDbContext(DbContextOptions<MyDbContext> options) : base(options) { }
+
+    public DbSet<User> Users { get; set; }
+}
+```
+
+Then register with `AddEfSseBackplane<TContext>()`:
+
+```cs
+builder.Services.AddEfSseBackplane<MyDbContext>();
+builder.Services.AddEfRealtime();
+builder.Services.AddDbContext<MyDbContext>((sp, opt) =>
+{
+    opt.UseNpgsql(connectionString);
+    opt.AddEfRealtimeInterceptor(sp);
+});
+```
+
+### Linking connections to your own entities
+
+`SseConnection` has an optional `UserId` property. You can configure a foreign key to your user table:
+
+```cs
+public class User
+{
+    public string Id { get; set; }
+    public string Nickname { get; set; }
+    public List<SseConnection> Connections { get; set; } = [];
+}
+
+// In MyDbContext.OnModelCreating:
+protected override void OnModelCreating(ModelBuilder builder)
+{
+    base.OnModelCreating(builder);
+
+    builder.Entity<User>()
+        .HasMany(u => u.Connections)
+        .WithOne()
+        .HasForeignKey(c => c.UserId)
+        .OnDelete(DeleteBehavior.Cascade);
+}
+```
+
+To associate a user with their SSE connection, override `GetConnectionUserId()` in your controller:
+
+```cs
+public class ChatController(ISseBackplane backplane) : RealtimeControllerBase(backplane)
+{
+    protected override string? GetConnectionUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier);
+}
+```
+
+This lets you join through the backplane tables to resolve user info. For example, getting the nicknames of all members in a group:
+
+```cs
+var members = await ctx.SseGroupMembers
+    .Where(gm => gm.GroupName == "members:room1")
+    .Join(ctx.SseConnections, gm => gm.ConnectionId, c => c.ConnectionId, (gm, c) => c)
+    .Join(ctx.Users, c => c.UserId, u => u.Id, (c, u) => new { c.ConnectionId, u.Nickname })
+    .ToListAsync();
+```
+
+### Connection TTL
+
+Stale connections (from server crashes/restarts) are automatically cleaned up via a heartbeat mechanism. Each connection has a `LastHeartbeat` timestamp that is refreshed periodically. Connections that miss heartbeats beyond the TTL threshold are deleted along with their group memberships.
+
+The default TTL is 60 seconds (cleanup after 120s of no heartbeat). You can configure it:
+
+```cs
+builder.Services.AddEfSseBackplane<MyDbContext>(connectionTtl: TimeSpan.FromSeconds(30));
+```
+
 ## Scaling with PostgreSQL
 
 Swap `AddInMemorySseBackplane()` for PostgreSQL to scale across multiple server instances — no extra infrastructure needed if you already use Postgres for your data:

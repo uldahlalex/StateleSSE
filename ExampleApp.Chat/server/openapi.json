@@ -249,34 +249,6 @@
         ]
       }
     },
-    "/SetName": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_SetName",
-        "parameters": [
-          {
-            "name": "connectionId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
     "/GetRooms": {
       "get": {
         "tags": [
@@ -511,6 +483,12 @@
             "items": {
               "$ref": "#/components/schemas/UserRoom"
             }
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SseConnection"
+            }
           }
         }
       },
@@ -556,6 +534,23 @@
             "items": {
               "$ref": "#/components/schemas/UserRoom"
             }
+          }
+        }
+      },
+      "SseConnection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

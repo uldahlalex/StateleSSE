@@ -7,27 +7,33 @@ using Microsoft.Extensions.Logging;
 
 namespace StateleSSE.AspNetCore.EfBackplane;
 
-public class EfSseBackplane<TContext> : ISseBackplane, IDisposable where TContext : SseDbContext
+public class EfSseBackplane<TContext> : ISseBackplane, IAsyncDisposable where TContext : SseDbContext
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<EfSseBackplane<TContext>> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly TimeSpan _connectionTtl;
     private readonly ConcurrentDictionary<string, ConnectionState> _connections = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _groups = new();
 
     private readonly EfClients _clients;
     private readonly EfGroups _groupsApi;
+    private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly Task _heartbeatTask;
 
     public EfSseBackplane(
         IServiceScopeFactory scopeFactory,
         ILogger<EfSseBackplane<TContext>> logger,
-        JsonSerializerOptions? jsonOptions = null)
+        JsonSerializerOptions? jsonOptions = null,
+        TimeSpan? connectionTtl = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _jsonOptions = jsonOptions ?? new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        _connectionTtl = connectionTtl ?? TimeSpan.FromSeconds(60);
         _clients = new EfClients(this);
         _groupsApi = new EfGroups(this);
+        _heartbeatTask = RunHeartbeatAsync(_shutdownCts.Token);
     }
 
     public IBackplaneClients Clients => _clients;
@@ -35,7 +41,7 @@ public class EfSseBackplane<TContext> : ISseBackplane, IDisposable where TContex
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
     public event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
 
-    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect(string? userId = null)
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
         var connectionId = Guid.NewGuid().ToString();
@@ -44,10 +50,13 @@ public class EfSseBackplane<TContext> : ISseBackplane, IDisposable where TContex
 
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
+        var now = DateTimeOffset.UtcNow;
         ctx.SseConnections.Add(new SseConnection
         {
             ConnectionId = connectionId,
-            ConnectedAt = DateTimeOffset.UtcNow
+            UserId = userId,
+            ConnectedAt = now,
+            LastHeartbeat = now
         });
         ctx.SaveChanges();
 
@@ -109,7 +118,6 @@ public class EfSseBackplane<TContext> : ISseBackplane, IDisposable where TContex
     internal async Task AddToGroupAsync(string connectionId, string groupName)
     {
         // Update local state FIRST so interceptor-triggered broadcasts include new member
-        // Only track locally if this is a real connection (supports "nickname/" hack where connectionId isn't a real connection)
         if (_connections.TryGetValue(connectionId, out var state))
         {
             state.Groups.TryAdd(groupName, 0);
@@ -117,7 +125,7 @@ public class EfSseBackplane<TContext> : ISseBackplane, IDisposable where TContex
             members.TryAdd(connectionId, 0);
         }
 
-        // Persist via EF — interceptor fires (no FK to SseConnection, so "nickname/" entries work)
+        // Persist via EF — interceptor fires
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
         ctx.SseGroupMembers.Add(new SseGroupMember
@@ -221,8 +229,60 @@ public class EfSseBackplane<TContext> : ISseBackplane, IDisposable where TContex
             .ToListAsync();
     }
 
-    public void Dispose()
+    private async Task RunHeartbeatAsync(CancellationToken ct)
     {
+        var interval = TimeSpan.FromSeconds(_connectionTtl.TotalSeconds / 3);
+        var staleThreshold = TimeSpan.FromSeconds(_connectionTtl.TotalSeconds * 2);
+        using var timer = new PeriodicTimer(interval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
+                var now = DateTimeOffset.UtcNow;
+
+                var localIds = _connections.Keys.ToList();
+                if (localIds.Count > 0)
+                {
+                    var localConns = await ctx.SseConnections
+                        .Where(c => localIds.Contains(c.ConnectionId))
+                        .ToListAsync(ct);
+                    foreach (var c in localConns)
+                        c.LastHeartbeat = now;
+                    await ctx.SaveChangesAsync(ct);
+                }
+
+                var cutoff = now - staleThreshold;
+                var staleGroupMembers = await ctx.SseGroupMembers
+                    .Where(gm => ctx.SseConnections
+                        .Where(c => c.LastHeartbeat < cutoff)
+                        .Select(c => c.ConnectionId)
+                        .Contains(gm.ConnectionId))
+                    .ToListAsync(ct);
+                var staleConns = await ctx.SseConnections
+                    .Where(c => c.LastHeartbeat < cutoff)
+                    .ToListAsync(ct);
+
+                if (staleConns.Count == 0)
+                    continue;
+
+                ctx.SseGroupMembers.RemoveRange(staleGroupMembers);
+                ctx.SseConnections.RemoveRange(staleConns);
+                await ctx.SaveChangesAsync(ct);
+
+                _logger.LogDebug("Cleaned up {Count} stale connections", staleConns.Count);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _shutdownCts.Cancel();
+        try { await _heartbeatTask; } catch (OperationCanceledException) { }
+        _shutdownCts.Dispose();
+
         foreach (var state in _connections.Values)
             state.Channel.Writer.Complete();
         _connections.Clear();

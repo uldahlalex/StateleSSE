@@ -7,7 +7,7 @@ namespace StateleSSE.AspNetCore.Extensions;
 
 public static class EfBackplaneServiceCollectionExtensions
 {
-    public static IServiceCollection AddEfSseBackplane<TContext>(this IServiceCollection services)
+    public static IServiceCollection AddEfSseBackplane<TContext>(this IServiceCollection services, TimeSpan? connectionTtl = null)
         where TContext : SseDbContext
     {
         services.AddSingleton(sp =>
@@ -15,7 +15,7 @@ public static class EfBackplaneServiceCollectionExtensions
             var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EfSseBackplane<TContext>>>();
             var jsonOptions = sp.GetService<IOptions<JsonOptions>>()?.Value.JsonSerializerOptions;
-            return new EfSseBackplane<TContext>(scopeFactory, logger, jsonOptions);
+            return new EfSseBackplane<TContext>(scopeFactory, logger, jsonOptions, connectionTtl);
         });
         services.AddSingleton<ISseBackplane>(sp => sp.GetRequiredService<EfSseBackplane<TContext>>());
         return services;

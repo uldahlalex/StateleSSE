@@ -16,6 +16,7 @@ public abstract class SseDbContext : DbContext
         builder.Entity<SseConnection>(e =>
         {
             e.HasKey(c => c.ConnectionId);
+            e.HasIndex(c => c.UserId);
         });
 
         builder.Entity<SseGroupMember>(e =>

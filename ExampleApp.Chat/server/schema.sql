@@ -1,3 +1,5 @@
+
+
 CREATE TABLE "Rooms" (
                          "Id" text NOT NULL,
                          "Name" text NOT NULL,

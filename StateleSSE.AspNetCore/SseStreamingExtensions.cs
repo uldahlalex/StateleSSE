@@ -195,9 +195,9 @@ public static class SseStreamingExtensions
     /// <summary>
     /// Creates a client connection to the backplane.
     /// </summary>
-    public static BackplaneConnection CreateConnection(this ISseBackplane backplane)
+    public static BackplaneConnection CreateConnection(this ISseBackplane backplane, string? userId = null)
     {
-        var (reader, connectionId) = backplane.Connect();
+        var (reader, connectionId) = backplane.Connect(userId);
         return new BackplaneConnection(backplane, reader, connectionId);
     }
 
