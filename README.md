@@ -12,7 +12,7 @@ These docs are for the newest version (v4). For older version (before live queri
 | ASP.NET Core | yes                     | `FrameworkReference` — comes with the SDK |
 | Entity Framework Core | only for EfRealtime     | Bundled in the package but unused unless you call `AddEfRealtime()` |
 | StackExchange.Redis | only for Redis backplane | Bundled in the package but unused unless you call `AddRedisSseBackplane()` |
-| Npgsql | only for Postgres backplane | Bundled in the package but unused unless you call `AddPostgresSseBackplane()` |
+
 
 Minimal setup (in-memory backplane, no EfRealtime) requires no additional packages from the consumer — just ASP.NET Core.
 
@@ -480,19 +480,6 @@ The default TTL is 60 seconds (cleanup after 120s of no heartbeat). You can conf
 builder.Services.AddEfSseBackplane<MyDbContext>(connectionTtl: TimeSpan.FromSeconds(30));
 ```
 
-## Scaling with PostgreSQL
-
-Swap `AddInMemorySseBackplane()` for PostgreSQL to scale across multiple server instances — no extra infrastructure needed if you already use Postgres for your data:
-
-```cs
-builder.Services.AddPostgresSseBackplane(opts =>
-{
-    opts.ConnectionString = "Host=localhost;Database=mydb";
-});
-```
-
-Uses UNLOGGED tables for connection/group state and LISTEN/NOTIFY for cross-server messaging. Tables are auto-created on startup.
-
 ## Scaling with Redis
 
 Alternatively, swap `AddInMemorySseBackplane()` for Redis:
@@ -503,7 +490,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 builder.Services.AddRedisSseBackplane();
 ```
 
-All backplane operations (send, groups, membership) work transparently across instances with either backplane.
+All backplane operations (send, groups, membership) work transparently across instances with Redis.
 The EF.Realtime + Group Changes (like waiting for Entity Framework DbContext.SaveChanges()) does not currently support horizontal scaling.
 
 ## JsonSerializer settings
@@ -524,7 +511,7 @@ builder.Services.AddControllers()
 ## Examples
 
 - [`ExampleApp.Quickstart`](ExampleApp.Quickstart) — minimal server + vanilla JS client
-- [`ExampleApp.Chat`](ExampleApp.Chat) — full chat app with React, PostgreSQL backplane, EfRealtime
+- [`ExampleApp.Chat`](ExampleApp.Chat) — full chat app with React, EF backplane, EfRealtime
 
 ## License
 

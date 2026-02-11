@@ -551,6 +551,10 @@
           "connectedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "lastHeartbeat": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

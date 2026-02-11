@@ -128,6 +128,9 @@ public class EfSseBackplane<TContext> : ISseBackplane, IAsyncDisposable where TC
         // Persist via EF — interceptor fires
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
+        var exists = await ctx.SseGroupMembers.AnyAsync(gm => gm.ConnectionId == connectionId && gm.GroupName == groupName);
+        if (exists)
+            return;
         ctx.SseGroupMembers.Add(new SseGroupMember
         {
             ConnectionId = connectionId,

@@ -540,6 +540,7 @@ export interface SseConnection {
     connectionId?: string;
     userId?: string | undefined;
     connectedAt?: string;
+    lastHeartbeat?: string;
 }
 
 export interface CreateMessageRequestDto {

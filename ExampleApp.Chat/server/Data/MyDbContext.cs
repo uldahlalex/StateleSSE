@@ -18,7 +18,11 @@ public class MyDbContext : SseDbContext
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        builder.HasDefaultSchema("efchat");                                                                                          
+
         base.OnModelCreating(builder);
+        
+        
 
         builder.Entity<User>()
             .HasMany(u => u.Connections)

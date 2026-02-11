@@ -20,13 +20,7 @@ export function Room() {
     })
     useEffect(() => {
 
-        sse.listen(async(id) => {
-            const result = await chatClient.setName(id);
-            return {group: id, data: null}
-        },
-            (data) => {
 
-            })
 
             sse.listen(
                 async(id) => {

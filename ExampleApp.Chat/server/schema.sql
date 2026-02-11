@@ -1,17 +1,14 @@
+drop schema if exists efchat cascade;
+create schema if not exists efchat;
 
+-- default to using efchat schema
+set search_path to efchat;
 
 CREATE TABLE "Rooms" (
                          "Id" text NOT NULL,
                          "Name" text NOT NULL,
                          "CreatedBy" text NOT NULL,
                          CONSTRAINT "PK_Rooms" PRIMARY KEY ("Id")
-);
-
-
-CREATE TABLE "SseConnections" (
-                                  "ConnectionId" text NOT NULL,
-                                  "ConnectedAt" timestamp with time zone NOT NULL,
-                                  CONSTRAINT "PK_SseConnections" PRIMARY KEY ("ConnectionId")
 );
 
 
@@ -43,6 +40,16 @@ CREATE TABLE "Messages" (
 );
 
 
+CREATE TABLE "SseConnections" (
+                                  "ConnectionId" text NOT NULL,
+                                  "UserId" text,
+                                  "ConnectedAt" timestamp with time zone NOT NULL,
+                                  "LastHeartbeat" timestamp with time zone NOT NULL,
+                                  CONSTRAINT "PK_SseConnections" PRIMARY KEY ("ConnectionId"),
+                                  CONSTRAINT "FK_SseConnections_Users_UserId" FOREIGN KEY ("UserId") REFERENCES "Users" ("Id") ON DELETE CASCADE
+);
+
+
 CREATE TABLE "UserRooms" (
                              "UserId" text NOT NULL,
                              "RoomId" text NOT NULL,
@@ -58,7 +65,11 @@ CREATE INDEX "IX_Messages_RoomId" ON "Messages" ("RoomId");
 CREATE INDEX "IX_Messages_UserId" ON "Messages" ("UserId");
 
 
+CREATE INDEX "IX_SseConnections_UserId" ON "SseConnections" ("UserId");
+
+
 CREATE INDEX "IX_SseGroupMembers_GroupName" ON "SseGroupMembers" ("GroupName");
 
 
 CREATE INDEX "IX_UserRooms_RoomId" ON "UserRooms" ("RoomId");
+
