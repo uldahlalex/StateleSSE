@@ -25,6 +25,15 @@ dotnet add package StateleSSE.AspNetCore --prerelease
 
 > These snippets are from [`ExampleApp.Quickstart`](ExampleApp.Quickstart).
 
+```bash
+#Set up the API with the CLI + install required dependencies
+mkdir quickstart
+cd quickstart
+dotnet new web
+dotnet add package StateleSSE.AspNetCore --prerelease
+dotnet add package Microsoft.EntityFrameworkCore.InMemory
+```
+
 ### Server
 
 ```cs
