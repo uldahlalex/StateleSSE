@@ -1,34 +1,53 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import {useEffect, useState} from 'react'
 import './App.css'
+import {StateleSSEClient} from "statele-sse";
+import {type Measurement, WebClientClient} from "./generated-ts-client.ts";
+import {LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts'
+
+const sse = new StateleSSEClient("http://localhost:5233/sse")
+const restClient = new WebClientClient("http://localhost:5233")
+
+const metrics = [
+  {key: 'temperature' as const, label: 'Temperature (°C)', color: '#ef4444'},
+  {key: 'humidity' as const, label: 'Humidity (%)', color: '#3b82f6'},
+  {key: 'pressure' as const, label: 'Pressure (hPa)', color: '#22c55e'},
+  {key: 'lightLevel' as const, label: 'Light Level', color: '#f59e0b'},
+] as const
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [measurements, setMeasurements] = useState<Measurement[]>([])
+
+  useEffect(() => {
+    sse.listen(async (id) => {
+      const result = await restClient.getMeasurements(id);
+      return result;
+    }, (data) => {
+      setMeasurements(data);
+    })
+  }, []);
+
+  const chartData = measurements.map(m => ({
+    ...m,
+    time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '',
+  }))
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16}}>
+      {metrics.map(({key, label, color}) => (
+        <div key={key}>
+          <h3>{label}</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="time" tick={{fontSize: 10}} />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey={key} stroke={color} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ))}
+    </div>
   )
 }
 

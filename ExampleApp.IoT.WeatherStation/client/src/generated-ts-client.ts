@@ -17,6 +17,43 @@ export class WebClientClient {
         this.baseUrl = baseUrl ?? "";
     }
 
+    getMeasurements(connectionId: string | undefined): Promise<RealtimeListenResponseOfListOfMeasurement> {
+        let url_ = this.baseUrl + "/GetMeasurements?";
+        if (connectionId === null)
+            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
+        else if (connectionId !== undefined)
+            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMeasurements(_response);
+        });
+    }
+
+    protected processGetMeasurements(response: Response): Promise<RealtimeListenResponseOfListOfMeasurement> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as RealtimeListenResponseOfListOfMeasurement;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<RealtimeListenResponseOfListOfMeasurement>(null as any);
+    }
+
     connect(): Promise<void> {
         let url_ = this.baseUrl + "/sse";
         url_ = url_.replace(/[?&]$/, "");
@@ -46,6 +83,27 @@ export class WebClientClient {
         }
         return Promise.resolve<void>(null as any);
     }
+}
+
+/** Returned by subscribe endpoints so the client knows which SSE group to listen on. */
+export interface RealtimeListenResponse {
+    group?: string;
+}
+
+/** Returned by subscribe endpoints with initial data. The client receives the current state immediately and knows which SSE group to listen on for subsequent updates. */
+export interface RealtimeListenResponseOfListOfMeasurement extends RealtimeListenResponse {
+    data?: Measurement[] | undefined;
+}
+
+export interface Measurement {
+    id?: string;
+    stationId?: string;
+    sensorId?: string;
+    timestamp?: string;
+    temperature?: number;
+    humidity?: number;
+    pressure?: number;
+    lightLevel?: number;
 }
 
 export class ApiException extends Error {

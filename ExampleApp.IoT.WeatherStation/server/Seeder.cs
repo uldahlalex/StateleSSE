@@ -10,6 +10,7 @@ public class Seeder(MyDbContext ctx, ILogger<Seeder> logger)
     {
         logger.LogInformation("adding a test user + pasting the recreate script for reproducing the schema");
         logger.LogInformation(ctx.Database.GenerateCreateScript());
+        ctx.Database.EnsureCreated();
         var exists = ctx.Users.Any(u => u.Id == "test");
         if (!exists)
         {

@@ -1,4 +1,4 @@
-using server.Services;
+using Microsoft.AspNetCore.Mvc;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.EfRealtime;
 using StateleSSE.AspNetCore.GroupRealtime;
@@ -7,11 +7,13 @@ namespace server.Controllers;
 
 public class WebClientController(ISseBackplane backplane,
     IRealtimeManager realtimeManager,
-    IGroupRealtimeManager groupRealtimeManager,
-    WeatherService weatherService
+    MyDbContext db,
+    IGroupRealtimeManager groupRealtimeManager
 ) : RealtimeControllerBase(backplane)
 {
-    public async Task GetMeasurements(string connectionId)
+    
+    [HttpGet(nameof(GetMeasurements))]
+    public async Task<RealtimeListenResponse<List<Measurement>>> GetMeasurements(string connectionId)
     {
         var group = "measurements";
         await backplane.Groups.AddToGroupAsync(connectionId, group);
@@ -25,5 +27,6 @@ public class WebClientController(ISseBackplane backplane,
                 return context.Measurements.ToList();
             }
             );
+        return new RealtimeListenResponse<List<Measurement>>(group, db.Measurements.ToList());
     }
 }

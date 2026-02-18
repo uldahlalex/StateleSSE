@@ -6,6 +6,36 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/GetMeasurements": {
+      "get": {
+        "tags": [
+          "WebClient"
+        ],
+        "operationId": "WebClient_GetMeasurements",
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RealtimeListenResponseOfListOfMeasurement"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sse": {
       "get": {
         "tags": [
@@ -21,6 +51,75 @@
     }
   },
   "components": {
+    "schemas": {
+      "RealtimeListenResponseOfListOfMeasurement": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RealtimeListenResponse"
+          },
+          {
+            "type": "object",
+            "description": "Returned by subscribe endpoints with initial data. The client receives the current state\nimmediately and knows which SSE group to listen on for subsequent updates.",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "$ref": "#/components/schemas/Measurement"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Measurement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "stationId": {
+            "type": "string"
+          },
+          "sensorId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "temperature": {
+            "type": "number",
+            "format": "double"
+          },
+          "humidity": {
+            "type": "number",
+            "format": "double"
+          },
+          "pressure": {
+            "type": "number",
+            "format": "double"
+          },
+          "lightLevel": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "RealtimeListenResponse": {
+        "type": "object",
+        "description": "Returned by subscribe endpoints so the client knows which SSE group to listen on.",
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "securitySchemes": {
       "Bearer": {
         "type": "http",

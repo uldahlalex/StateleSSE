@@ -9,17 +9,21 @@ using Mqtt.Controllers;
 using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
-using StackExchange.Redis;
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.Extensions;
 using StateleSSE.AspNetCore.GroupRealtime;
+using Testcontainers.PostgreSql;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 var connectionStrings = new ConnectionStrings();
 configuration.GetSection(nameof(ConnectionStrings)).Bind(connectionStrings);
-
+if (string.IsNullOrWhiteSpace(connectionStrings.DbConnectionString))
+{
+    var container = new PostgreSqlBuilder("postgres:15.1").Build();
+    container.StartAsync().GetAwaiter().GetResult();
+    connectionStrings.DbConnectionString = container.GetConnectionString();
+}
 
 builder.Services.AddSingleton(connectionStrings);
 
@@ -32,20 +36,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-{
-    var config = ConfigurationOptions.Parse( connectionStrings.Redis    );
-    config.AbortOnConnectFail = false;
-    return ConnectionMultiplexer.Connect(config);
-});
 
-builder.Services.AddRedisSseBackplane();
+builder.Services.AddInMemorySseBackplane();
 builder.Services.AddEfRealtime();
 builder.Services.AddGroupRealtime();
+
+
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
-    conf.AddEfRealtimeInterceptor(sp);
     conf.UseNpgsql(connectionStrings.DbConnectionString);
+    conf.AddEfRealtimeInterceptor(sp);
 });
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -89,6 +89,7 @@ app.UseSwaggerUi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.UseStaticFiles();
 app.UseCors(c => 
     c.AllowAnyHeader()
         .AllowAnyMethod()
