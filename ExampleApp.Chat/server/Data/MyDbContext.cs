@@ -8,6 +8,10 @@ public class MyDbContext : DbContext
         : base(options)
     {
     }
+    protected override void OnModelCreating(ModelBuilder modelBuilder)                                                                                           
+    {                                                                                                                                                            
+        modelBuilder.HasDefaultSchema("chat");                                                                                          
+    }      
 
     public DbSet<Room> Rooms { get; set; }
     public DbSet<Message> Messages { get; set; }

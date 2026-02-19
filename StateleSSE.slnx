@@ -1,13 +1,13 @@
 <Solution>
     <Project Path="ExampleApp.Quickstart/ExampleApp.Quickstart.csproj" />
-    <Project Path="StateleSSE.AspNetCore.IntegrationTests/StateleSSE.AspNetCore.IntegrationTests.csproj" />
-    <Project Path="StateleSSE.AspNetCore.Tests/StateleSSE.AspNetCore.Tests.csproj" />
+<!--    <Project Path="StateleSSE.AspNetCore.IntegrationTests/StateleSSE.AspNetCore.IntegrationTests.csproj" />-->
+<!--    <Project Path="StateleSSE.AspNetCore.Tests/StateleSSE.AspNetCore.Tests.csproj" />-->
     <Project Path="StateleSSE.AspNetCore/StateleSSE.AspNetCore.csproj" />
     <Folder Name="/ExampleApp.Chat/">
         <Project Path="ExampleApp.Chat/loadbalancer/loadbalancer.csproj" />
         <Project Path="ExampleApp.Chat/server/server.csproj" />
     </Folder>
-    <Folder Name="/ExampleApp.IoT.WeatherStation/">
-        <Project Path="ExampleApp.IoT.WeatherStation/server/server.csproj" />
-    </Folder>
+<!--    <Folder Name="/ExampleApp.IoT.WeatherStation/">-->
+<!--        <Project Path="ExampleApp.IoT.WeatherStation/server/server.csproj" />-->
+<!--    </Folder>-->
 </Solution>

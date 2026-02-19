@@ -3,13 +3,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Etc;
 
-public class GlobalExceptionHandler : IExceptionHandler
+public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
         CancellationToken cancellationToken)
     {
+        //Log exception
+        logger.LogError(exception, "An unhandled exception occurred.");
         var (statusCode, title) = exception switch
         {
             UnauthorizedAccessException => (401, "Unauthorized"),

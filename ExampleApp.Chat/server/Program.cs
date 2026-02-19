@@ -10,7 +10,6 @@ using Microsoft.IdentityModel.Tokens;
 using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
-using StackExchange.Redis;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.Extensions;
 using StateleSSE.AspNetCore.GroupRealtime;
@@ -18,7 +17,6 @@ using StateleSSE.AspNetCore.GroupRealtime;
 var builder = WebApplication.CreateBuilder(args);
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
 var db = builder.Configuration.GetSection("DbConnectionString").Value;
-var redis = builder.Configuration.GetSection("Redis").Value;
 var secret = builder.Configuration.GetSection("Secret").Value;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -30,19 +28,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-{
-    var config = ConfigurationOptions.Parse(redis);
-    config.AbortOnConnectFail = false;
-    return ConnectionMultiplexer.Connect(config);
-});
-builder.Services.AddRedisSseBackplane();
+builder.Services.AddPostgresSseBackplane(db!);
 builder.Services.AddGroupRealtime();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
     conf.UseNpgsql(db);
-    conf.AddEfRealtimeInterceptor(sp); // hooks into SaveChanges
+    conf.AddPostgresEfRealtimeInterceptor(sp);
 });
 builder.Services.AddOpenApiDocument(config =>
 {
@@ -88,7 +80,7 @@ using (var scope = app.Services.CreateScope())
 {
     var ctx = scope.ServiceProvider.GetRequiredService<MyDbContext>();
     Console.WriteLine(ctx.Database.GenerateCreateScript());
-
+    // ctx.Database.EnsureDeleted();
     ctx.Database.EnsureCreated();
     var exists = ctx.Users.Any(u => u.Id == "test");
     if (!exists)

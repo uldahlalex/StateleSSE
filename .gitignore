@@ -3,6 +3,7 @@
 ##
 ## Get latest from `dotnet new gitignore`
 ng
+RESEARCH_OUTLINE.md
 # dotenv files
 .env
 ExampleApp.Kahoot

@@ -55,20 +55,13 @@ public class ChatController(ISseBackplane backplane,
     public async Task<RealtimeListenResponse<List<Message>>> GetMessages(string connectionId, string roomId)
     {
         var group = "message:"+roomId;
-        await backplane.Groups.AddToGroupAsync(connectionId, group);
-
-        realtimeManager.Subscribe<MyDbContext>(connectionId, group,
-            criteria: changes =>
-            {
-                var change = changes.HasAdded<Message>();
-                return change;
-            },
+        await realtimeManager.SubscribeAsync<MyDbContext>(connectionId, group,
+            criteria: changes => changes.HasAdded<Message>(),
             query: async c => await c.Messages
                 .Where(m => m.RoomId == roomId)
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync()
         );
-
         return new RealtimeListenResponse<List<Message>>(group, ctx.Messages
             .Where(m => m.RoomId == roomId)
             .ToList());
@@ -152,15 +145,10 @@ public class ChatController(ISseBackplane backplane,
     public async Task<RealtimeListenResponse<List<Room>>> GetRooms(string connectionId)
     {
         var group = "rooms";
-        await backplane.Groups.AddToGroupAsync(connectionId, group);
-
-        realtimeManager.Subscribe<MyDbContext>(connectionId, "rooms",
-            criteria: changes =>
-            {
-                return changes.OfType<Room>().Any();
-            },
-            query:async (context) => await context.Rooms.ToListAsync()); 
-        return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList()); 
+        await realtimeManager.SubscribeAsync<MyDbContext>(connectionId, group,
+            criteria: changes => changes.OfType<Room>().Any(),
+            query: async c => await c.Rooms.ToListAsync());
+        return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList());
     }
     
     [HttpGet(nameof(GetMembers))]
