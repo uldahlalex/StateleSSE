@@ -1,5 +1,6 @@
 # StateleSSE
 
+
 Realtime SSE framework for ASP.NET Core with live queries. Pair with the [`statele-sse`](statele-sse-client) npm package for a type-safe client.
 
 These docs are for the newest version (v4). For older version (before live queries with EF.Realtime), see branch "v3"
@@ -14,6 +15,11 @@ These docs are for the newest version (v4). For older version (before live queri
 | StackExchange.Redis | only for Redis backplane | Bundled in the package but unused unless you call `AddRedisSseBackplane()` |
 
 Minimal setup (in-memory backplane, no EfRealtime) requires no additional packages from the consumer — just ASP.NET Core.
+
+Video tutorial on live queries:
+
+[![Watch the video](https://img.youtube.com/vi/0XPoqKiBFEw/hqdefault.jpg)](https://www.youtube.com/watch?v=0XPoqKiBFEw)    
+
 
 ## Install
 
