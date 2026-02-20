@@ -11,7 +11,6 @@ using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.Extensions;
 using StateleSSE.AspNetCore.GroupRealtime;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,13 +27,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-builder.Services.AddPostgresSseBackplane(db!);
+builder.Services.AddEfSseBackplane<MyDbContext>();
 builder.Services.AddGroupRealtime();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
     conf.UseNpgsql(db);
-    conf.AddPostgresEfRealtimeInterceptor(sp);
+    conf.AddEfRealtimeInterceptor(sp);
 });
 builder.Services.AddOpenApiDocument(config =>
 {

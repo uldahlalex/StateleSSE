@@ -1,4 +1,4 @@
-namespace StateleSSE.AspNetCore.Infrastructure.PostgresBackplane;
+namespace StateleSSE.AspNetCore;
 
 /// <summary>
 /// Represents an active SSE connection tracked in Postgres.

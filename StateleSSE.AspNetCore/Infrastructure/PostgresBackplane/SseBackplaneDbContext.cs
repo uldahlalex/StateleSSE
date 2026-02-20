@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace StateleSSE.AspNetCore.Infrastructure.PostgresBackplane;
+namespace StateleSSE.AspNetCore;
 
 /// <summary>
 /// Standalone DbContext for SSE connection/group tracking tables.
