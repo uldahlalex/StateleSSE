@@ -10,8 +10,8 @@ public class MyDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("chat");
-        SsePresence.ConfigureModel(modelBuilder);
-        modelBuilder.Entity<SseConnection>()
+        DbContextModelBuilderExtensionsForPresence.ConfigureModel(modelBuilder);
+        modelBuilder.Entity<SseConnectionMetadata>()
             .HasOne<User>()
             .WithMany()
             .HasForeignKey(c => c.OwnerId)
@@ -24,6 +24,6 @@ public class MyDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<UserRoom> UserRooms { get; set; }
     public DbSet<Poke> Pokes { get; set; }
-    public DbSet<SseConnection> SseConnections => Set<SseConnection>();
-    public DbSet<SseConnectionGroup> SseConnectionGroups => Set<SseConnectionGroup>();
+    public DbSet<SseConnectionMetadata> SseConnections => Set<SseConnectionMetadata>();
+    public DbSet<SseConnectionMetadataGroup> SseConnectionGroups => Set<SseConnectionMetadataGroup>();
 }

@@ -20,29 +20,7 @@ public sealed class SseStream : IAsyncDisposable
         _keepaliveTask = SendKeepalives(keepaliveInterval, _keepaliveCts.Token);
     }
 
-    /// <summary>
-    /// Write an SSE event to the stream with a named event type.
-    /// </summary>
-    public async Task WriteAsync(string eventType, JsonElement data, CancellationToken cancellationToken = default)
-    {
-        _eventId++;
-        await _response.WriteAsync($"id: {_eventId}\n", cancellationToken);
-        await _response.WriteAsync($"event: {eventType}\n", cancellationToken);
-        await _response.WriteAsync($"data: {data.GetRawText()}\n\n", cancellationToken);
-        await _response.Body.FlushAsync(cancellationToken);
-    }
 
-    /// <summary>
-    /// Write an SSE event with raw string data and named event type.
-    /// </summary>
-    public async Task WriteAsync(string eventType, string data, CancellationToken cancellationToken = default)
-    {
-        _eventId++;
-        await _response.WriteAsync($"id: {_eventId}\n", cancellationToken);
-        await _response.WriteAsync($"event: {eventType}\n", cancellationToken);
-        await _response.WriteAsync($"data: {data}\n\n", cancellationToken);
-        await _response.Body.FlushAsync(cancellationToken);
-    }
 
     /// <summary>
     /// Write an SSE event without a named event type (received via onmessage).
@@ -55,25 +33,8 @@ public sealed class SseStream : IAsyncDisposable
         await _response.Body.FlushAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Write an SSE event without a named event type (received via onmessage).
-    /// </summary>
-    public async Task WriteAsync(string data, CancellationToken cancellationToken = default)
-    {
-        _eventId++;
-        await _response.WriteAsync($"id: {_eventId}\n", cancellationToken);
-        await _response.WriteAsync($"data: {data}\n\n", cancellationToken);
-        await _response.Body.FlushAsync(cancellationToken);
-    }
 
-    /// <summary>
-    /// Write an SSE comment (useful for custom keepalives or debugging).
-    /// </summary>
-    public async Task WriteCommentAsync(string comment, CancellationToken cancellationToken = default)
-    {
-        await _response.WriteAsync($": {comment}\n\n", cancellationToken);
-        await _response.Body.FlushAsync(cancellationToken);
-    }
+
 
     private async Task SendKeepalives(TimeSpan interval, CancellationToken ct)
     {

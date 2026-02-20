@@ -25,7 +25,7 @@ public class ChatController(IRealtimeManager realtimeManager, AppDb ctx) : Realt
     public Task GetMessages(string roomId, CancellationToken ct) =>
         ListenAsync<AppDb, List<Message>>(
             getInitialData: () => ctx.Messages.Where(m => m.RoomId == roomId).OrderBy(m => m.CreatedAt).ToListAsync(),
-            criteria: changes => changes.HasChanges<Message>(),
+            criteria: changes => changes.Any(c => c.Entity is Message),
             query: async c => await c.Messages.Where(m => m.RoomId == roomId).OrderBy(m => m.CreatedAt).ToListAsync(),
             ct);
 
@@ -33,8 +33,8 @@ public class ChatController(IRealtimeManager realtimeManager, AppDb ctx) : Realt
     [ProducesResponseType<List<User>>(200)]
     public async Task GetMembers(string roomId, string? userId, CancellationToken ct)
     {
-        var conn  = new SseConnection      { ConnectionId = Guid.NewGuid().ToString(), ServerId = Environment.MachineName, LastSeen = DateTimeOffset.UtcNow, OwnerId = userId };
-        var group = new SseConnectionGroup { ConnectionId = conn.ConnectionId, GroupName = "room:" + roomId };
+        var conn  = new SseConnectionMetadata      { ConnectionId = Guid.NewGuid().ToString(),  OwnerId = userId };
+        var group = new SseConnectionMetadataGroup { ConnectionId = conn.ConnectionId, GroupName = "room:" + roomId };
         ctx.Connections.Add(conn);
         ctx.ConnectionGroups.Add(group);
         await ctx.SaveChangesAsync(ct);
@@ -42,7 +42,7 @@ public class ChatController(IRealtimeManager realtimeManager, AppDb ctx) : Realt
         {
             await ListenAsync<AppDb, List<User>>(
                 getInitialData: () => MembersQuery(ctx, roomId),
-                criteria: changes => changes.HasChanges<SseConnectionGroup>(),
+                criteria: changes => changes.Any(c => c.Entity is SseConnectionMetadataGroup),
                 query: async c => await MembersQuery(c, roomId),
                 ct);
             

@@ -5,8 +5,8 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        SsePresence.ConfigureModel(modelBuilder);
-        modelBuilder.Entity<SseConnection>()
+        DbContextModelBuilderExtensionsForPresence.ConfigureModel(modelBuilder);
+        modelBuilder.Entity<SseConnectionMetadata>()
             .HasOne<User>()
             .WithMany()
             .HasForeignKey(c => c.OwnerId)
@@ -16,8 +16,8 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Message> Messages => Set<Message>();
-    public DbSet<SseConnection> Connections => Set<SseConnection>();
-    public DbSet<SseConnectionGroup> ConnectionGroups => Set<SseConnectionGroup>();
+    public DbSet<SseConnectionMetadata> Connections => Set<SseConnectionMetadata>();
+    public DbSet<SseConnectionMetadataGroup> ConnectionGroups => Set<SseConnectionMetadataGroup>();
 }
 
 public class User

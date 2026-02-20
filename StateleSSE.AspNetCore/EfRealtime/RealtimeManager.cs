@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace StateleSSE.AspNetCore.EfRealtime;
 
-internal sealed class RealtimeManager : IRealtimeManager
+public class RealtimeManager : IRealtimeManager
 {
     private readonly ConcurrentDictionary<string, RealtimeSubscription> _subscriptions = new();
 

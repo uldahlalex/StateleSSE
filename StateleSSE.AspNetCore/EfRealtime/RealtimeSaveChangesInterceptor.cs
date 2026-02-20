@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace StateleSSE.AspNetCore.EfRealtime;
 
-internal sealed class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
+public class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
 {
     private readonly RealtimeManager _manager;
     private readonly ILogger<RealtimeSaveChangesInterceptor> _logger;
@@ -77,7 +77,7 @@ internal sealed class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
     {
        return context.ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-            .Where(e => e.Entity is not SseConnection)
+            .Where(e => e.Entity is not SseConnectionMetadata)
             .ToList(); 
     }
 }

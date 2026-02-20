@@ -65,8 +65,8 @@ public class ChatController(
     public async Task GetMembers(string roomId, CancellationToken ct)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var conn  = new SseConnection      { ConnectionId = Guid.NewGuid().ToString(), ServerId = Environment.MachineName, LastSeen = DateTimeOffset.UtcNow, OwnerId = userId };
-        var group = new SseConnectionGroup { ConnectionId = conn.ConnectionId, GroupName = "members:" + roomId };
+        var conn  = new SseConnectionMetadata      { ConnectionId = Guid.NewGuid().ToString(), ServerId = Environment.MachineName, LastSeen = DateTimeOffset.UtcNow, OwnerId = userId };
+        var group = new SseConnectionMetadataGroup { ConnectionId = conn.ConnectionId, GroupName = "members:" + roomId };
         ctx.SseConnections.Add(conn);
         ctx.SseConnectionGroups.Add(group);
         await ctx.SaveChangesAsync(ct);
@@ -74,7 +74,7 @@ public class ChatController(
         {
             await ListenAsync<MyDbContext, List<MemberInfo>>(
                 getInitialData: () => MembersQuery(ctx, roomId),
-                criteria: changes => changes.HasChanges<SseConnectionGroup>(),
+                criteria: changes => changes.HasChanges<SseConnectionMetadataGroup>(),
                 query: async c => await MembersQuery(c, roomId),
                 ct);
         }
