@@ -91,7 +91,7 @@ export class ChatClient {
         return Promise.resolve<LoginResponse>(null as any);
     }
 
-    getMessages(roomId: string | undefined): Promise<void> {
+    getMessages(roomId: string | undefined): Promise<Message[]> {
         let url_ = this.baseUrl + "/GetMessages?";
         if (roomId === null)
             throw new globalThis.Error("The parameter 'roomId' cannot be null.");
@@ -102,6 +102,7 @@ export class ChatClient {
         let options_: RequestInit = {
             method: "GET",
             headers: {
+                "Accept": "application/json"
             }
         };
 
@@ -110,28 +111,31 @@ export class ChatClient {
         });
     }
 
-    protected processGetMessages(response: Response): Promise<void> {
+    protected processGetMessages(response: Response): Promise<Message[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Message[];
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<Message[]>(null as any);
     }
 
-    getRooms(): Promise<void> {
+    getRooms(): Promise<Room[]> {
         let url_ = this.baseUrl + "/GetRooms";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
             method: "GET",
             headers: {
+                "Accept": "application/json"
             }
         };
 
@@ -140,22 +144,24 @@ export class ChatClient {
         });
     }
 
-    protected processGetRooms(response: Response): Promise<void> {
+    protected processGetRooms(response: Response): Promise<Room[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Room[];
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<Room[]>(null as any);
     }
 
-    getMembers(roomId: string | undefined): Promise<void> {
+    getMembers(roomId: string | undefined): Promise<MemberInfo[]> {
         let url_ = this.baseUrl + "/GetMembers?";
         if (roomId === null)
             throw new globalThis.Error("The parameter 'roomId' cannot be null.");
@@ -166,6 +172,7 @@ export class ChatClient {
         let options_: RequestInit = {
             method: "GET",
             headers: {
+                "Accept": "application/json"
             }
         };
 
@@ -174,28 +181,31 @@ export class ChatClient {
         });
     }
 
-    protected processGetMembers(response: Response): Promise<void> {
+    protected processGetMembers(response: Response): Promise<MemberInfo[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MemberInfo[];
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<MemberInfo[]>(null as any);
     }
 
-    getPokes(): Promise<void> {
+    getPokes(): Promise<PokeNotification> {
         let url_ = this.baseUrl + "/GetPokes";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
             method: "GET",
             headers: {
+                "Accept": "application/json"
             }
         };
 
@@ -204,27 +214,29 @@ export class ChatClient {
         });
     }
 
-    protected processGetPokes(response: Response): Promise<void> {
+    protected processGetPokes(response: Response): Promise<PokeNotification> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            return;
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PokeNotification;
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<void>(null as any);
+        return Promise.resolve<PokeNotification>(null as any);
     }
 
-    poke(connectionId: string | undefined): Promise<void> {
+    poke(userId: string | undefined): Promise<void> {
         let url_ = this.baseUrl + "/Poke?";
-        if (connectionId === null)
-            throw new globalThis.Error("The parameter 'connectionId' cannot be null.");
-        else if (connectionId !== undefined)
-            url_ += "connectionId=" + encodeURIComponent("" + connectionId) + "&";
+        if (userId === null)
+            throw new globalThis.Error("The parameter 'userId' cannot be null.");
+        else if (userId !== undefined)
+            url_ += "userId=" + encodeURIComponent("" + userId) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -482,6 +494,16 @@ export interface SseConnectionGroup {
     connectionId?: string;
     groupName?: string;
     connection?: SseConnection;
+}
+
+export interface MemberInfo {
+    connectionId?: string;
+    ownerId?: string | undefined;
+    nickname?: string;
+}
+
+export interface PokeNotification {
+    message?: string;
 }
 
 export interface CreateMessageRequestDto {

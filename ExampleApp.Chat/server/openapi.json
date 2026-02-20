@@ -88,7 +88,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -101,7 +111,17 @@
         "operationId": "Chat_GetRooms",
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Room"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -124,7 +144,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberInfo"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -137,9 +167,21 @@
         "operationId": "Chat_GetPokes",
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PokeNotification"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/Poke": {
@@ -150,7 +192,7 @@
         "operationId": "Chat_Poke",
         "parameters": [
           {
-            "name": "connectionId",
+            "name": "userId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -479,6 +521,31 @@
           },
           "connection": {
             "$ref": "#/components/schemas/SseConnection"
+          }
+        }
+      },
+      "MemberInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "nickname": {
+            "type": "string"
+          }
+        }
+      },
+      "PokeNotification": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
           }
         }
       },

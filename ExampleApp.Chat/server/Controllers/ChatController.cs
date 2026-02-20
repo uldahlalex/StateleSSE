@@ -41,6 +41,7 @@ public class ChatController(
     }
 
     [HttpGet(nameof(GetMessages))]
+    [ProducesResponseType<List<Message>>(200)]
     public Task GetMessages(string roomId, CancellationToken ct) =>
         ListenAsync<MyDbContext, List<Message>>(
             group: "message:" + roomId,
@@ -50,6 +51,7 @@ public class ChatController(
             ct);
 
     [HttpGet(nameof(GetRooms))]
+    [ProducesResponseType<List<Room>>(200)]
     public Task GetRooms(CancellationToken ct) =>
         ListenAsync<MyDbContext, List<Room>>(
             group: "rooms",
@@ -59,6 +61,7 @@ public class ChatController(
             ct);
 
     [HttpGet(nameof(GetMembers))]
+    [ProducesResponseType<List<MemberInfo>>(200)]
     public Task GetMembers(string roomId, CancellationToken ct)
     {
         var group = "members:" + roomId;
@@ -70,20 +73,22 @@ public class ChatController(
             ct);
     }
 
+    [Authorize]
     [HttpGet(nameof(GetPokes))]
+    [ProducesResponseType<PokeNotification>(200)]
     public async Task GetPokes(CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         await using var sse = await HttpContext.OpenSseStreamAsync(cancellationToken: ct);
-        await using var conn = backplane.CreateConnection();
-        await conn.JoinGroupAsync($"poke:{conn.ConnectionId}");
-        await sse.WriteAsync(JsonSerializer.SerializeToElement(new { connectionId = conn.ConnectionId }, SseJsonOptions), ct);
+        await using var conn = backplane.CreateConnection(userId);
+        await conn.JoinGroupAsync($"poke:{userId}");
         await foreach (var evt in conn.ReadAllAsync(ct))
             await sse.WriteAsync(evt.Data, ct);
     }
 
     [HttpPost(nameof(Poke))]
-    public Task Poke(string connectionId) =>
-        backplane.Clients.SendToGroupAsync($"poke:{connectionId}", new { message = "You have been poked" });
+    public Task Poke(string userId) =>
+        backplane.Clients.SendToGroupAsync($"poke:{userId}", new PokeNotification("You have been poked"));
 
     [HttpPatch(nameof(UpdateMessage))]
     public async Task UpdateMessage([FromBody] Message newMessage)
@@ -145,6 +150,6 @@ public class ChatController(
             .Join(c.SseConnections, g => g.ConnectionId, conn => conn.ConnectionId, (g, conn) => new { g, conn })
             .GroupJoin(c.Users, t => t.conn.OwnerId, u => u.Id, (t, users) => new { t, users })
             .SelectMany(t => t.users.DefaultIfEmpty(),
-                (t, u) => new MemberInfo(t.t.g.ConnectionId, u != null ? u.Nickname : "Anonymous"))
+                (t, u) => new MemberInfo(t.t.g.ConnectionId, t.t.conn.OwnerId, u != null ? u.Nickname : "Anonymous"))
             .ToListAsync();
 }

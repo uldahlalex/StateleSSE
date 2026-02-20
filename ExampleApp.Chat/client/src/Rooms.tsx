@@ -3,7 +3,7 @@ import {useEffect, useState} from "react";
 import type {Room} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
 import {Outlet, useNavigate} from "react-router";
-import {sse} from "./Sse.tsx";
+import {makeSseStream} from "./utils/makeSseStream.ts";
 
 
 function ChangeRoomName(props: { room: Room }) {
@@ -27,10 +27,8 @@ export function Rooms() {
     const navigate = useNavigate();
 
     useEffect(() => {
-         sse.listen<Room[]>(
-             async (id) => await chatClient.getRooms(id),
-                 data => setRooms(data)
-        );
+        const es = makeSseStream(c => c.getRooms(), setRooms);
+        return () => es.close();
     }, []);
 
 

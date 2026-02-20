@@ -1,16 +1,14 @@
 import {useEffect, useState} from "react";
-import {type CreateMessageRequestDto, type MemberInfo, type Message,} from "./generated-ts-client.ts";
+import {type CreateMessageRequestDto, type MemberInfo, type Message} from "./generated-ts-client.ts";
 import {chatClient} from "./ChatClient.ts";
-import {useNavigate, useParams} from "react-router";
-
-import {sse} from "./Sse.tsx";
+import {useParams} from "react-router";
+import {makeSseStream} from "./utils/makeSseStream.ts";
 
 export type RoomParams = {
     roomId: string;
 }
 
 export function Room() {
-    const navigate = useNavigate()
     const params = useParams<RoomParams>();
     const [members, setMembers] = useState<MemberInfo[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -18,60 +16,26 @@ export function Room() {
         groupId: params.roomId,
         message: ""
     })
+
     useEffect(() => {
+        const messagesEs = makeSseStream(c => c.getMessages(params.roomId), setMessages);
+        const membersEs = makeSseStream(c => c.getMembers(params.roomId), setMembers);
 
-        sse.listen(async(id) => {
-            const result = await chatClient.setName(id);
-            return {group: id, data: null}
-        },
-            (data) => {
+        const token = localStorage.getItem('jwt') ?? undefined;
+        const pokesEs = token
+            ? makeSseStream(c => c.getPokes(), d => { if (d.message) alert(d.message); }, token)
+            : null;
 
-            })
-
-            sse.listen(
-                async(id) => {
-                    const result = await chatClient.getMessages(id, params.roomId)
-                    return result;
-                },
-                async (data) => {
-                    setMessages(data);
-                    console.log(data)
-                }
-
-            )
-
-            sse.listen(
-                async(id) => {
-                    const result = await chatClient.getPokes(id)
-                    return result;
-                },
-                async (data) => {
-                    alert('you have been poked')
-                }
-
-            )
-
-            sse.listen(
-                async(id) => {
-                    const result = await chatClient.getMembers(id, params.roomId)
-                    return result;
-                },
-                async (data) => {
-                    setMembers(data)
-                }
-
-            )
-
-    }, []);
-
-
-
+        return () => {
+            messagesEs.close();
+            membersEs.close();
+            pokesEs?.close();
+        };
+    }, [params.roomId]);
 
     return (
         <div className="room-container">
             <div className="chat-panel">
-
-
                 <div className="messages-container">
                     {messages.length === 0 ? (
                         <div className="empty-state">
@@ -92,24 +56,14 @@ export function Room() {
                         <input
                             className="input"
                             placeholder="Type a message..."
-                            onChange={e => {
-                                setMessage({
-                                    ...message, message: e.target.value
-                                })
-                            }}
+                            onChange={e => setMessage({...message, message: e.target.value})}
                             value={message.message}
                             onKeyDown={e => {
-                                if (e.key === 'Enter' && message.message?.trim()) {
+                                if (e.key === 'Enter' && message.message?.trim())
                                     chatClient.createMessage(message)
-                                }
                             }}
                         />
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => {
-                                chatClient.createMessage(message)
-                            }}
-                        >
+                        <button className="btn btn-primary" onClick={() => chatClient.createMessage(message)}>
                             Send
                         </button>
                     </div>
@@ -121,7 +75,7 @@ export function Room() {
                     <h3>Members</h3>
                 </div>
                 <div className="members-list">
-                    {members && members.map(m => (
+                    {members.map(m => (
                         <div className="member-item" key={m.connectionId}>
                             <div className="member-info">
                                 <div className="member-avatar">
@@ -129,16 +83,14 @@ export function Room() {
                                 </div>
                                 <span className="member-name">{m.nickname || 'Anonymous'}</span>
                             </div>
-                            <button
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => {
-                                    chatClient.poke(m.connectionId).then(r => {
-                                        alert('poke sent')
-                                    })
-                                }}
-                            >
-                                Poke
-                            </button>
+                            {m.ownerId && (
+                                <button
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => chatClient.poke(m.ownerId).then(() => alert('poke sent'))}
+                                >
+                                    Poke
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>
