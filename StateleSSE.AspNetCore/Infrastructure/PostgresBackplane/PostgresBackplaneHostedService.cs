@@ -180,12 +180,7 @@ internal sealed class PostgresBackplaneHostedService : IHostedService, IAsyncDis
             {
                 var data = await sub.Query(ctx);
                 if (data is null) continue;
-
-                var jsonData = System.Text.Json.JsonSerializer.SerializeToElement(data);
-                var evt = new SseEvent(sub.GroupName, jsonData);
-
-                foreach (var connectionId in sub.ConnectionIds.ToList())
-                    await _backplane.DeliverLocalAsync(connectionId, evt);
+                await sub.Deliver(data);
             }
         }
     }

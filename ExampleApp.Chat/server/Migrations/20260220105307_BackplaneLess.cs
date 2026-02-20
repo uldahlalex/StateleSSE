@@ -1,0 +1,94 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace server.Migrations
+{
+    /// <inheritdoc />
+    public partial class BackplaneLess : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "SseConnectionGroups",
+                schema: "chat");
+
+            migrationBuilder.DropTable(
+                name: "SseConnections",
+                schema: "chat");
+
+            migrationBuilder.CreateTable(
+                name: "Pokes",
+                schema: "chat",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    FromUserId = table.Column<string>(type: "text", nullable: false),
+                    ToUserId = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Pokes", x => x.Id);
+                });
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "Pokes",
+                schema: "chat");
+
+            migrationBuilder.CreateTable(
+                name: "SseConnections",
+                schema: "chat",
+                columns: table => new
+                {
+                    ConnectionId = table.Column<string>(type: "text", nullable: false),
+                    LastSeen = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    OwnerId = table.Column<string>(type: "text", nullable: true),
+                    ServerId = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SseConnections", x => x.ConnectionId);
+                    table.ForeignKey(
+                        name: "FK_SseConnections_Users_OwnerId",
+                        column: x => x.OwnerId,
+                        principalSchema: "chat",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SseConnectionGroups",
+                schema: "chat",
+                columns: table => new
+                {
+                    ConnectionId = table.Column<string>(type: "text", nullable: false),
+                    GroupName = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SseConnectionGroups", x => new { x.ConnectionId, x.GroupName });
+                    table.ForeignKey(
+                        name: "FK_SseConnectionGroups_SseConnections_ConnectionId",
+                        column: x => x.ConnectionId,
+                        principalSchema: "chat",
+                        principalTable: "SseConnections",
+                        principalColumn: "ConnectionId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SseConnections_OwnerId",
+                schema: "chat",
+                table: "SseConnections",
+                column: "OwnerId");
+        }
+    }
+}

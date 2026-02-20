@@ -198,7 +198,7 @@ export class ChatClient {
         return Promise.resolve<MemberInfo[]>(null as any);
     }
 
-    getPokes(): Promise<PokeNotification> {
+    getPokes(): Promise<Poke[]> {
         let url_ = this.baseUrl + "/GetPokes";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -214,13 +214,13 @@ export class ChatClient {
         });
     }
 
-    protected processGetPokes(response: Response): Promise<PokeNotification> {
+    protected processGetPokes(response: Response): Promise<Poke[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PokeNotification;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Poke[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -228,15 +228,15 @@ export class ChatClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<PokeNotification>(null as any);
+        return Promise.resolve<Poke[]>(null as any);
     }
 
-    poke(userId: string | undefined): Promise<void> {
+    poke(toUserId: string | undefined): Promise<void> {
         let url_ = this.baseUrl + "/Poke?";
-        if (userId === null)
-            throw new globalThis.Error("The parameter 'userId' cannot be null.");
-        else if (userId !== undefined)
-            url_ += "userId=" + encodeURIComponent("" + userId) + "&";
+        if (toUserId === null)
+            throw new globalThis.Error("The parameter 'toUserId' cannot be null.");
+        else if (toUserId !== undefined)
+            url_ += "toUserId=" + encodeURIComponent("" + toUserId) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -251,6 +251,40 @@ export class ChatClient {
     }
 
     protected processPoke(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    joinRoom(roomId: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/JoinRoom?";
+        if (roomId === null)
+            throw new globalThis.Error("The parameter 'roomId' cannot be null.");
+        else if (roomId !== undefined)
+            url_ += "roomId=" + encodeURIComponent("" + roomId) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processJoinRoom(_response);
+        });
+    }
+
+    protected processJoinRoom(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -462,7 +496,6 @@ export interface User {
     hash?: string;
     messages?: Message[];
     userRooms?: UserRoom[];
-    connections?: SseConnection[];
 }
 
 export interface UserRoom {
@@ -480,30 +513,16 @@ export interface Room {
     userRooms?: UserRoom[];
 }
 
-/** Represents an active SSE connection tracked in Postgres. */
-export interface SseConnection {
-    connectionId?: string;
-    serverId?: string;
-    lastSeen?: string;
-    ownerId?: string | undefined;
-    groups?: SseConnectionGroup[];
-}
-
-/** Represents membership of an SSE connection in a named group. */
-export interface SseConnectionGroup {
-    connectionId?: string;
-    groupName?: string;
-    connection?: SseConnection;
-}
-
 export interface MemberInfo {
-    connectionId?: string;
-    ownerId?: string | undefined;
+    userId?: string;
     nickname?: string;
 }
 
-export interface PokeNotification {
-    message?: string;
+export interface Poke {
+    id?: string;
+    fromUserId?: string;
+    toUserId?: string;
+    createdAt?: string;
 }
 
 export interface CreateMessageRequestDto {

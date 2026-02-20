@@ -41,7 +41,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
-builder.Services.AddEfSseBackplane<MyDbContext>();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {

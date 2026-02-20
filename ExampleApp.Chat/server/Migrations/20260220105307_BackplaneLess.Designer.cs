@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using server;
@@ -11,9 +12,11 @@ using server;
 namespace server.Migrations
 {
     [DbContext(typeof(MyDbContext))]
-    partial class MyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260220105307_BackplaneLess")]
+    partial class BackplaneLess
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,41 +25,6 @@ namespace server.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("StateleSSE.AspNetCore.SseConnection", b =>
-                {
-                    b.Property<string>("ConnectionId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("LastSeen")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("OwnerId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ServerId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("ConnectionId");
-
-                    b.HasIndex("OwnerId");
-
-                    b.ToTable("SseConnections", "chat");
-                });
-
-            modelBuilder.Entity("StateleSSE.AspNetCore.SseConnectionGroup", b =>
-                {
-                    b.Property<string>("ConnectionId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GroupName")
-                        .HasColumnType("text");
-
-                    b.HasKey("ConnectionId", "GroupName");
-
-                    b.ToTable("SseConnectionGroups", "chat");
-                });
 
             modelBuilder.Entity("server.Message", b =>
                 {
@@ -163,25 +131,6 @@ namespace server.Migrations
                     b.ToTable("UserRooms", "chat");
                 });
 
-            modelBuilder.Entity("StateleSSE.AspNetCore.SseConnection", b =>
-                {
-                    b.HasOne("server.User", null)
-                        .WithMany()
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade);
-                });
-
-            modelBuilder.Entity("StateleSSE.AspNetCore.SseConnectionGroup", b =>
-                {
-                    b.HasOne("StateleSSE.AspNetCore.SseConnection", "Connection")
-                        .WithMany("Groups")
-                        .HasForeignKey("ConnectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Connection");
-                });
-
             modelBuilder.Entity("server.Message", b =>
                 {
                     b.HasOne("server.Room", "Room")
@@ -218,11 +167,6 @@ namespace server.Migrations
                     b.Navigation("Room");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("StateleSSE.AspNetCore.SseConnection", b =>
-                {
-                    b.Navigation("Groups");
                 });
 
             modelBuilder.Entity("server.Room", b =>

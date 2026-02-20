@@ -3,33 +3,23 @@ using Microsoft.EntityFrameworkCore;
 namespace StateleSSE.AspNetCore.EfRealtime;
 
 /// <summary>
-/// Manages realtime subscriptions that trigger queries on SaveChanges and broadcast results via the SSE backplane.
+/// Manages realtime subscriptions that trigger queries on SaveChanges and deliver results directly to the subscriber.
 /// </summary>
 public interface IRealtimeManager
 {
     /// <summary>
-    /// Register a realtime subscription and add the connection to the backplane group.
-    /// When <c>SaveChanges</c> is called on a <typeparamref name="TDbContext"/> and the
-    /// <paramref name="criteria"/> matches the changes, the <paramref name="query"/> is executed
-    /// and the result is broadcast to all clients in <paramref name="groupName"/>.
-    /// Multiple connections can subscribe to the same group; the subscription stays alive
-    /// until the last connection unsubscribes.
+    /// Register a realtime subscription. When SaveChanges is called on a <typeparamref name="TDbContext"/>
+    /// and <paramref name="criteria"/> matches the changes, <paramref name="query"/> is executed
+    /// and the result is passed to <paramref name="deliver"/>.
+    /// Returns a subscription ID to pass to <see cref="Unsubscribe"/> when done.
     /// </summary>
-    Task SubscribeAsync<TDbContext>(
-        string connectionId,
-        string groupName,
+    string Subscribe<TDbContext>(
         Func<ChangeSnapshot, bool> criteria,
-        Func<TDbContext, Task<object?>> query) where TDbContext : DbContext;
+        Func<TDbContext, Task<object?>> query,
+        Func<object?, Task> deliver) where TDbContext : DbContext;
 
     /// <summary>
-    /// Remove a connection from a realtime subscription and from the backplane group.
-    /// The subscription is removed when the last connection unsubscribes.
+    /// Remove a subscription by the ID returned from <see cref="Subscribe{TDbContext}"/>.
     /// </summary>
-    Task UnsubscribeAsync(string connectionId, string groupName);
-
-    /// <summary>
-    /// Remove a connection from all realtime subscriptions. Called on client disconnect.
-    /// Backplane group cleanup is handled by <c>DisconnectAsync</c> on the backplane itself.
-    /// </summary>
-    void UnsubscribeAll(string connectionId);
+    void Unsubscribe(string subscriptionId);
 }

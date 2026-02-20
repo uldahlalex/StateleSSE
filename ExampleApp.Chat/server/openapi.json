@@ -171,7 +171,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PokeNotification"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Poke"
+                  }
                 }
               }
             }
@@ -192,7 +195,7 @@
         "operationId": "Chat_Poke",
         "parameters": [
           {
-            "name": "userId",
+            "name": "toUserId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -204,7 +207,40 @@
           "200": {
             "description": ""
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/JoinRoom": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_JoinRoom",
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/UpdateMessage": {
@@ -427,12 +463,6 @@
             "items": {
               "$ref": "#/components/schemas/UserRoom"
             }
-          },
-          "connections": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SseConnection"
-            }
           }
         }
       },
@@ -481,71 +511,34 @@
           }
         }
       },
-      "SseConnection": {
-        "type": "object",
-        "description": "Represents an active SSE connection tracked in Postgres.",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string"
-          },
-          "serverId": {
-            "type": "string"
-          },
-          "lastSeen": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "ownerId": {
-            "type": "string",
-            "nullable": true
-          },
-          "groups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SseConnectionGroup"
-            }
-          }
-        }
-      },
-      "SseConnectionGroup": {
-        "type": "object",
-        "description": "Represents membership of an SSE connection in a named group.",
-        "additionalProperties": false,
-        "properties": {
-          "connectionId": {
-            "type": "string"
-          },
-          "groupName": {
-            "type": "string"
-          },
-          "connection": {
-            "$ref": "#/components/schemas/SseConnection"
-          }
-        }
-      },
       "MemberInfo": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "connectionId": {
+          "userId": {
             "type": "string"
-          },
-          "ownerId": {
-            "type": "string",
-            "nullable": true
           },
           "nickname": {
             "type": "string"
           }
         }
       },
-      "PokeNotification": {
+      "Poke": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "message": {
+          "id": {
             "type": "string"
+          },
+          "fromUserId": {
+            "type": "string"
+          },
+          "toUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

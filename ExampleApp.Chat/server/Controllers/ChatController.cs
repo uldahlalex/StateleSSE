@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +11,9 @@ using StateleSSE.AspNetCore.EfRealtime;
 namespace server.Controllers;
 
 public class ChatController(
-    ISseBackplane backplane,
     IRealtimeManager realtimeManager,
     JwtService jwtService,
-    MyDbContext ctx) : RealtimeControllerBase(backplane, realtimeManager)
+    MyDbContext ctx) : RealtimeControllerBase(realtimeManager)
 {
     [HttpPost(nameof(Login))]
     public LoginResponse Login([FromBody] LoginRequest request)
@@ -44,7 +42,6 @@ public class ChatController(
     [ProducesResponseType<List<Message>>(200)]
     public Task GetMessages(string roomId, CancellationToken ct) =>
         ListenAsync<MyDbContext, List<Message>>(
-            group: "message:" + roomId,
             getInitialData: () => ctx.Messages.Where(m => m.RoomId == roomId).OrderByDescending(m => m.CreatedAt).ToListAsync(),
             criteria: changes => changes.HasAdded<Message>(),
             query: async c => await c.Messages.Where(m => m.RoomId == roomId).OrderByDescending(m => m.CreatedAt).ToListAsync(),
@@ -54,7 +51,6 @@ public class ChatController(
     [ProducesResponseType<List<Room>>(200)]
     public Task GetRooms(CancellationToken ct) =>
         ListenAsync<MyDbContext, List<Room>>(
-            group: "rooms",
             getInitialData: () => ctx.Rooms.ToListAsync(),
             criteria: changes => changes.HasChanges<Room>(),
             query: async c => await c.Rooms.ToListAsync(),
@@ -62,33 +58,51 @@ public class ChatController(
 
     [HttpGet(nameof(GetMembers))]
     [ProducesResponseType<List<MemberInfo>>(200)]
-    public Task GetMembers(string roomId, CancellationToken ct)
+    public async Task GetMembers(string roomId, CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var connectionId = Guid.NewGuid().ToString();
         var group = "members:" + roomId;
-        return ListenAsync<MyDbContext, List<MemberInfo>>(
-            group: group,
-            getInitialData: () => MembersQuery(ctx, group),
-            criteria: changes => changes.HasChanges<SseConnectionGroup>(),
-            query: async c => await MembersQuery(c, group),
-            ct);
+        ctx.SseConnections.Add(new SseConnection { ConnectionId = connectionId, ServerId = "local", LastSeen = DateTimeOffset.UtcNow, OwnerId = userId });
+        ctx.SseConnectionGroups.Add(new SseConnectionGroup { ConnectionId = connectionId, GroupName = group });
+        await ctx.SaveChangesAsync(ct);
+        try
+        {
+            await ListenAsync<MyDbContext, List<MemberInfo>>(
+                getInitialData: () => MembersQuery(ctx, roomId),
+                criteria: changes => changes.HasChanges<SseConnectionGroup>(),
+                query: async c => await MembersQuery(c, roomId),
+                ct);
+        }
+        finally
+        {
+            ctx.SseConnectionGroups.Remove(new SseConnectionGroup { ConnectionId = connectionId, GroupName = group });
+            ctx.SseConnections.Remove(new SseConnection { ConnectionId = connectionId, ServerId = "local", LastSeen = DateTimeOffset.UtcNow });
+            await ctx.SaveChangesAsync(CancellationToken.None);
+        }
     }
 
     [Authorize]
     [HttpGet(nameof(GetPokes))]
-    [ProducesResponseType<PokeNotification>(200)]
-    public async Task GetPokes(CancellationToken ct)
+    [ProducesResponseType<List<Poke>>(200)]
+    public Task GetPokes(CancellationToken ct)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        await using var sse = await HttpContext.OpenSseStreamAsync(cancellationToken: ct);
-        await using var conn = backplane.CreateConnection(userId);
-        await conn.JoinGroupAsync($"poke:{userId}");
-        await foreach (var evt in conn.ReadAllAsync(ct))
-            await sse.WriteAsync(evt.Data, ct);
+        return ListenAsync<MyDbContext, List<Poke>>(
+            getInitialData: () => ctx.Pokes.Where(p => p.ToUserId == userId).OrderByDescending(p => p.CreatedAt).ToListAsync(),
+            criteria: changes => changes.OfType<Poke>().Any(e => e.Entity.ToUserId == userId),
+            query: async c => await c.Pokes.Where(p => p.ToUserId == userId).OrderByDescending(p => p.CreatedAt).ToListAsync(),
+            ct);
     }
 
+    [Authorize]
     [HttpPost(nameof(Poke))]
-    public Task Poke(string userId) =>
-        backplane.Clients.SendToGroupAsync($"poke:{userId}", new PokeNotification("You have been poked"));
+    public async Task Poke(string toUserId)
+    {
+        var fromUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        ctx.Pokes.Add(new Poke { Id = Guid.NewGuid().ToString(), FromUserId = fromUserId, ToUserId = toUserId, CreatedAt = DateTimeOffset.UtcNow });
+        await ctx.SaveChangesAsync();
+    }
 
     [HttpPatch(nameof(UpdateMessage))]
     public async Task UpdateMessage([FromBody] Message newMessage)
@@ -144,12 +158,12 @@ public class ChatController(
         await ctx.SaveChangesAsync();
     }
 
-    private static async Task<List<MemberInfo>> MembersQuery(MyDbContext c, string group) =>
+    private static async Task<List<MemberInfo>> MembersQuery(MyDbContext c, string roomId) =>
         await c.SseConnectionGroups
-            .Where(g => g.GroupName == group)
-            .Join(c.SseConnections, g => g.ConnectionId, conn => conn.ConnectionId, (g, conn) => new { g, conn })
-            .GroupJoin(c.Users, t => t.conn.OwnerId, u => u.Id, (t, users) => new { t, users })
+            .Where(g => g.GroupName == "members:" + roomId)
+            .Join(c.SseConnections, g => g.ConnectionId, conn => conn.ConnectionId, (g, conn) => conn)
+            .GroupJoin(c.Users, conn => conn.OwnerId, u => u.Id, (conn, users) => new { conn, users })
             .SelectMany(t => t.users.DefaultIfEmpty(),
-                (t, u) => new MemberInfo(t.t.g.ConnectionId, t.t.conn.OwnerId, u != null ? u.Nickname : "Anonymous"))
+                (t, u) => new MemberInfo(t.conn.OwnerId, u != null ? u.Nickname : "Anonymous"))
             .ToListAsync();
 }
