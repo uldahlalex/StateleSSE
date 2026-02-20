@@ -17,7 +17,6 @@ export function Room() {
 
     useEffect(() => {
         const token = localStorage.getItem('jwt') ?? undefined;
-        if (token) chatClient.joinRoom(params.roomId);
 
         const messagesEs = makeSseStream(c => c.getMessages(params.roomId), setMessages);
         const membersEs = makeSseStream(c => c.getMembers(params.roomId), setMembers);

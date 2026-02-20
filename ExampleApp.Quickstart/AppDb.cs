@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 {
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<SseConnection> Connections => Set<SseConnection>()
 }
 
 public class Message

@@ -6,6 +6,26 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/GuestLogin": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "operationId": "Chat_GuestLogin",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/Login": {
       "post": {
         "tags": [
@@ -215,34 +235,6 @@
         ]
       }
     },
-    "/JoinRoom": {
-      "post": {
-        "tags": [
-          "Chat"
-        ],
-        "operationId": "Chat_JoinRoom",
-        "parameters": [
-          {
-            "name": "roomId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
     "/UpdateMessage": {
       "patch": {
         "tags": [
@@ -265,7 +257,12 @@
           "200": {
             "description": ""
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/CreateMessage": {
@@ -516,7 +513,8 @@
         "additionalProperties": false,
         "properties": {
           "userId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "nickname": {
             "type": "string"

@@ -1,8 +1,5 @@
-namespace StateleSSE.AspNetCore;
+namespace server;
 
-/// <summary>
-/// Represents membership of an SSE connection in a named group.
-/// </summary>
 public class SseConnectionGroup
 {
     public string ConnectionId { get; set; } = default!;

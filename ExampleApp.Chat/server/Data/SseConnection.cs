@@ -1,8 +1,5 @@
-namespace StateleSSE.AspNetCore;
+namespace server;
 
-/// <summary>
-/// Represents an active SSE connection tracked in Postgres.
-/// </summary>
 public class SseConnection
 {
     public string ConnectionId { get; set; } = default!;

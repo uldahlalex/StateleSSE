@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddInMemorySseBackplane();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<AppDb>((sp, opt) =>
 {
@@ -10,9 +9,13 @@ builder.Services.AddDbContext<AppDb>((sp, opt) =>
     opt.AddEfRealtimeInterceptor(sp);
 });
 builder.Services.AddControllers();
-
 var app = builder.Build();
-app.UseDefaultFiles();
-app.UseStaticFiles();
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+    var ctx = scope.ServiceProvider.GetRequiredService<AppDb>();
+    
+}
+
 app.Run();

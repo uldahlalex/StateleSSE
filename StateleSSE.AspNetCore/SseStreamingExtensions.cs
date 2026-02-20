@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
-using System.Threading.Channels;
 
 namespace StateleSSE.AspNetCore;
 
@@ -103,68 +102,6 @@ public sealed class SseStream : IAsyncDisposable
 }
 
 /// <summary>
-/// Represents a client connection to the backplane.
-/// </summary>
-public sealed class BackplaneConnection : IAsyncDisposable
-{
-    private readonly ISseBackplane _backplane;
-
-    internal BackplaneConnection(ISseBackplane backplane, ChannelReader<SseEvent> reader, string connectionId)
-    {
-        _backplane = backplane;
-        Reader = reader;
-        ConnectionId = connectionId;
-    }
-
-    /// <summary>
-    /// The unique connection ID for this client.
-    /// </summary>
-    public string ConnectionId { get; }
-
-    /// <summary>
-    /// The channel reader for receiving events.
-    /// </summary>
-    public ChannelReader<SseEvent> Reader { get; }
-
-    /// <summary>
-    /// Add this client to a group.
-    /// </summary>
-    public Task JoinGroupAsync(string groupName) =>
-        _backplane.Groups.AddToGroupAsync(ConnectionId, groupName);
-
-    /// <summary>
-    /// Add this client to multiple groups.
-    /// </summary>
-    public async Task JoinGroupsAsync(IEnumerable<string> groupNames)
-    {
-        foreach (var groupName in groupNames)
-            await _backplane.Groups.AddToGroupAsync(ConnectionId, groupName);
-    }
-
-    /// <summary>
-    /// Remove this client from a group.
-    /// </summary>
-    public Task LeaveGroupAsync(string groupName) =>
-        _backplane.Groups.RemoveFromGroupAsync(ConnectionId, groupName);
-
-    /// <summary>
-    /// Get all groups this client belongs to.
-    /// </summary>
-    public Task<IReadOnlyList<string>> GetGroupsAsync() =>
-        _backplane.Groups.GetClientGroupsAsync(ConnectionId);
-
-    /// <summary>
-    /// Read all events from the connection.
-    /// </summary>
-    public IAsyncEnumerable<SseEvent> ReadAllAsync(CancellationToken cancellationToken = default)
-        => Reader.ReadAllAsync(cancellationToken);
-
-    /// <inheritdoc/>
-    public async ValueTask DisposeAsync() =>
-        await _backplane.DisconnectAsync(ConnectionId);
-}
-
-/// <summary>
 /// Extension methods for SSE streaming via HttpContext.
 /// </summary>
 public static class SseStreamingExtensions
@@ -190,14 +127,5 @@ public static class SseStreamingExtensions
         await response.Body.FlushAsync(cancellationToken);
 
         return new SseStream(response, keepaliveInterval ?? DefaultKeepalive);
-    }
-
-    /// <summary>
-    /// Creates a client connection to the backplane.
-    /// </summary>
-    public static BackplaneConnection CreateConnection(this ISseBackplane backplane, string? ownerId = null)
-    {
-        var (reader, connectionId) = backplane.Connect(ownerId);
-        return new BackplaneConnection(backplane, reader, connectionId);
     }
 }

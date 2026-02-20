@@ -32,8 +32,8 @@ export default function Login() {
                 className="btn btn-primary"
                 onClick={() => {
                     chatClient.login(authForm).then(r => {
-                        alert('welcome!')
                         localStorage.setItem('jwt', r.token!)
+                        window.location.reload()
                     })
                 }}
             >
@@ -43,12 +43,23 @@ export default function Login() {
                 className="btn btn-secondary"
                 onClick={() => {
                     chatClient.register(authForm).then(r => {
-                        alert('welcome!')
                         localStorage.setItem('jwt', r.token!)
+                        window.location.reload()
                     })
                 }}
             >
                 Register
+            </button>
+            <button
+                className="btn btn-ghost"
+                onClick={() => {
+                    chatClient.guestLogin().then(r => {
+                        localStorage.setItem('jwt', r.token!)
+                        window.location.reload()
+                    })
+                }}
+            >
+                Continue as guest
             </button>
         </div>
     </div>

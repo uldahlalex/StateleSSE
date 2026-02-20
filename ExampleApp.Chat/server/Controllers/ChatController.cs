@@ -15,6 +15,10 @@ public class ChatController(
     JwtService jwtService,
     MyDbContext ctx) : RealtimeControllerBase(realtimeManager)
 {
+    [HttpPost(nameof(GuestLogin))]
+    public LoginResponse GuestLogin() =>
+        new LoginResponse(jwtService.GenerateToken(Guid.NewGuid().ToString()));
+
     [HttpPost(nameof(Login))]
     public LoginResponse Login([FromBody] LoginRequest request)
     {
@@ -104,6 +108,7 @@ public class ChatController(
         await ctx.SaveChangesAsync();
     }
 
+    [Authorize]
     [HttpPatch(nameof(UpdateMessage))]
     public async Task UpdateMessage([FromBody] Message newMessage)
     {
