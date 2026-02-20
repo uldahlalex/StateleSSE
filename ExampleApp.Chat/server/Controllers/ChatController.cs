@@ -65,10 +65,10 @@ public class ChatController(
     public async Task GetMembers(string roomId, CancellationToken ct)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var connectionId = Guid.NewGuid().ToString();
-        var group = "members:" + roomId;
-        ctx.SseConnections.Add(new SseConnection { ConnectionId = connectionId, ServerId = "local", LastSeen = DateTimeOffset.UtcNow, OwnerId = userId });
-        ctx.SseConnectionGroups.Add(new SseConnectionGroup { ConnectionId = connectionId, GroupName = group });
+        var conn  = new SseConnection      { ConnectionId = Guid.NewGuid().ToString(), ServerId = Environment.MachineName, LastSeen = DateTimeOffset.UtcNow, OwnerId = userId };
+        var group = new SseConnectionGroup { ConnectionId = conn.ConnectionId, GroupName = "members:" + roomId };
+        ctx.SseConnections.Add(conn);
+        ctx.SseConnectionGroups.Add(group);
         await ctx.SaveChangesAsync(ct);
         try
         {
@@ -80,8 +80,8 @@ public class ChatController(
         }
         finally
         {
-            ctx.SseConnectionGroups.Remove(new SseConnectionGroup { ConnectionId = connectionId, GroupName = group });
-            ctx.SseConnections.Remove(new SseConnection { ConnectionId = connectionId, ServerId = "local", LastSeen = DateTimeOffset.UtcNow });
+            ctx.SseConnectionGroups.Remove(group);
+            ctx.SseConnections.Remove(conn);
             await ctx.SaveChangesAsync(CancellationToken.None);
         }
     }

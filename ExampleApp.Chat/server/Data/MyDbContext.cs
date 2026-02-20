@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using StateleSSE.AspNetCore;
 
 namespace server;
 
@@ -9,18 +10,7 @@ public class MyDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("chat");
-
-        modelBuilder.Entity<SseConnection>(e => e.HasKey(x => x.ConnectionId));
-
-        modelBuilder.Entity<SseConnectionGroup>(e =>
-        {
-            e.HasKey(x => new { x.ConnectionId, x.GroupName });
-            e.HasOne(g => g.Connection)
-             .WithMany(c => c.Groups)
-             .HasForeignKey(g => g.ConnectionId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
+        SsePresence.ConfigureModel(modelBuilder);
         modelBuilder.Entity<SseConnection>()
             .HasOne<User>()
             .WithMany()

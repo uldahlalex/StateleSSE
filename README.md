@@ -119,71 +119,32 @@ o.Events = new JwtBearerEvents
 
 ## Presence tracking
 
-Use `SseConnection` / `SseConnectionGroup` as plain EF entities to track which users are online in a room. Manage their lifecycle in the endpoint:
+The library provides `SseConnection` and `SseConnectionGroup` entity types. Register them in your DbContext via `SsePresence.ConfigureModel`, then use `ListenWithPresenceAsync` — the framework inserts a row on connect and deletes it in `finally` on disconnect.
 
+**`OnModelCreating`:**
+```csharp
+SsePresence.ConfigureModel(modelBuilder);
+```
+
+**Endpoint:**
 ```csharp
 [HttpGet(nameof(GetMembers))]
 [ProducesResponseType<List<MemberInfo>>(200)]
-public async Task GetMembers(string roomId, CancellationToken ct)
+public Task GetMembers(string roomId, CancellationToken ct)
 {
     var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    var connectionId = Guid.NewGuid().ToString();
-    var group = "members:" + roomId;
-
-    ctx.SseConnections.Add(new SseConnection { ConnectionId = connectionId, ServerId = "local", LastSeen = DateTimeOffset.UtcNow, OwnerId = userId });
-    ctx.SseConnectionGroups.Add(new SseConnectionGroup { ConnectionId = connectionId, GroupName = group });
-    await ctx.SaveChangesAsync(ct);
-
-    try
-    {
-        await ListenAsync<AppDbContext, List<MemberInfo>>(
-            getInitialData: () => MembersQuery(ctx, roomId),
-            criteria: changes => changes.HasChanges<SseConnectionGroup>(),
-            query: async c => await MembersQuery(c, roomId),
-            ct);
-    }
-    finally
-    {
-        ctx.SseConnectionGroups.Remove(new SseConnectionGroup { ConnectionId = connectionId, GroupName = group });
-        ctx.SseConnections.Remove(new SseConnection { ConnectionId = connectionId, ServerId = "local", LastSeen = DateTimeOffset.UtcNow });
-        await ctx.SaveChangesAsync(CancellationToken.None);
-    }
+    return ListenWithPresenceAsync<AppDbContext, List<MemberInfo>>(
+        dbContext: ctx,
+        presenceGroup: "members:" + roomId,
+        ownerId: userId,
+        getInitialData: () => MembersQuery(ctx, roomId),
+        criteria: changes => changes.HasChanges<SseConnectionGroup>(),
+        query: async c => await MembersQuery(c, roomId),
+        ct);
 }
 ```
 
-Define the entities in your own project (they are plain EF types, not part of the library):
-
-```csharp
-public class SseConnection
-{
-    public string ConnectionId { get; set; } = default!;
-    public string ServerId { get; set; } = default!;
-    public DateTimeOffset LastSeen { get; set; }
-    public string? OwnerId { get; set; }
-    public ICollection<SseConnectionGroup> Groups { get; set; } = [];
-}
-
-public class SseConnectionGroup
-{
-    public string ConnectionId { get; set; } = default!;
-    public string GroupName { get; set; } = default!;
-    public SseConnection Connection { get; set; } = default!;
-}
-```
-
-Configure them in `OnModelCreating`:
-
-```csharp
-modelBuilder.Entity<SseConnection>(e => e.HasKey(x => x.ConnectionId));
-modelBuilder.Entity<SseConnectionGroup>(e =>
-{
-    e.HasKey(x => new { x.ConnectionId, x.GroupName });
-    e.HasOne(g => g.Connection)
-     .WithMany(c => c.Groups)
-     .HasForeignKey(g => g.ConnectionId)
-     .OnDelete(DeleteBehavior.Cascade);
-});
-```
+`SseConnectionGroup` changes (joins/leaves) trigger the criteria. `SseConnection` inserts are excluded from snapshots so they don't fire unrelated subscriptions.
 
 ## TypeScript client — `makeSseStream`
 
