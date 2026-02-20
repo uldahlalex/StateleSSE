@@ -195,50 +195,9 @@ public static class SseStreamingExtensions
     /// <summary>
     /// Creates a client connection to the backplane.
     /// </summary>
-    public static BackplaneConnection CreateConnection(this ISseBackplane backplane)
+    public static BackplaneConnection CreateConnection(this ISseBackplane backplane, string? ownerId = null)
     {
-        var (reader, connectionId) = backplane.Connect();
+        var (reader, connectionId) = backplane.Connect(ownerId);
         return new BackplaneConnection(backplane, reader, connectionId);
-    }
-
-    /// <summary>
-    /// Stream SSE events to the client with URL-based group subscriptions.
-    /// Events are sent with group name as SSE event type for client-side routing.
-    /// </summary>
-    /// <example>
-    /// <code>
-    /// // Minimal API
-    /// app.MapGet("/events", (HttpContext ctx, ISseBackplane bp, [FromQuery] string[] group)
-    ///     => ctx.StreamSseAsync(bp, group));
-    ///
-    /// // Client
-    /// const es = new EventSource('/events?group=chat:room1:messages&amp;group=chat:room1:typing');
-    /// es.addEventListener('chat:room1:messages', e => console.log(JSON.parse(e.data)));
-    /// </code>
-    /// </example>
-    public static async Task StreamSseAsync(
-        this HttpContext context,
-        ISseBackplane backplane,
-        IEnumerable<string> groups,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken = cancellationToken == default ? context.RequestAborted : cancellationToken;
-
-        await using var sse = await context.OpenSseStreamAsync(cancellationToken: cancellationToken);
-        await using var connection = backplane.CreateConnection();
-
-        await connection.JoinGroupsAsync(groups);
-
-        await foreach (var evt in connection.ReadAllAsync(cancellationToken))
-        {
-            if (evt.Group != null)
-            {
-                await sse.WriteAsync(evt.Group, evt.Data, cancellationToken);
-            }
-            else
-            {
-                await sse.WriteAsync(evt.Data, cancellationToken);
-            }
-        }
     }
 }

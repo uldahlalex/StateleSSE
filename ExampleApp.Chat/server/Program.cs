@@ -13,6 +13,8 @@ using server;
 using StateleSSE.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(o =>
+    o.ConfigureEndpointDefaults(e => e.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2));
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
 var db = builder.Configuration.GetSection("DbConnectionString").Value;
 var secret = builder.Configuration.GetSection("Secret").Value;
@@ -69,16 +71,6 @@ app.UseSwaggerUi();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
-using (var scope = app.Services.CreateScope())
-{
-    var bp = scope.ServiceProvider.GetRequiredService<ISseBackplane>();
-    bp.OnClientDisconnected += (_, e) =>
-    {
-        //is this relevant for cleanup? 
-    };
-}
-
 
 app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
 

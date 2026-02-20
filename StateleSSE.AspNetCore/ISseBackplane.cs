@@ -69,7 +69,7 @@ public interface ISseBackplane
     /// <summary>
     /// Opens a new client connection. Returns a channel reader for receiving events and a unique connection ID.
     /// </summary>
-    (ChannelReader<SseEvent> Reader, string ConnectionId) Connect();
+    (ChannelReader<SseEvent> Reader, string ConnectionId) Connect(string? ownerId = null);
 
     /// <summary>
     /// Close a client connection and remove from all groups.

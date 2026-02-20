@@ -34,13 +34,13 @@ internal sealed class EfBackplane<TDbContext> : ISseBackplane, IDisposable
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
     public event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
 
-    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect(string? ownerId = null)
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
         var connectionId = Guid.NewGuid().ToString();
         _channels.TryAdd(connectionId, channel);
 
-        InsertConnectionAsync(connectionId).GetAwaiter().GetResult();
+        InsertConnectionAsync(connectionId, ownerId).GetAwaiter().GetResult();
 
         _logger.LogDebug("Client {ConnectionId} connected", connectionId);
         return (channel.Reader, connectionId);
@@ -188,7 +188,7 @@ internal sealed class EfBackplane<TDbContext> : ISseBackplane, IDisposable
         _logger.LogDebug("Sent to all ({Count} clients)", _channels.Count);
     }
 
-    private async Task InsertConnectionAsync(string connectionId)
+    private async Task InsertConnectionAsync(string connectionId, string? ownerId)
     {
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TDbContext>();
@@ -196,7 +196,8 @@ internal sealed class EfBackplane<TDbContext> : ISseBackplane, IDisposable
         {
             ConnectionId = connectionId,
             ServerId = "local",
-            LastSeen = DateTimeOffset.UtcNow
+            LastSeen = DateTimeOffset.UtcNow,
+            OwnerId = ownerId
         });
         await ctx.SaveChangesAsync();
     }

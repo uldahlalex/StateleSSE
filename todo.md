@@ -1,11 +1,10 @@
 - hvordan fungerer scaffolding / code first med nuværende pg backplane?
-- det skal være muligt også at FK mellem brugeren og connection med delete cascade
+
 - er serverid på sseconnection redundant?
 
-- is non periodic cleanup better? (now using on disconnect)
+- what is the backplane even doing with this new EF centric approach?
 
-- er det bedre med user navigation property end ownerId string? hvad er egentlig bedst dx?
-
+- is it possible to make a client id-less system?
 
 - ws/sse conn for hvert endpoint?
   - det vil nok give meget bøvl 

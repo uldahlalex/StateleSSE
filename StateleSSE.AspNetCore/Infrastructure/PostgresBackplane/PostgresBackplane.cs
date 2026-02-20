@@ -31,13 +31,13 @@ internal sealed class PostgresBackplane : ISseBackplane, IAsyncDisposable
     public event EventHandler<ClientDisconnectedEventArgs>? OnClientDisconnected;
     public event EventHandler<GroupChangedEventArgs>? OnGroupChanged;
 
-    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect()
+    public (ChannelReader<SseEvent> Reader, string ConnectionId) Connect(string? ownerId = null)
     {
         var channel = Channel.CreateUnbounded<SseEvent>();
         var connectionId = Guid.NewGuid().ToString();
         _localConnections.TryAdd(connectionId, channel);
 
-        InsertConnectionAsync(connectionId).GetAwaiter().GetResult();
+        InsertConnectionAsync(connectionId, ownerId).GetAwaiter().GetResult();
 
         _logger.LogDebug("Client {ConnectionId} connected on server {ServerId}", connectionId, ServerId);
         return (channel.Reader, connectionId);
@@ -269,12 +269,13 @@ internal sealed class PostgresBackplane : ISseBackplane, IAsyncDisposable
         _logger.LogInformation("Postgres backplane disposed. ServerId: {ServerId}", ServerId);
     }
 
-    private async Task InsertConnectionAsync(string connectionId)
+    private async Task InsertConnectionAsync(string connectionId, string? ownerId)
     {
         await using var cmd = _dataSource.CreateCommand(
-            "INSERT INTO \"SseConnections\" (\"ConnectionId\", \"ServerId\", \"LastSeen\") VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING");
+            "INSERT INTO \"SseConnections\" (\"ConnectionId\", \"ServerId\", \"LastSeen\", \"OwnerId\") VALUES ($1, $2, NOW(), $3) ON CONFLICT DO NOTHING");
         cmd.Parameters.AddWithValue(connectionId);
         cmd.Parameters.AddWithValue(ServerId.ToString());
+        cmd.Parameters.AddWithValue((object?)ownerId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync();
     }
 
