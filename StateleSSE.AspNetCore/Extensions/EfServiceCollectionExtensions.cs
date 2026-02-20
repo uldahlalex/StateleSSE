@@ -20,8 +20,7 @@ public static class EfServiceCollectionExtensions
     /// <see cref="SseBackplaneDbContext.ConfigureModel"/> from <c>OnModelCreating</c>.
     /// </summary>
     public static IServiceCollection AddEfSseBackplane<TDbContext>(
-        this IServiceCollection services,
-        TimeSpan? connectionTtl = null)
+        this IServiceCollection services)
         where TDbContext : DbContext, ISseEfContext
     {
         services.AddSingleton(sp =>
@@ -36,9 +35,9 @@ public static class EfServiceCollectionExtensions
 
         services.AddSingleton<IHostedService>(sp =>
         {
-            var backplane = sp.GetRequiredService<EfBackplane<TDbContext>>();
+            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
             var logger = sp.GetRequiredService<ILogger<EfBackplaneHostedService<TDbContext>>>();
-            return new EfBackplaneHostedService<TDbContext>(backplane, logger, connectionTtl);
+            return new EfBackplaneHostedService<TDbContext>(scopeFactory, logger);
         });
 
         return services;

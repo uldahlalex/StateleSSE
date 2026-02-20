@@ -511,6 +511,12 @@
             "items": {
               "$ref": "#/components/schemas/UserRoom"
             }
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SseConnection"
+            }
           }
         }
       },
@@ -556,6 +562,49 @@
             "items": {
               "$ref": "#/components/schemas/UserRoom"
             }
+          }
+        }
+      },
+      "SseConnection": {
+        "type": "object",
+        "description": "Represents an active SSE connection tracked in Postgres.",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "serverId": {
+            "type": "string"
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ownerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SseConnectionGroup"
+            }
+          }
+        }
+      },
+      "SseConnectionGroup": {
+        "type": "object",
+        "description": "Represents membership of an SSE connection in a named group.",
+        "additionalProperties": false,
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/SseConnection"
           }
         }
       },

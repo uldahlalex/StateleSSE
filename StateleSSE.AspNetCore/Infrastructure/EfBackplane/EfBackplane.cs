@@ -64,6 +64,16 @@ internal sealed class EfBackplane<TDbContext> : ISseBackplane, IDisposable
 
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TDbContext>();
+
+        var groupRows = await ctx.SseConnectionGroups
+            .Where(g => g.ConnectionId == connectionId)
+            .ToListAsync();
+        if (groupRows.Count > 0)
+        {
+            ctx.SseConnectionGroups.RemoveRange(groupRows);
+            await ctx.SaveChangesAsync();
+        }
+
         var conn = await ctx.SseConnections.FindAsync(connectionId);
         if (conn is not null)
         {
@@ -176,42 +186,6 @@ internal sealed class EfBackplane<TDbContext> : ISseBackplane, IDisposable
             await ch.Writer.WriteAsync(evt);
 
         _logger.LogDebug("Sent to all ({Count} clients)", _channels.Count);
-    }
-
-    internal IEnumerable<string> GetLocalConnectionIds() => _channels.Keys;
-
-    internal async Task UpdateHeartbeatAsync()
-    {
-        var ids = _channels.Keys.ToList();
-        if (ids.Count == 0) return;
-
-        using var scope = _scopeFactory.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<TDbContext>();
-        var now = DateTimeOffset.UtcNow;
-        var connections = await ctx.SseConnections
-            .Where(c => ids.Contains(c.ConnectionId))
-            .ToListAsync();
-
-        foreach (var c in connections)
-            c.LastSeen = now;
-
-        await ctx.SaveChangesAsync();
-    }
-
-    internal async Task DeleteStaleConnectionsAsync(TimeSpan ttl)
-    {
-        var cutoff = DateTimeOffset.UtcNow - ttl;
-        using var scope = _scopeFactory.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<TDbContext>();
-        var stale = await ctx.SseConnections
-            .Where(c => c.LastSeen < cutoff)
-            .ToListAsync();
-
-        if (stale.Count == 0) return;
-
-        ctx.SseConnections.RemoveRange(stale);
-        await ctx.SaveChangesAsync();
-        _logger.LogDebug("Cleaned up {Count} stale connections", stale.Count);
     }
 
     private async Task InsertConnectionAsync(string connectionId)

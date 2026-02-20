@@ -14,6 +14,11 @@ public class MyDbContext : DbContext, ISseEfContext
     {
         modelBuilder.HasDefaultSchema("chat");
         SseBackplaneDbContext.ConfigureModel(modelBuilder);
+        modelBuilder.Entity<User>()
+            .HasMany(u => u.Connections)
+            .WithOne()
+            .HasForeignKey(c => c.OwnerId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public DbSet<Room> Rooms { get; set; }

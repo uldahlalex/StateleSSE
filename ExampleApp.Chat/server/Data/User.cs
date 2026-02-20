@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using StateleSSE.AspNetCore;
 
 namespace server;
 
@@ -12,4 +13,5 @@ public class User
 
     public List<Message> Messages { get; set; } = new();
     public List<UserRoom> UserRooms { get; set; } = new();
+    public List<SseConnection> Connections { get; set; } = [];
 }

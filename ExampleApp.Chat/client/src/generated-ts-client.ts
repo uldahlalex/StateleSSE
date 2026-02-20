@@ -552,6 +552,7 @@ export interface User {
     hash?: string;
     messages?: Message[];
     userRooms?: UserRoom[];
+    connections?: SseConnection[];
 }
 
 export interface UserRoom {
@@ -567,6 +568,22 @@ export interface Room {
     createdBy?: string;
     messages?: Message[];
     userRooms?: UserRoom[];
+}
+
+/** Represents an active SSE connection tracked in Postgres. */
+export interface SseConnection {
+    connectionId?: string;
+    serverId?: string;
+    lastSeen?: string;
+    ownerId?: string | undefined;
+    groups?: SseConnectionGroup[];
+}
+
+/** Represents membership of an SSE connection in a named group. */
+export interface SseConnectionGroup {
+    connectionId?: string;
+    groupName?: string;
+    connection?: SseConnection;
 }
 
 export interface CreateMessageRequestDto {

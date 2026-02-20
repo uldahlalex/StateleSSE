@@ -1,61 +1,40 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace StateleSSE.AspNetCore.Infrastructure.EfBackplane;
 
-internal sealed class EfBackplaneHostedService<TDbContext> : IHostedService, IAsyncDisposable
+internal sealed class EfBackplaneHostedService<TDbContext> : IHostedService
     where TDbContext : DbContext, ISseEfContext
 {
-    private readonly EfBackplane<TDbContext> _backplane;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<EfBackplaneHostedService<TDbContext>> _logger;
-    private readonly TimeSpan _connectionTtl;
-    private readonly CancellationTokenSource _cts = new();
-    private Task _heartbeatTask = Task.CompletedTask;
 
     public EfBackplaneHostedService(
-        EfBackplane<TDbContext> backplane,
-        ILogger<EfBackplaneHostedService<TDbContext>> logger,
-        TimeSpan? connectionTtl = null)
+        IServiceScopeFactory scopeFactory,
+        ILogger<EfBackplaneHostedService<TDbContext>> logger)
     {
-        _backplane = backplane;
+        _scopeFactory = scopeFactory;
         _logger = logger;
-        _connectionTtl = connectionTtl ?? TimeSpan.FromSeconds(60);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _heartbeatTask = RunHeartbeatAsync(_cts.Token);
-        _logger.LogInformation("EF backplane started");
-        return Task.CompletedTask;
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        _cts.Cancel();
-        await Task.WhenAny(_heartbeatTask, Task.Delay(5000, CancellationToken.None));
-        _logger.LogInformation("EF backplane stopped");
-    }
-
-    private async Task RunHeartbeatAsync(CancellationToken ct)
-    {
-        var interval = TimeSpan.FromSeconds(_connectionTtl.TotalSeconds / 3);
-        using var timer = new PeriodicTimer(interval);
-        try
+        using var scope = _scopeFactory.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<TDbContext>();
+        var stale = await ctx.SseConnections.ToListAsync(cancellationToken);
+        if (stale.Count > 0)
         {
-            while (await timer.WaitForNextTickAsync(ct))
-            {
-                await _backplane.UpdateHeartbeatAsync();
-                await _backplane.DeleteStaleConnectionsAsync(_connectionTtl);
-                _logger.LogTrace("Heartbeat: {Count} local connections", _backplane.GetLocalConnectionIds().Count());
-            }
+            ctx.SseConnections.RemoveRange(stale);
+            await ctx.SaveChangesAsync(cancellationToken);
         }
-        catch (OperationCanceledException) { }
+        _logger.LogInformation("EF backplane started, cleared {Count} stale connections from previous run", stale.Count);
     }
 
-    public ValueTask DisposeAsync()
+    public Task StopAsync(CancellationToken cancellationToken)
     {
-        _cts.Dispose();
-        return ValueTask.CompletedTask;
+        _logger.LogInformation("EF backplane stopped");
+        return Task.CompletedTask;
     }
 }

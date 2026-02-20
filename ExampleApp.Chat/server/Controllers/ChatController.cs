@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StateleSSE.AspNetCore;
 using StateleSSE.AspNetCore.EfRealtime;
-using StateleSSE.AspNetCore.GroupRealtime;
 
 namespace server.Controllers;
 
@@ -15,7 +14,6 @@ namespace server.Controllers;
 public class ChatController(ISseBackplane backplane,
     JwtService jwtService,
     IRealtimeManager realtimeManager,
-    IGroupRealtimeManager groupRealtimeManager,
     MyDbContext ctx) : RealtimeControllerBase(backplane)
 {
     
@@ -135,10 +133,10 @@ public class ChatController(ISseBackplane backplane,
     public async Task SetName(string connectionId)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var user = ctx.Users.FirstOrDefault(u => u.Id == userId) ??
-            throw new ValidationException("Could not find user with ID " + userId);
-
-        await backplane.Groups.AddToGroupAsync("nickname/"+connectionId, user.Nickname);
+        var conn = await ctx.SseConnections.FindAsync(connectionId)
+            ?? throw new ValidationException("Connection not found");
+        conn.OwnerId = userId;
+        await ctx.SaveChangesAsync();
     }
     
     [HttpGet(nameof(GetRooms))]
@@ -154,33 +152,25 @@ public class ChatController(ISseBackplane backplane,
     [HttpGet(nameof(GetMembers))]
     public async Task<RealtimeListenResponse<List<MemberInfo>>> GetMembers(string connectionId, string roomId)
     {
-        var listenGroup = "members:"+roomId;
-        await backplane.Groups.AddToGroupAsync(connectionId, listenGroup);
+        var listenGroup = "members:" + roomId;
+        await realtimeManager.SubscribeAsync<MyDbContext>(connectionId, listenGroup,
+            criteria: changes => changes.HasChanges<SseConnectionGroup>(),
+            query: async c => await MembersQuery(c, listenGroup));
 
-        groupRealtimeManager.Subscribe(listenGroup,
-            criteria: change => change.GroupName == listenGroup || change.ConnectionId.StartsWith("nickname/"),
-            query: async bp =>
-            {
-                var members = await bp.Groups.GetMembersAsync(listenGroup);
-                var list = new List<MemberInfo>();
-                foreach (var m in members)
-                {
-                    var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-                    list.Add(new MemberInfo(m, nickname.FirstOrDefault() ?? "Anonymous"));
-                }
-
-                return list;
-            });
-        var members = await backplane.Groups.GetMembersAsync(roomId);
-        var list = new List<MemberInfo>();
-        foreach (var m in members)
-        {
-            var nickname = await backplane.Groups.GetClientGroupsAsync("nickname/" + m);
-            list.Add(new MemberInfo(m, nickname.FirstOrDefault() ?? "Anonymous"));
-        }
-        return new RealtimeListenResponse<List<MemberInfo>>(listenGroup, list);
+        return new RealtimeListenResponse<List<MemberInfo>>(listenGroup, await MembersQuery(ctx, listenGroup));
     }
-    
+
+    private static async Task<List<MemberInfo>> MembersQuery(MyDbContext ctx, string listenGroup)
+    {
+        var res =  await ctx.SseConnectionGroups
+            .Where(g => g.GroupName == listenGroup)
+            .Join(ctx.SseConnections, g => g.ConnectionId, conn => conn.ConnectionId, (g, conn) => new { g, conn })
+            .GroupJoin(ctx.Users, @t => @t.conn.OwnerId, u => u.Id, (@t, users) => new { @t, users })
+            .SelectMany(@t => @t.users.DefaultIfEmpty(),
+                (@t, u) => new MemberInfo(@t.@t.g.ConnectionId, u != null ? u.Nickname : "Anonymous")).ToListAsync();
+        return res;
+    }
+
 
     [HttpGet(nameof(GetPokes))]                               
     public async Task<RealtimeListenResponse<object?>> GetPokes(string connectionId)                             

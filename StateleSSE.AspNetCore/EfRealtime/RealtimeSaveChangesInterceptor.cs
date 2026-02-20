@@ -145,7 +145,7 @@ internal sealed class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
     {
         var entries = context.ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-            .Where(e => e.Entity is not SseConnection and not SseConnectionGroup)
+            .Where(e => e.Entity is not SseConnection)
             .Select(e => new ChangeEntry(e.Entity, e.State))
             .ToList();
 

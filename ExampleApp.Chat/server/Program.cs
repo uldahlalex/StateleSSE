@@ -11,7 +11,6 @@ using NSwag;
 using NSwag.Generation.Processors.Security;
 using server;
 using StateleSSE.AspNetCore;
-using StateleSSE.AspNetCore.GroupRealtime;
 
 var builder = WebApplication.CreateBuilder(args);
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
@@ -28,7 +27,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(0));
 builder.Services.AddEfSseBackplane<MyDbContext>();
-builder.Services.AddGroupRealtime();
 builder.Services.AddEfRealtime();
 builder.Services.AddDbContext<MyDbContext>((sp, conf) =>
 {
@@ -72,6 +70,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+using (var scope = app.Services.CreateScope())
+{
+    var bp = scope.ServiceProvider.GetRequiredService<ISseBackplane>();
+    bp.OnClientDisconnected += (_, e) =>
+    {
+        //is this relevant for cleanup? 
+    };
+}
+
 
 app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
 
@@ -79,8 +86,6 @@ using (var scope = app.Services.CreateScope())
 {
     var ctx = scope.ServiceProvider.GetRequiredService<MyDbContext>();
     Console.WriteLine(ctx.Database.GenerateCreateScript());
-    // ctx.Database.EnsureDeleted();
-    ctx.Database.EnsureCreated();
     var exists = ctx.Users.Any(u => u.Id == "test");
     if (!exists)
     {
