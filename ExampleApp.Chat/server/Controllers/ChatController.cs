@@ -146,7 +146,7 @@ public class ChatController(ISseBackplane backplane,
     {
         var group = "rooms";
         await realtimeManager.SubscribeAsync<MyDbContext>(connectionId, group,
-            criteria: changes => changes.OfType<Room>().Any(),
+            criteria: changes => changes.HasChanges<Room>(),
             query: async c => await c.Rooms.ToListAsync());
         return new RealtimeListenResponse<List<Room>>(group, ctx.Rooms.ToList());
     }

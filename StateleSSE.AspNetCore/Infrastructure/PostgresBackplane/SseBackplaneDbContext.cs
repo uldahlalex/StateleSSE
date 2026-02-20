@@ -4,24 +4,42 @@ namespace StateleSSE.AspNetCore.Infrastructure.PostgresBackplane;
 
 /// <summary>
 /// Standalone DbContext for SSE connection/group tracking tables.
-/// Alternatively call <see cref="ConfigureModel"/> from your own DbContext's OnModelCreating.
+/// Use this for migrations when you want a separate EF context, or call
+/// <see cref="ConfigureModel"/> from your own DbContext's <c>OnModelCreating</c>
+/// to include the SSE tables in your existing migrations.
 /// </summary>
 public class SseBackplaneDbContext : DbContext
 {
     public SseBackplaneDbContext(DbContextOptions<SseBackplaneDbContext> options) : base(options) { }
 
-    internal DbSet<SseConnection> SseConnections => Set<SseConnection>();
-    internal DbSet<SseConnectionGroup> SseConnectionGroups => Set<SseConnectionGroup>();
+    public DbSet<SseConnection> SseConnections => Set<SseConnection>();
+    public DbSet<SseConnectionGroup> SseConnectionGroups => Set<SseConnectionGroup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) => ConfigureModel(modelBuilder);
 
     /// <summary>
-    /// Configure the SSE backplane tables. Call this from your own DbContext's OnModelCreating
-    /// when using the integrated mode.
+    /// Configures the SSE connection and group tables including the FK relationship.
+    /// Call this from your own DbContext's <c>OnModelCreating</c> to include the SSE tables
+    /// in your existing migrations and enable LINQ queries over them.
+    /// <code>
+    /// protected override void OnModelCreating(ModelBuilder modelBuilder)
+    /// {
+    ///     SseBackplaneDbContext.ConfigureModel(modelBuilder);
+    ///     // ... rest of your model
+    /// }
+    /// </code>
     /// </summary>
     public static void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<SseConnection>(e => e.HasKey(x => x.ConnectionId));
-        modelBuilder.Entity<SseConnectionGroup>(e => e.HasKey(x => new { x.ConnectionId, x.GroupName }));
+
+        modelBuilder.Entity<SseConnectionGroup>(e =>
+        {
+            e.HasKey(x => new { x.ConnectionId, x.GroupName });
+            e.HasOne(g => g.Connection)
+             .WithMany(c => c.Groups)
+             .HasForeignKey(g => g.ConnectionId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }
