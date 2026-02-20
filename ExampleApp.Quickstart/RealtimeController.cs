@@ -45,6 +45,7 @@ public class ChatController(IRealtimeManager realtimeManager, AppDb ctx) : Realt
                 criteria: changes => changes.HasChanges<SseConnectionGroup>(),
                 query: async c => await MembersQuery(c, roomId),
                 ct);
+            
         }
         finally
         {

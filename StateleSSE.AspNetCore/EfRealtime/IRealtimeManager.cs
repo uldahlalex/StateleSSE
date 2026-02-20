@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace StateleSSE.AspNetCore.EfRealtime;
 
@@ -14,7 +15,7 @@ public interface IRealtimeManager
     /// Returns a subscription ID to pass to <see cref="Unsubscribe"/> when done.
     /// </summary>
     string Subscribe<TDbContext>(
-        Func<ChangeSnapshot, bool> criteria,
+        Func<List<EntityEntry>, bool> criteria,
         Func<TDbContext, Task<object?>> query,
         Func<object?, Task> deliver) where TDbContext : DbContext;
 

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using StateleSSE.AspNetCore.EfRealtime;
 
 namespace StateleSSE.AspNetCore;
@@ -17,7 +18,7 @@ public abstract class RealtimeControllerBase(IRealtimeManager realtimeManager) :
     /// </summary>
     protected async Task ListenAsync<TDbContext, T>(
         Func<Task<T>> getInitialData,
-        Func<ChangeSnapshot, bool> criteria,
+        Func<List<EntityEntry>, bool> criteria,
         Func<TDbContext, Task<T>> query,
         CancellationToken ct = default) where TDbContext : DbContext
     {

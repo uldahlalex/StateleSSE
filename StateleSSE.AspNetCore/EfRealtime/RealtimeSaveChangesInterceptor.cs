@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 
@@ -72,13 +73,11 @@ internal sealed class RealtimeSaveChangesInterceptor : SaveChangesInterceptor
         }
     }
 
-    private static ChangeSnapshot CreateSnapshot(DbContext context)
+    private static List<EntityEntry> CreateSnapshot(DbContext context)
     {
-        var entries = context.ChangeTracker.Entries()
+       return context.ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Where(e => e.Entity is not SseConnection)
-            .Select(e => new ChangeEntry(e.Entity, e.State))
-            .ToList();
-        return new ChangeSnapshot(entries);
+            .ToList(); 
     }
 }
